@@ -20,6 +20,7 @@ from rcon.commands import (
     HLLVServerCtl,
     ServerCtl,
     VipId,
+    players_by_name,
 )
 from rcon.connection import HLLCommandError
 from rcon.game.player_adapter import PlayerResponseAdapterError
@@ -115,6 +116,39 @@ LOG_ACTIONS = [
     "MESSAGE",
 ]
 logger = logging.getLogger(__name__)
+
+
+def _validate_map_replacement(requested: list[str], available: list[str]) -> None:
+    """Reject an entire replacement before issuing any mutating commands."""
+    if any(not isinstance(name, str) or not name.strip() for name in requested):
+        raise HLLCommandFailedError("Map list contains an empty or invalid map ID")
+    unknown = sorted(set(requested) - set(available))
+    if unknown:
+        raise HLLCommandFailedError(
+            f"Maps not offered by the game server: {', '.join(unknown)}"
+        )
+
+
+def _raise_map_replacement_error(kind, previous, requested, phase, read_current, error):
+    """Report an incomplete change without guessing whether a command ran."""
+    try:
+        observed = read_current()["maps"]
+        if not isinstance(observed, list):
+            raise ValueError("Invalid map list returned")
+        observed = [getattr(item, "id", item) for item in observed]
+        if not all(isinstance(item, str) for item in observed):
+            raise ValueError("Invalid map list returned")
+        state = repr(observed)
+    except Exception:
+        state = "unavailable"
+    message = (
+        f"Map {kind} update stopped during {phase} ({type(error).__name__}). "
+        f"Previous: {previous!r}; requested: {requested!r}; "
+        f"observed after failure: {state}. "
+        "The server may have applied the last command; refresh and inspect before changing it again."
+    )
+    logger.error("%s", message)
+    raise HLLCommandFailedError(message) from error
 
 CTL: Optional["Rcon"] = None
 
@@ -379,6 +413,8 @@ class Rcon(ServerCtl):
             player_id = player[PLAYER_ID]
             player_info = all_player_info.get(player_id)
             if player_info is None:
+                logger.warning("Missing detailed player info for %s", player_id)
+                fail_count += 1
                 continue
 
             try:
@@ -395,7 +431,9 @@ class Rcon(ServerCtl):
                     player_data["profile"]["current_playtime_seconds"], map_time_seconds
                 )
             else:
-                player_data["map_playtime_seconds"] = map_time_seconds
+                # Without a session profile the join time is unknown. A zero
+                # sentinel avoids treating the whole round as observed play.
+                player_data["map_playtime_seconds"] = 0
 
             players_by_id[player_id] = player_data
 
@@ -415,13 +453,19 @@ class Rcon(ServerCtl):
         )
         players_by_id = detailed_players["players"]
         fail_count = detailed_players["fail_count"]
+        commander_key = object()
 
         for player in players_by_id.values():
             team_name = (
                 player.get("team") if player.get("team") is not None else UNASSIGNED
             )
             team = teams.setdefault(team_name, {})
-            squad = team.setdefault(player.get("unit_name"), {})
+            squad_key = (
+                commander_key
+                if get_role_unit_type(self.config.game, player.get("role")) == "commander"
+                else player.get("unit_name")
+            )
+            squad = team.setdefault(squad_key, {})
             squad_players = squad.setdefault("players", [])
             squad_players.append(player)
 
@@ -512,8 +556,8 @@ class Rcon(ServerCtl):
     def get_player_ids(self, as_dict: Literal[True] = False) -> dict[str, str]: ...
 
     def get_player_ids(self, as_dict=False) -> dict[str, str] | list[tuple[str, str]]:
-        raw_list = super().get_player_ids()
-        return raw_list if as_dict else list(raw_list.items())
+        pairs = super().get_player_id_pairs()
+        return players_by_name(pairs) if as_dict else pairs
 
     def get_vips_count(self) -> int:
         players = self.get_player_ids()
@@ -716,6 +760,9 @@ class Rcon(ServerCtl):
         # Remove VIP before anything else in case we have errors
         with invalidates(Rcon.get_vip_ids):
             result = super().remove_vip(player_id)
+        if not result:
+            logger.warning("Game server rejected VIP removal for %s", player_id)
+            return False
 
         server_number = get_server_number()
         with enter_session() as session:
@@ -1234,11 +1281,29 @@ class Rcon(ServerCtl):
         return res
 
     def switch_player_now(self, player_id: str) -> bool:
-        from rcon.vip_rewards.hooks import mark_forced
-        mark_forced(player_id)
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id)
-        return super().switch_player_now(player_id)
+        return self._switch_forced(player_id, lambda: super(Rcon, self).switch_player_now(player_id))
+
+    def _switch_forced(self, player_id, command, on_death=False):
+        from rcon.vip_rewards.hooks import finish_forced, mark_forced
+        marker = mark_forced(player_id, on_death=on_death) if on_death else mark_forced(player_id)
+        try:
+            result = command()
+        except Exception:
+            # An unknown outcome may have executed; preserve the marker.
+            try:
+                finish_forced(player_id, marker)
+            except Exception:
+                logger.exception("Could not record an uncertain forced switch")
+            raise
+        try:
+            finish_forced(player_id, marker, rejected=result is False)
+        except Exception:
+            # The command has already completed; never turn a bookkeeping
+            # failure into a reason for callers to replay a side effect.
+            logger.exception("Could not finalize a forced switch marker")
+        return result
 
     def switch_volunteer_now(self, player_id: str) -> bool:
         """Internal autobalancer path for an explicitly registered volunteer."""
@@ -1259,11 +1324,11 @@ class Rcon(ServerCtl):
         return super().disband_squad(team_index, squad_index, reason)
 
     def switch_player_on_death(self, player_id, by) -> bool:
-        from rcon.vip_rewards.hooks import mark_forced
-        mark_forced(player_id, on_death=True)
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id, by)
-        return super().switch_player_on_death(player_id)
+        return self._switch_forced(
+            player_id, lambda: super(Rcon, self).switch_player_on_death(player_id), on_death=True
+        )
 
     def kick(self, player_id: str, reason, by, player_name: str | None = None) -> bool:
         from rcon.leadership_vote.storage import before_manual_action
@@ -1347,13 +1412,28 @@ class Rcon(ServerCtl):
 
             maps.append(self.game_profile.parse_layer(map_))
 
-        next_map_index = map_sequence["current_index"] + 1
-        if next_map_index >= len(map_sequence["maps"]):
-            next_map_index = 0
+        # Sequence indices address the sequence, not the rotation. A repeated
+        # layer cannot be mapped reliably between differently ordered lists.
+        rotation_ids = [name.rsplit("/", 1)[-1] for name in map_rotation_list]
+        sequence_ids = [name.rsplit("/", 1)[-1] for name in map_sequence["maps"]]
+        sequence_current = map_sequence["current_index"]
+        current_map_index = next_map_index = None
+        if isinstance(sequence_current, int) and 0 <= sequence_current < len(sequence_ids):
+            sequence_next = (sequence_current + 1) % len(sequence_ids)
+
+            def rotation_index(sequence_index):
+                if rotation_ids == sequence_ids:
+                    return sequence_index
+                matches = [i for i, name in enumerate(rotation_ids)
+                           if name == sequence_ids[sequence_index]]
+                return matches[0] if len(matches) == 1 else None
+
+            current_map_index = rotation_index(sequence_current)
+            next_map_index = rotation_index(sequence_next)
 
         return {
             "maps": maps,
-            "current_index": map_sequence["current_index"],
+            "current_index": current_map_index,
             "next_index": next_map_index,
         }
 
@@ -1388,9 +1468,11 @@ class Rcon(ServerCtl):
         map_name: str,
         map_index: int,
     ) -> None:
+        rotation = self.get_map_rotation()["maps"]
         if map_index < 0:
-            rotation = self.get_map_rotation()
             map_index = len(rotation) + map_index + 1
+        if not 0 <= map_index <= len(rotation):
+            raise ValueError("Map rotation insertion index is out of range")
 
         with invalidates(
             Rcon.get_map_rotation,
@@ -1406,9 +1488,11 @@ class Rcon(ServerCtl):
             return super().remove_map_from_rotation(map_name)
 
     def remove_map_from_rotation_at_index(self, map_index: int):
+        rotation = self.get_map_rotation()["maps"]
         if map_index < 0:
-            rotation = self.get_map_rotation()["maps"]
-            map_index = len(rotation) + map_index + 1
+            map_index = len(rotation) + map_index
+        if not 0 <= map_index < len(rotation):
+            raise ValueError("Map rotation removal index is out of range")
 
         with invalidates(
             Rcon.get_map_rotation, Rcon.get_map_sequence, Rcon.get_next_map
@@ -1422,15 +1506,34 @@ class Rcon(ServerCtl):
             for map_name in map_names:
                 super().remove_map_from_rotation(map_name)
 
-    def add_maps_to_rotation(self, map_names: list[str]):
-        """Add the given maps to the rotation, returns the game server response for each map"""
+    def add_maps_to_rotation(self, map_names: list[str]) -> list[dict[str, str | int]]:
+        """Append maps and return each server-confirmed insertion.
+
+        A failure may follow a partial change or an uncertain response; report
+        the observed rotation so callers can inspect it before trying again.
+        """
+        if not isinstance(map_names, list):
+            raise ValueError("Map names must be a list")
+        if not map_names:
+            return []
+        map_names = list(map_names)
         rotation = self.get_map_rotation()["maps"]
+        previous = [layer.id for layer in rotation]
+        _validate_map_replacement(map_names, super().get_maps())
         results = []
         with invalidates(
             Rcon.get_map_rotation, Rcon.get_map_sequence, Rcon.get_next_map
         ):
             for map_index, map_name in enumerate(map_names, start=len(rotation)):
-                super().add_map_to_rotation_at_index(map_name, map_index)
+                try:
+                    super().add_map_to_rotation_at_index(map_name, map_index)
+                except Exception as exc:
+                    _raise_map_replacement_error(
+                        "rotation", previous, map_names,
+                        f"adding {map_name!r} at index {map_index}",
+                        super().get_map_rotation, exc,
+                    )
+                results.append({"map_name": map_name, "index": map_index, "status": "confirmed"})
 
         return results
 
@@ -1454,14 +1557,22 @@ class Rcon(ServerCtl):
                 logger.debug("Map rotation is the same, nothing to do")
                 return
 
-            # Remove all but the first map
-            for _ in range(rotation_size - 1):
-                super().remove_map_from_rotation_at_index(1)
-            # Add all our new maps
-            for i, map_name in enumerate(map_names, 1):
-                super().add_map_to_rotation_at_index(map_name, i)
-            # Remove the first map
-            super().remove_map_from_rotation_at_index(0)
+            _validate_map_replacement(map_names, super().get_maps())
+
+            # Keep the existing rotation while the replacement is appended.
+            # An invalid new entry must not first erase the old entries.
+            phase = "adding replacement"
+            try:
+                for i, map_name in enumerate(map_names, rotation_size):
+                    super().add_map_to_rotation_at_index(map_name, i)
+                phase = "removing previous entries"
+                for _ in range(rotation_size):
+                    super().remove_map_from_rotation_at_index(0)
+            except Exception as exc:
+                _raise_map_replacement_error(
+                    "rotation", current_map_names, map_names, phase,
+                    super().get_map_rotation, exc,
+                )
 
     def add_map_to_sequence_at_index(self, map_name: str, map_index: int) -> None:
         sequence = self.get_map_sequence()["maps"]
@@ -1511,9 +1622,7 @@ class Rcon(ServerCtl):
         """Replace the complete sequence with validated, cache-safe operations.
 
         The game protocol offers add/remove/move primitives but no atomic
-        replace.  Validate the complete request before mutating and retain one
-        existing entry while building the replacement so a non-empty server
-        sequence is maintained throughout the operation.
+        replace. Keep the existing sequence until the replacement is appended.
         """
         if not map_names:
             raise HLLCommandFailedError("Empty map sequence")
@@ -1524,21 +1633,25 @@ class Rcon(ServerCtl):
         if requested == current:
             return
 
+        _validate_map_replacement(requested, super().get_maps())
+
         with invalidates(
             Rcon.get_map_sequence,
             Rcon.get_map_rotation,
             Rcon.get_next_map,
         ):
-            if not sequence:
-                for index, map_name in enumerate(requested):
+            phase = "adding replacement"
+            try:
+                for index, map_name in enumerate(requested, start=len(sequence)):
                     super().add_map_to_sequence_at_index(map_name, index)
-                return
-
-            for _ in range(len(sequence) - 1):
-                super().remove_map_from_sequence_at_index(1)
-            for index, map_name in enumerate(requested, start=1):
-                super().add_map_to_sequence_at_index(map_name, index)
-            super().remove_map_from_sequence_at_index(0)
+                phase = "removing previous entries"
+                for _ in sequence:
+                    super().remove_map_from_sequence_at_index(0)
+            except Exception as exc:
+                _raise_map_replacement_error(
+                    "sequence", current, requested, phase,
+                    super().get_map_sequence, exc,
+                )
 
     def get_objective_rows(self) -> List[List[str]]:
         return super().get_objective_rows()

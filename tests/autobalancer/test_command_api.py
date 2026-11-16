@@ -74,6 +74,21 @@ def test_invalid_config_is_a_safe_400_and_is_not_saved(web, monkeypatch, endpoin
     assert saved == []
 
 
+def test_invalid_template_attribute_is_a_validation_error(web):
+    from django.test import RequestFactory
+    from api import autobalancer as api
+
+    request = RequestFactory().post(
+        "/api/validate_autobalancer_config",
+        data=json.dumps({"messages": {"volunteer_request": "{target_team.foo}"}}),
+        content_type="application/json",
+    )
+    request.user = SimpleNamespace(username="admin", is_authenticated=True, is_active=True, has_perms=lambda _: True)
+    response = api.validate_autobalancer_config(request)
+    assert response.status_code == 400
+    assert json.loads(response.content)["failed"] is True
+
+
 @pytest.mark.parametrize(
     "state",
     [

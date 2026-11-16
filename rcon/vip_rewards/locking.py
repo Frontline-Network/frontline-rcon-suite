@@ -45,6 +45,12 @@ def vip_lock(player_id):
     return lock(f"vip:{get_server_number()}:{player_id}")
 
 
+def switch_state_lock():
+    from rcon.utils import get_server_number
+
+    return lock(f"vip-rewards-switch-state:{get_server_number()}")
+
+
 def serialized_vip(func):
     @wraps(func)
     def wrapped(self, player_id, *args, **kwargs):

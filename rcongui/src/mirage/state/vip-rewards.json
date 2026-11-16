@@ -6,6 +6,7 @@
   "daily_hours": 24.0,
   "timezone": "Europe/Berlin",
   "notify_player": true,
+  "message_language": "de",
   "excluded_player_ids": [],
   "opponent_cooldown_minutes": 30,
   "melee": {

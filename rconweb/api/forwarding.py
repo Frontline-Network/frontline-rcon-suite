@@ -228,7 +228,7 @@ def forward_command(
         try:
             url = f"http://{host}{path}"
 
-            logger.info("Forwarding command: %s %s %s", url, params, data)
+            logger.info("Forwarding command to server %s", server_number)
             res = _post_with_csrf_recovery(
                 url,
                 params=params,
@@ -256,8 +256,8 @@ def forward_command(
                     server_number,
                     res.status_code,
                 )
-        except requests.exceptions.RequestException as exc:
-            logger.warning("Unable to connect with %s: %s", host, exc)
+        except requests.exceptions.RequestException:
+            logger.warning("Unable to connect to server %s", server_number)
             result["response"] = _forward_failure(
                 "The target CRCON server did not respond"
             )

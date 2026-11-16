@@ -20,7 +20,7 @@ def compute(monkeypatch):
     stats = player_stats.TimeWindowStats.__new__(player_stats.TimeWindowStats)
     start = datetime(2026, 10, 24, tzinfo=timezone.utc)
 
-    def run(events, duration=3600, cooldown=100):
+    def run(events, duration=3600, cooldown=100, warmup=None):
         logs = [
             {
                 "action": action,
@@ -37,6 +37,7 @@ def compute(monkeypatch):
             start,
             start + timedelta(seconds=duration),
             offset_cooldown_time_seconds=cooldown,
+            **({} if warmup is None else {"offset_warmup_time_seconds": warmup}),
         )
         return stats.times["player"]["total"]
 
@@ -46,6 +47,40 @@ def compute(monkeypatch):
 CONNECTED = AllLogTypes.connected
 DISCONNECTED = AllLogTypes.disconnected
 ACTIVITY = AllLogTypes.kill
+
+
+@pytest.mark.parametrize("warmup,expected", [(0, 3600), (120, 3480), (300, 3300)])
+def test_inferred_start_uses_requested_warmup(compute, warmup, expected):
+    assert compute([(20, ACTIVITY)], cooldown=0, warmup=warmup) == expected
+
+
+def test_inferred_start_uses_public_default_warmup(compute):
+    assert compute([(20, ACTIVITY)], cooldown=0) == 3480
+
+
+def test_warmup_does_not_shift_observed_connect(compute):
+    assert compute([(200, CONNECTED)], cooldown=0, warmup=300) == 3400
+
+
+def test_custom_warmup_cannot_make_short_round_negative(compute):
+    assert compute([(20, ACTIVITY)], duration=60, cooldown=0, warmup=300) == 0
+
+
+def test_historical_name_is_latest_even_when_logs_are_out_of_order(monkeypatch):
+    monkeypatch.setattr(player_stats, "enter_session", lambda: nullcontext(None))
+    monkeypatch.setattr(player_stats, "get_player_profile_by_player_ids", lambda *_: [])
+    stats = player_stats.TimeWindowStats.__new__(player_stats.TimeWindowStats)
+    monkeypatch.setattr(stats, "get_stats_by_player", lambda **kwargs: kwargs["players"])
+    start = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    logs = [
+        {"action": ACTIVITY, "event_time": start + timedelta(seconds=second),
+         "player_name_1": name, "player_id_1": "player"}
+        for second, name in [(300, "Latest"), (100, "Earlier")]
+    ]
+
+    assert stats._get_players_stats_from_logs(logs, start, start + timedelta(hours=1)) == [
+        {"name": "Latest", "player_id": "player"}
+    ]
 
 
 @pytest.mark.parametrize("remaining", [0, 1, 51, 99, 100, 101])

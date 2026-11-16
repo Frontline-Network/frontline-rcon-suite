@@ -200,7 +200,11 @@ class BaseStats:
     ) -> None:
         action = log["action"]
 
-        log_time = datetime.datetime.fromtimestamp(log["timestamp_ms"] / 1000)
+        timestamp_ms = log.get("timestamp_ms")
+        log_time = (
+            datetime.datetime.fromtimestamp(timestamp_ms / 1000, datetime.UTC)
+            if timestamp_ms is not None else None
+        )
         if action == AllLogTypes.kill:
             if self._is_player_kill(player, log):
                 streaks.kill += 1
@@ -210,17 +214,26 @@ class BaseStats:
                 streaks.kill = 0
                 streaks.deaths_by_tk = 0
                 streaks.death += 1
-                self._process_death_time(log_time, stats)
+                if log_time is not None:
+                    self._process_death_time(log_time, stats)
+                else:
+                    stats["last_spawn"] = None
         if action == AllLogTypes.team_kill:
             if self._is_player_kill(player, log):
                 streaks.teamkills += 1
             if self._is_player_death(player, log):
+                streaks.kill = 0
                 streaks.deaths_by_tk += 1
-                self._process_death_time(log_time, stats)
+                if log_time is not None:
+                    self._process_death_time(log_time, stats)
+                else:
+                    stats["last_spawn"] = None
         if action == AllLogTypes.connected:
             stats["last_spawn"] = log_time
         if action == AllLogTypes.disconnected:
-            self._process_death_time(log_time, stats, save_spawn=False)
+            if log_time is not None:
+                self._process_death_time(log_time, stats, save_spawn=False)
+            stats["last_spawn"] = None
 
         stats["kills_streak"] = max(streaks.kill, stats["kills_streak"])
         stats["deaths_without_kill_streak"] = max(
@@ -305,20 +318,22 @@ class BaseStats:
             stats["last_spawn"] = log_time
             return
 
-        time_since_last_spawn = int(
-            (
-                log_time.replace(tzinfo=datetime.UTC)
-                - stats["last_spawn"].replace(tzinfo=datetime.UTC)
-            ).total_seconds()
-        )
+        spawn_time = stats["last_spawn"]
+        if log_time.tzinfo is None:
+            log_time = log_time.replace(tzinfo=datetime.UTC)
+        if spawn_time.tzinfo is None:
+            spawn_time = spawn_time.replace(tzinfo=datetime.UTC)
+        time_since_last_spawn = int((log_time - spawn_time).total_seconds())
         stats["longest_life_secs"] = max(
             time_since_last_spawn,
             stats["longest_life_secs"],
         )
-        stats["shortest_life_secs"] = min(
-            time_since_last_spawn,
-            stats["shortest_life_secs"],
-        )
+        if time_since_last_spawn > 0:
+            previous_shortest = stats["shortest_life_secs"]
+            stats["shortest_life_secs"] = (
+                min(time_since_last_spawn, previous_shortest)
+                if previous_shortest > 0 else time_since_last_spawn
+            )
         if save_spawn:
             stats["last_spawn"] = log_time
 
@@ -378,7 +393,9 @@ class LiveStats(BaseStats):
         if not session_start:
             return None
 
-        return session_start.replace(tzinfo=datetime.UTC)
+        # Historical sessions without timezone information were stored as local
+        # wall time; newer sessions have an authoritative UTC-aware timestamp.
+        return session_start.astimezone(datetime.UTC)
 
     def _is_log_from_current_session(
         self, now, player, log: StructuredLogLineWithMetaData
@@ -605,7 +622,7 @@ class TimeWindowStats(BaseStats):
         cached_players: dict[str, PlayerStat] = {},
     ):
         indexed_logs: dict[str, list[StructuredLogLineWithMetaData]] = {}
-        unique_players = set[tuple[str, str]]()
+        latest_players: dict[str, tuple[datetime.datetime | None, str]] = {}
         players_times: dict[str, PlayerSessions] = {}
         name_to_id = {
             name: player_id
@@ -636,7 +653,13 @@ class TimeWindowStats(BaseStats):
                     continue
 
                 if player_name and player_key:
-                    unique_players.add((player_name, player_key))
+                    event_time = self._session_event_time(log)
+                    previous = latest_players.get(player_key)
+                    if previous is None or (
+                        event_time is not None
+                        and (previous[0] is None or event_time >= previous[0])
+                    ):
+                        latest_players[player_key] = (event_time, player_name)
                     prev_key = name_to_id.setdefault(player_name, player_key)
                     if prev_key != player_key:
                         logger.warning(
@@ -674,12 +697,15 @@ class TimeWindowStats(BaseStats):
                     if boundary in seen_boundaries:
                         continue
                     seen_boundaries.add(boundary)
-                self._set_start_end_times(player_key, players_times, log, from_)
+                self._set_start_end_times(
+                    player_key, players_times, log, from_,
+                    offset_warmup_time_seconds=offset_warmup_time_seconds,
+                )
 
-        # Convert the unique set of players into a list of dict for compatibility with parent class
+        # Keep the latest observed name for each ID independent of hash order.
         players = [
             dict(name=player_name, player_id=player_id)
-            for player_name, player_id in unique_players
+            for player_id, (_, player_name) in latest_players.items()
         ]
         # Here we massage the session times for a player. 1 session should be a pair of times a start and an end
         for player, times in players_times.items():

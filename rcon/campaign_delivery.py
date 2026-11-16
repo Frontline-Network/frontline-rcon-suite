@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import func, or_, text
+from sqlalchemy import and_, func, or_, text
 
 from rcon.broadcast import campaign_is_eligible, format_message
 from rcon.models import (
@@ -29,6 +29,7 @@ DELIVERY_RETENTION_DAYS = 30
 MAX_ATTEMPTS = 3
 RETRY_DELAYS = (30, 60)
 STALE_SENDING_SECONDS = 120
+RECOVERY_INTERVAL_SECONDS = 30
 CLAIM_LOCK_NAMESPACE = 824_000
 
 QUEUED = "queued"
@@ -38,7 +39,13 @@ FAILED = "failed"
 EXPIRED = "expired"
 
 
-def recipient_is_eligible(campaign: AutoBroadcastMessage, is_vip: bool) -> bool:
+class MessageRejected(RuntimeError):
+    """The game server explicitly rejected a player message."""
+
+
+def recipient_is_eligible(campaign: AutoBroadcastMessage, is_vip: bool | None) -> bool | None:
+    if is_vip is None and campaign.recipient_group in {"vip", "non_vip"}:
+        return None
     if campaign.recipient_group == "vip":
         return is_vip
     if campaign.recipient_group == "non_vip":
@@ -48,9 +55,11 @@ def recipient_is_eligible(campaign: AutoBroadcastMessage, is_vip: bool) -> bool:
 
 def session_is_eligible(
     campaign: AutoBroadcastMessage,
-    session_start: datetime,
+    session_start: datetime | None,
     now: datetime,
 ) -> bool:
+    if session_start is None:
+        return False
     return now >= session_start + timedelta(minutes=campaign.min_session_minutes)
 
 
@@ -113,7 +122,7 @@ def _all_direct_campaigns(
 
 def _online_players(ctl) -> dict[str, dict[str, Any]]:
     players = {
-        player_id: {"player_id": player_id, "player_name": name, "is_vip": False}
+        player_id: {"player_id": player_id, "player_name": name, "is_vip": None}
         for name, player_id in ctl.get_player_ids()
     }
     if not players:
@@ -123,7 +132,7 @@ def _online_players(ctl) -> dict[str, dict[str, Any]]:
         vip_ids = {item["player_id"] for item in ctl.get_vip_ids()}
     except Exception:
         logger.exception("Unable to load VIP ids for campaign targeting")
-        vip_ids = set()
+        return players
 
     for player_id, player in players.items():
         player["is_vip"] = player_id in vip_ids
@@ -155,7 +164,19 @@ def _active_sessions(
                 {
                     "player_db_id": player.id,
                     "session_id": player_session.id,
-                    "start": player_session.start or player_session.created,
+                    # Campaign timestamps are stored as naive UTC.  The old
+                    # wall-clock column can cross a DST change, so prefer the
+                    # absolute connect instant where it is available.
+                    "start": (
+                        datetime.fromtimestamp(
+                            player_session.start_event_us / 1_000_000, timezone.utc
+                        ).replace(tzinfo=None)
+                        if player_session.start_event_us is not None
+                        # Legacy starts are local wall time with no recorded
+                        # timezone. Creation is UTC and conservatively delays
+                        # delivery if an old connect was processed late.
+                        else player_session.created
+                    ),
                 },
             )
         return result
@@ -179,7 +200,7 @@ def enqueue_eligible_deliveries(
             player_session = active_sessions.get(player_id)
             if player_session is None:
                 continue
-            if not recipient_is_eligible(campaign, bool(player["is_vip"])):
+            if recipient_is_eligible(campaign, player["is_vip"]) is not True:
                 continue
             if not session_is_eligible(campaign, player_session["start"], now):
                 continue
@@ -239,7 +260,7 @@ def _recover_interrupted_deliveries(server_number: int, now: datetime) -> None:
             CampaignDelivery.server_number == server_number,
             CampaignDelivery.status == SENDING,
             CampaignDelivery.last_attempt_at < cutoff,
-        )
+        ).with_for_update()
         for delivery in stale:
             delivery.status = FAILED
             delivery.updated_at = now
@@ -287,94 +308,101 @@ def claim_next_delivery(
         ):
             return None
 
-        deliveries = (
-            sess.query(CampaignDelivery)
-            .filter(
+        # Scan the whole due queue in stable keyset pages. Paused or
+        # temporarily ineligible entries must not hide a later eligible one.
+        cursor = None
+        while True:
+            query = sess.query(CampaignDelivery).filter(
                 CampaignDelivery.server_number == server_number,
                 CampaignDelivery.status == QUEUED,
-                or_(
-                    CampaignDelivery.next_attempt_at.is_(None),
-                    CampaignDelivery.next_attempt_at <= now,
-                ),
+                or_(CampaignDelivery.next_attempt_at.is_(None),
+                    CampaignDelivery.next_attempt_at <= now),
             )
-            .order_by(CampaignDelivery.eligible_at, CampaignDelivery.id)
-            .limit(500)
-            .all()
-        )
+            if cursor is not None:
+                query = query.filter(or_(
+                    CampaignDelivery.eligible_at > cursor[0],
+                    and_(CampaignDelivery.eligible_at == cursor[0], CampaignDelivery.id > cursor[1]),
+                ))
+            deliveries = query.order_by(CampaignDelivery.eligible_at, CampaignDelivery.id).limit(500).all()
+            if not deliveries:
+                break
+            cursor = (deliveries[-1].eligible_at, deliveries[-1].id)
+            for delivery in deliveries:
+                campaign = campaign_by_id.get(delivery.campaign_id)
+                if campaign is None or delivery.player_session_id not in active_session_ids:
+                    delivery.status = EXPIRED
+                    delivery.updated_at = now
+                    continue
 
-        for delivery in deliveries:
-            campaign = campaign_by_id.get(delivery.campaign_id)
-            if campaign is None or delivery.player_session_id not in active_session_ids:
-                delivery.status = EXPIRED
-                delivery.updated_at = now
-                continue
-
-            player_id = next(
-                (
-                    candidate_id
-                    for candidate_id, player_session in active_sessions.items()
-                    if player_session["session_id"] == delivery.player_session_id
-                ),
-                None,
-            )
-            player = online_players.get(player_id) if player_id else None
-            player_session = active_sessions.get(player_id) if player_id else None
-            if player is None or player_session is None:
-                delivery.status = EXPIRED
-                delivery.updated_at = now
-                continue
-            if not campaign_is_eligible(campaign, player_count, seeding_config):
-                continue
-            if not recipient_is_eligible(campaign, bool(player["is_vip"])):
-                delivery.status = EXPIRED
-                delivery.updated_at = now
-                continue
-            if not session_is_eligible(campaign, player_session["start"], now):
-                continue
-
-            previous_direct_delivery = (
-                sess.query(func.max(CampaignDelivery.sent_at))
-                .filter(
-                    CampaignDelivery.server_number == server_number,
-                    CampaignDelivery.player_session_id == delivery.player_session_id,
-                    CampaignDelivery.status == SENT,
+                player_id = next(
+                    (
+                        candidate_id
+                        for candidate_id, player_session in active_sessions.items()
+                        if player_session["session_id"] == delivery.player_session_id
+                    ),
+                    None,
                 )
-                .scalar()
-            )
-            previous_lifecycle_delivery = (
-                sess.query(func.max(VipLifecycleDelivery.sent_at))
-                .filter(
-                    VipLifecycleDelivery.server_number == server_number,
-                    VipLifecycleDelivery.player_session_id
-                    == delivery.player_session_id,
-                    VipLifecycleDelivery.status == "sent",
-                    VipLifecycleDelivery.test_mode.is_(False),
-                )
-                .scalar()
-            )
-            if not player_gap_is_due(
-                _latest_delivery_time(
-                    previous_direct_delivery, previous_lifecycle_delivery
-                ),
-                config.player_message_gap_sec,
-                now,
-            ):
-                continue
+                player = online_players.get(player_id) if player_id else None
+                player_session = active_sessions.get(player_id) if player_id else None
+                if player is None or player_session is None:
+                    delivery.status = EXPIRED
+                    delivery.updated_at = now
+                    continue
+                if not campaign_is_eligible(campaign, player_count, seeding_config):
+                    continue
+                recipient_eligible = recipient_is_eligible(campaign, player["is_vip"])
+                if recipient_eligible is None:
+                    continue
+                if not recipient_eligible:
+                    delivery.status = EXPIRED
+                    delivery.updated_at = now
+                    continue
+                if not session_is_eligible(campaign, player_session["start"], now):
+                    continue
 
-            delivery.status = SENDING
-            delivery.attempt_count += 1
-            delivery.last_attempt_at = now
-            delivery.updated_at = now
-            delivery.message = campaign.message
-            return {
-                "id": delivery.id,
-                "campaign_id": delivery.campaign_id,
-                "campaign_title": campaign.title,
-                "player_id": player_id,
-                "player_name": player["player_name"],
-                "message": delivery.message,
-                "attempt_count": delivery.attempt_count,
-            }
+                previous_direct_delivery = (
+                    sess.query(func.max(CampaignDelivery.sent_at))
+                    .filter(
+                        CampaignDelivery.server_number == server_number,
+                        CampaignDelivery.player_session_id == delivery.player_session_id,
+                        CampaignDelivery.status == SENT,
+                    )
+                    .scalar()
+                )
+                previous_lifecycle_delivery = (
+                    sess.query(func.max(VipLifecycleDelivery.sent_at))
+                    .filter(
+                        VipLifecycleDelivery.server_number == server_number,
+                        VipLifecycleDelivery.player_session_id
+                        == delivery.player_session_id,
+                        VipLifecycleDelivery.status == "sent",
+                        VipLifecycleDelivery.test_mode.is_(False),
+                    )
+                    .scalar()
+                )
+                if not player_gap_is_due(
+                    _latest_delivery_time(
+                        previous_direct_delivery, previous_lifecycle_delivery
+                    ),
+                    config.player_message_gap_sec,
+                    now,
+                ):
+                    continue
+
+                delivery.status = SENDING
+                delivery.attempt_count += 1
+                delivery.last_attempt_at = now
+                delivery.updated_at = now
+                delivery.message = campaign.message
+                return {
+                    "id": delivery.id,
+                    "campaign_id": delivery.campaign_id,
+                    "campaign_title": campaign.title,
+                    "player_id": player_id,
+                    "player_name": player["player_name"],
+                    "message": delivery.message,
+                    "attempt_count": delivery.attempt_count,
+                }
     return None
 
 
@@ -384,11 +412,15 @@ def finish_delivery(
     success: bool,
     now: datetime,
     error: str | None = None,
+    uncertain: bool = False,
 ) -> None:
     with enter_session() as sess:
-        delivery = sess.get(CampaignDelivery, delivery_id)
+        delivery = sess.get(CampaignDelivery, delivery_id, with_for_update=True)
         if delivery is None:
             logger.error("Campaign delivery %s disappeared while sending", delivery_id)
+            return
+        if delivery.status != SENDING:
+            logger.warning("Campaign delivery %s was already resolved; late result ignored", delivery_id)
             return
         delivery.updated_at = now
         if success:
@@ -399,7 +431,7 @@ def finish_delivery(
             return
 
         delivery.last_error = (error or "Unknown RCON failure")[:4000]
-        if delivery.attempt_count >= MAX_ATTEMPTS:
+        if uncertain or delivery.attempt_count >= MAX_ATTEMPTS:
             delivery.status = FAILED
             delivery.next_attempt_at = None
         else:
@@ -514,11 +546,14 @@ def run(stop_event=None) -> None:
     ctl = get_rcon()
     server_number = int(get_server_number())
     last_cleanup = datetime.min
-    _recover_interrupted_deliveries(server_number, datetime.utcnow())
+    last_recovery = datetime.min
 
     while not stopping(stop_event):
         now = datetime.utcnow()
         try:
+            if now - last_recovery >= timedelta(seconds=RECOVERY_INTERVAL_SECONDS):
+                _recover_interrupted_deliveries(server_number, now)
+                last_recovery = now
             if now - last_cleanup >= timedelta(days=1):
                 expire_old_deliveries(server_number, now)
                 last_cleanup = now
@@ -582,7 +617,7 @@ def run(stop_event=None) -> None:
                         player_name=delivery["player_name"],
                     )
                     if not success:
-                        raise RuntimeError("RCON rejected the player message")
+                        raise MessageRejected("RCON rejected the player message")
                 except Exception as exc:
                     logger.exception(
                         "Unable to deliver campaign %s to %s",
@@ -594,6 +629,7 @@ def run(stop_event=None) -> None:
                         success=False,
                         now=datetime.utcnow(),
                         error=str(exc),
+                        uncertain=not isinstance(exc, MessageRejected),
                     )
                 else:
                     finish_delivery(delivery["id"], success=True, now=datetime.utcnow())

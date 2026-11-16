@@ -19,6 +19,8 @@ function sourceFiles(path) {
 const allowedRawFetchFiles = new Set([
   "src/utils/fetchUtils.js",
   "src/serviceWorker.js",
+  // Reads only the same-origin static language chunk manifest; no API write.
+  "src/i18n/index.js",
   "src/components/Header/footer.js",
   "src/hooks/useGithubReleases.js",
   "src/pages/login/footer.jsx",
@@ -42,6 +44,12 @@ if (rawFetchCount !== 1) {
   violations.push(
     `src/utils/fetchUtils.js contains ${rawFetchCount} raw fetch calls; expected only fetchWithCsrf`
   );
+}
+
+const languageLoader = readFileSync(join(sourceRoot, "i18n/index.js"), "utf8");
+const languageFetches = languageLoader.match(/(^|[^A-Za-z])fetch\s*\(/gm) || [];
+if (languageFetches.length !== 1 || !languageLoader.includes('fetch(new URL("language-chunks.json", base), { cache: "no-store" })')) {
+  violations.push("src/i18n/index.js must fetch only the static language manifest");
 }
 
 const requiredTransports = [

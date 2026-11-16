@@ -75,30 +75,36 @@ feature. Normal broadcast and direct-message campaigns remain unchanged.
 
 ## Delivery guarantees
 
-- Unverified: at most once per configured cooldown, seven days by default.
-- Active free VIP: once for the current free period.
-- Expiring free VIP: once inside the configured window, 48 hours by default.
-- Expired free VIP without a paid purchase: once after expiry.
+- Eligible unverified, active trial, expiring trial and expired trial recipients
+  can receive one automatic message per enabled rule and player session.
+- The expiring rule applies inside its configured window (48 hours by default).
 - Paid VIP, blocked players, family mismatches, invalid timestamps, missing rows,
   and API failures: no message.
 - Test mode persists simulations but never sends an automatic message.
 - Manual test messages are explicit, logged separately, and do not consume a
   regular lifecycle delivery.
 
-All comparisons use timezone-aware UTC timestamps. Status responses are cached
-for 60 seconds by default and all connected players are queried in one request.
+Lifecycle status timestamps use UTC. Session start times use the absolute event
+timestamp when available; older sessions can still contain a naive local start,
+so their minimum-session-time calculation depends on the historical server time
+zone. Status responses are cached for 60 seconds by default and all connected
+players are queried in one request.
 
 ## Database migration
 
-Alembic revision `9f3c2d1a6b40` creates `vip_lifecycle_deliveries`. The unique
-status fingerprint prevents reconnects, map changes, and worker restarts from
-repeating a one-time lifecycle message.
+Alembic revision `9f3c2d1a6b40` creates `vip_lifecycle_deliveries`. The delivery
+claim is scoped to server, rule, player session and test mode. A worker restart
+does not create another claim for the same rule and session, but a reconnect
+that creates a new session can make the player eligible again. There is no
+cross-session seven-day unverified cooldown or once-per-trial-period guarantee.
+Upgrades migrate legacy message texts; the old `unverified_cooldown_days` setting
+is not retained. Review campaign frequency and message intervals after upgrading.
 
 The delivery claim is committed before the RCON call. A failed or interrupted
-attempt is logged but is not retried automatically for the same status
-fingerprint, because an RCON timeout cannot prove that the player did not see
-the message. This deliberately favours no duplicate advertising. A materially
-changed WordPress status produces a new fingerprint and may become eligible.
+attempt is logged but is not retried automatically for the same rule and
+session, because an RCON timeout cannot prove that the player did not see the
+message. A new session or a different applicable rule can produce another
+delivery. The shared message interval and per-player gap also limit timing.
 
 Do not enable the feature until the WordPress plugin and database migration are
 installed and the signed status endpoint has passed a read-only smoke test.
@@ -120,8 +126,8 @@ installed and the signed status endpoint has passed a read-only smoke test.
 6. Send a signed, read-only lifecycle status request for controlled test IDs.
    Verify authentication rejection, server-family isolation, UTC timestamps,
    paid-VIP exclusion, and that no account/order fields are returned.
-7. Apply Alembic revision `9f3c2d1a6b40` to each CRCON database, verify that it
-   is the sole migration head, then deploy/restart the CRCON application.
+7. Apply the application's migrations, including `9f3c2d1a6b40`, to each CRCON
+   database and verify the expected head for the deployed version before restart.
 8. In one non-production or canary instance, keep the lifecycle function in test
    mode, inspect the audience preview and delivery log, and send one explicit
    manual test message to a consenting test player.

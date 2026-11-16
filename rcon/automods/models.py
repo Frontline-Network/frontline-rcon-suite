@@ -9,6 +9,55 @@ from pydantic.dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
+# Stored using the existing datetime representation so that older workers can
+# still unpickle a watch state during a rollback. A pending warning never
+# advances the warning timer until delivery is confirmed.
+PENDING_WARNING = datetime.max
+
+
+class WarningConfirmationMixin:
+    """Keep a planned warning pending until the game server confirms it."""
+
+    def player_warning_succeeded(self, aplayer):
+        with self.watch_state(aplayer.team, aplayer.squad) as status:
+            warnings = status.warned.get(aplayer.name)
+            if warnings and warnings[-1] == PENDING_WARNING:
+                warnings[-1] = datetime.now()
+
+    def player_warning_failed(self, aplayer):
+        with self.watch_state(aplayer.team, aplayer.squad) as status:
+            warnings = status.warned.get(aplayer.name)
+            if warnings and warnings[-1] == PENDING_WARNING:
+                warnings.pop()
+
+    def player_punish_started(self, aplayer):
+        """Reserve a punishment before sending it to the game server."""
+        with self.watch_state(aplayer.team, aplayer.squad) as status:
+            punishes = status.punished.setdefault(aplayer.name, [])
+            if punishes:
+                punishes[-1] = PENDING_WARNING
+            else:
+                punishes.append(PENDING_WARNING)
+
+    def player_punish_succeeded(self, aplayer):
+        with self.watch_state(aplayer.team, aplayer.squad) as status:
+            punishes = status.punished.get(aplayer.name)
+            if punishes and punishes[-1] == PENDING_WARNING:
+                punishes[-1] = datetime.now()
+
+    def player_kick_attempted(self, aplayer):
+        """Reserve the kick before sending, so a crash cannot trigger a replay."""
+        with self.watch_state(aplayer.team, aplayer.squad) as status:
+            punishes = status.punished.setdefault(aplayer.name, [])
+            if not punishes or punishes[-1] != PENDING_WARNING:
+                punishes.append(PENDING_WARNING)
+
+    def player_kick_rejected(self, aplayer):
+        with self.watch_state(aplayer.team, aplayer.squad) as status:
+            punishes = status.punished.get(aplayer.name)
+            if punishes and punishes[-1] == PENDING_WARNING:
+                punishes.pop()
+
 
 class SquadHasLeader(Exception):
     pass
@@ -37,6 +86,7 @@ class OffensiveDefensiveState(TypedDict):
 
 @dataclass
 class WatchStatus:
+    warning_confirmation_version: int = 1
     offensive_points: Mapping[str, int] = field(default_factory=dict)
     initial_world_positions: Mapping[str, tuple[float, float, float] | None] = field(
         default_factory=dict
@@ -55,6 +105,24 @@ class WatchStatus:
     noted: Mapping[str, List[datetime]] = field(default_factory=dict)
     warned: Mapping[str, List[datetime]] = field(default_factory=dict)
     punished: Mapping[str, List[datetime]] = field(default_factory=dict)
+
+
+def upgrade_legacy_warning_state(state: WatchStatus) -> WatchStatus:
+    """Do not treat warnings planned by older workers as confirmed sends."""
+    if state.__dict__.get("warning_confirmation_version") == 1:
+        return state
+    affected = 0
+    for warnings in state.warned.values():
+        if warnings:
+            warnings[-1] = PENDING_WARNING
+            affected += 1
+    state.warning_confirmation_version = 1
+    if affected:
+        logger.warning(
+            "Automod retained %s legacy warning(s) as unconfirmed until the watch resets",
+            affected,
+        )
+    return state
 
 
 class PunishStepState(Enum):
@@ -98,6 +166,9 @@ class PunishPlayer:
     role: str = None
     lvl: int = None
     details: PunishDetails = None
+    # Rules with the same live/dry-run mode can propose one shared action.
+    # Keep their authors so every contributing watch receives its outcome.
+    related_authors: List[str] = field(default_factory=list, repr=False, compare=False)
 
     def short_repr(self):
         return (
@@ -148,12 +219,18 @@ class PunitionsToApply:
     def merge(self, o: "PunitionsToApply"):
         if len(o.warning) != 0:
             self.warning.extend(o.warning)
-        for p in o.punish:
-            if not any(sp.player_id == p.player_id for sp in self.punish):
-                self.punish.append(p)
-        for k in o.kick:
-            if not any(sk.player_id == k.player_id for sk in self.kick):
-                self.kick.append(k)
+        for current, incoming in ((self.punish, o.punish), (self.kick, o.kick)):
+            for player in incoming:
+                index = next((i for i, item in enumerate(current) if item.player_id == player.player_id), None)
+                if index is None:
+                    current.append(player)
+                elif getattr(current[index].details, "dry_run", False) and not getattr(player.details, "dry_run", False):
+                    current[index] = player
+                elif getattr(current[index].details, "dry_run", False) == getattr(player.details, "dry_run", False):
+                    selected = current[index]
+                    for author in [player.details.author, *player.related_authors]:
+                        if author != selected.details.author and author not in selected.related_authors:
+                            selected.related_authors.append(author)
         for s in o.squads_state:
             if any(s.team == ss.team and s.name == ss.name for ss in self.squads_state):
                 continue

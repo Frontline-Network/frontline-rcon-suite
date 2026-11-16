@@ -85,6 +85,32 @@ def test_campaign_can_pause_while_seeding_rules_apply():
     assert campaign_is_eligible(campaign, 41, seeding)
 
 
+@pytest.mark.parametrize("rule,configured", [("enforce_cap_fight", {}),
+    ("disallowed_roles", {"roles": {"rifleman": "Rifleman"}}),
+    ("disallowed_weapons", {"weapons": {"weapon": "Weapon"}})])
+def test_seeding_pause_respects_each_rule_switch_and_player_bounds(rule, configured):
+    disabled = {name: {"enabled": False} for name in
+                ("enforce_cap_fight", "disallowed_roles", "disallowed_weapons")}
+    disabled[rule] = {"enabled": True, "min_players": 20, "max_players": 40, **configured}
+    config = AutoModSeedingUserConfig(enabled=True, dont_do_anything_below_this_number_of_players=25, **disabled)
+    assert not seeding_is_active(config, 19)
+    assert not seeding_is_active(config, 24)
+    assert seeding_is_active(config, 25)
+    assert seeding_is_active(config, 39)
+    assert not seeding_is_active(config, 40)
+    setattr(getattr(config, rule), "enabled", False)
+    assert not seeding_is_active(config, 30)
+
+
+@pytest.mark.parametrize("rule", ["disallowed_roles", "disallowed_weapons"])
+def test_empty_seeding_restriction_does_not_pause_campaign(rule):
+    disabled = {name: {"enabled": False} for name in
+                ("enforce_cap_fight", "disallowed_roles", "disallowed_weapons")}
+    disabled[rule] = {"enabled": True, "min_players": 0, "max_players": 100}
+    config = AutoModSeedingUserConfig(enabled=True, **disabled)
+    assert not seeding_is_active(config, 30)
+
+
 def test_manual_broadcast_defers_campaign_cycle(monkeypatch):
     campaign = AutoBroadcastMessage(time_sec=120, message="VIP access")
 

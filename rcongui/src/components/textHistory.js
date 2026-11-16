@@ -1,3 +1,4 @@
+import { browserStorage } from "@/utils/browser-storage";
 const PREFIX = "autocomplete_";
 
 class TextHistory {
@@ -6,13 +7,15 @@ class TextHistory {
   }
 
   getTexts() {
-    let texts = localStorage.getItem(this.namespace);
+    let texts = browserStorage.getItem(this.namespace);
 
     if (!texts) {
       texts = [];
-      localStorage.setItem(this.namespace, JSON.stringify(texts));
+      browserStorage.setItem(this.namespace, JSON.stringify(texts));
     } else {
-      texts = JSON.parse(texts);
+      try { texts = JSON.parse(texts); } catch { texts = []; }
+      if (!Array.isArray(texts)) texts = [];
+      texts = texts.filter((item) => typeof item === "string");
     }
 
     texts.sort((a, b) => a.toLowerCase() > b.toLowerCase());
@@ -26,11 +29,11 @@ class TextHistory {
     }
     const texts = this.getTexts();
     texts.push(text);
-    localStorage.setItem(this.namespace, JSON.stringify(_.uniq(texts)));
+    browserStorage.setItem(this.namespace, JSON.stringify([...new Set(texts)]));
   }
 
   clear() {
-    localStorage.removeItem(this.namespace);
+    browserStorage.removeItem(this.namespace);
   }
 }
 

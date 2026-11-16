@@ -1,8 +1,10 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import orjson
+import httpx
+import pytest
 
 from rcon.webhook_service import (
     WebhookQueueKeyCache,
@@ -45,6 +47,69 @@ def _message(message_type=WebhookMessageType.AUDIT):
             "rate_limit_retry": False,
         },
     )
+
+
+def test_enqueue_logs_do_not_expose_webhook_credentials(caplog):
+    import logging
+    red = Mock()
+    red.pipeline.return_value = Mock()
+    message = _message()
+    with caplog.at_level(logging.DEBUG, logger=webhook_service.__name__):
+        enqueue_message(message, red=red)
+        enqueue_transient_message(message, message_group_key="score", red=red)
+    assert "discord.com/api/webhooks/123/token" not in caplog.text
+    assert "webhook_token" not in caplog.text
+
+
+@pytest.mark.parametrize("failure", [400, 502, "transport"])
+def test_delivery_failure_logs_do_not_expose_webhook_payload(monkeypatch, caplog, failure):
+    import logging
+    from types import SimpleNamespace
+
+    secret = "fake-webhook-secret"
+    message = _message().model_copy(update={"payload": {
+        **_message().payload, "url": "https://example.invalid/" + secret,
+        "webhook_token": secret, "content": secret,
+    }})
+    red = Mock()
+    red.lpop.return_value = orjson.dumps(message.model_dump_json())
+    wh = SimpleNamespace(webhook_id="123", url="https://example.invalid/" + secret,
+                         execute=AsyncMock())
+    if failure == "transport":
+        wh.execute.side_effect = httpx.ConnectError(secret)
+    else:
+        wh.execute.return_value = SimpleNamespace(status_code=failure, headers={"secret": secret})
+    monkeypatch.setattr(webhook_service, "construct_webhook", lambda **_: wh)
+    monkeypatch.setattr(webhook_service, "move_to_dead_letter", Mock())
+    with caplog.at_level(logging.DEBUG, logger=webhook_service.__name__):
+        asyncio.run(dequeue_message(red=red, client=Mock(), queue_id="whs:1:discord:audit:123",
+                                    bucket_data=None, lock=asyncio.Lock()))
+    assert secret not in caplog.text
+    webhook_service.move_to_dead_letter.assert_called_once()
+
+
+def test_global_rate_limit_does_not_log_untrusted_response(monkeypatch, caplog):
+    import logging
+    from types import SimpleNamespace
+
+    secret = "fake-response-secret"
+    message = _message()
+    red = Mock()
+    red.lpop.return_value = orjson.dumps(message.model_dump_json())
+    response = SimpleNamespace(
+        status_code=429,
+        headers={"x-ratelimit-bucket": "", "x-ratelimit-remaining": "0", "x-ratelimit-reset-after": "1"},
+        json=lambda: {"global": True, "retry_after": secret, "message": secret},
+    )
+    wh = SimpleNamespace(webhook_id="123", execute=AsyncMock(return_value=response))
+    monkeypatch.setattr(webhook_service, "construct_webhook", lambda **_: wh)
+    monkeypatch.setattr(webhook_service, "update_bucket_rate_limit", Mock())
+    monkeypatch.setattr(webhook_service, "set_global_rate_limit_reset_after", Mock())
+    with caplog.at_level(logging.DEBUG, logger=webhook_service.__name__):
+        asyncio.run(dequeue_message(red=red, client=Mock(), queue_id="whs:1:discord:audit:123",
+                                    bucket_data=None, lock=asyncio.Lock()))
+    assert secret not in caplog.text
+    webhook_service.set_global_rate_limit_reset_after.assert_called_once()
 
 
 def test_queue_registry_is_installation_wide():

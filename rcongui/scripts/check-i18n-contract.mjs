@@ -6,6 +6,10 @@ import { parse } from "@babel/parser";
 import en from "../src/i18n/locales/en.js";
 import de from "../src/i18n/locales/de.js";
 import { settingsPanelsDe, settingsPanelsEn } from "../src/i18n/locales/settings-panels.js";
+import { seedVipJournalCopy } from "../src/i18n/locales/seed-vip-journal.js";
+import { blacklistSyncReviewCopy } from "../src/i18n/locales/blacklist-sync-review.js";
+import { sessionEventReviewCopy } from "../src/i18n/locales/session-event-review.js";
+import { automodActionReviewCopy } from "../src/i18n/locales/automod-action-review.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
@@ -25,7 +29,15 @@ function compare(label, german, english) {
 }
 compare("main catalogs", de, en);
 compare("lazy settings catalogs", settingsPanelsDe, settingsPanelsEn);
-const combinedEnglish = { ...en, settingsPanels: settingsPanelsEn };
+compare("seed VIP journal", seedVipJournalCopy.de, seedVipJournalCopy.en);
+compare("seed VIP journal French", seedVipJournalCopy.fr, seedVipJournalCopy.en);
+compare("blacklist synchronization review", blacklistSyncReviewCopy.de, blacklistSyncReviewCopy.en);
+compare("blacklist synchronization review French", blacklistSyncReviewCopy.fr, blacklistSyncReviewCopy.en);
+compare("session event review", sessionEventReviewCopy.de, sessionEventReviewCopy.en);
+compare("session event review French", sessionEventReviewCopy.fr, sessionEventReviewCopy.en);
+compare("automod action review", automodActionReviewCopy.de, automodActionReviewCopy.en);
+compare("automod action review French", automodActionReviewCopy.fr, automodActionReviewCopy.en);
+const combinedEnglish = { ...en, settingsPanels: settingsPanelsEn, seedVipJournal: seedVipJournalCopy.en, blacklistSyncReview: blacklistSyncReviewCopy.en, sessionEventReview: sessionEventReviewCopy.en, automodActionReview: automodActionReviewCopy.en };
 const globalKeys = new Set(Object.keys(flatten(combinedEnglish)));
 const syntaxTrees = new Map();
 const bilingualByDirectory = new Map();

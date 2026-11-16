@@ -598,6 +598,7 @@ const de = {
       title: "Spielerakten",
       eyebrow: "Moderation",
       subtitle: "Spieler suchen, auswählen und serverübergreifend verwalten.",
+      liveSnapshotUnavailable: "Der aktuelle Spielerstatus ist nicht verfügbar. Die zuletzt gesehenen Zeiten können unvollständig sein.",
       results: "{{count}} Ergebnisse",
       selected: "Ausgewählt: {{count}}",
       created: "Erstellt",
@@ -5267,7 +5268,7 @@ const de = {
     lastChecked: "Zuletzt geprüft",
     latestRelease: "Neueste Version",
   },
-  language: { label: "Sprache", de: "Deutsch", en: "English", fr: "Français" },
+  language: { label: "Sprache", de: "Deutsch", en: "English", fr: "Français", loadFailed: "Die Sprache konnte nicht geladen werden. Bitte versuche es erneut.", storageUnavailable: "Browserspeicher ist nicht verfügbar. Lokale Einstellungen gelten nur für diesen Besuch." },
 };
 
 Object.assign(de.maps.votemapSettings, {

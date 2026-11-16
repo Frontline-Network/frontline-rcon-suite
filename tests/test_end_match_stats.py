@@ -47,6 +47,37 @@ def test_duplicate_or_disabled_does_not_send(setup_match, monkeypatch):
     rcon.message_all_players.assert_not_called()
 
 
+@pytest.mark.parametrize("history,match_start,expected", [
+    ([{"start": 100, "guessed": False}], 100, True),
+    ([{"start": 101, "guessed": False}], 100, False),
+    ([{"start": 100, "guessed": True}], 100, False),
+    ([], 100, False),
+    ([{"start": 100, "guessed": False}], None, False),
+])
+def test_delayed_squad_ranking_requires_same_known_match(monkeypatch, history, match_start, expected):
+    from rcon import rcon as rcon_module
+    sender = MagicMock()
+    monkeypatch.setattr(stats.time, "time", lambda: 1000)
+    monkeypatch.setattr(stats, "MapsHistory", lambda: history)
+    monkeypatch.setattr(stats.EndMatchStatsUserConfig, "load_from_db", classmethod(
+        lambda cls, **kwargs: cls(enabled=True, include_squads=True)))
+    monkeypatch.setattr(rcon_module, "get_rcon", lambda: sender)
+    stats.send_delayed_squad_message("Squad ranking", 990, match_start)
+    assert sender.message_all_players.call_count == int(expected)
+
+
+def test_delayed_squad_job_records_match_identity(setup_match, monkeypatch):
+    rcon, redis, log = setup_match
+    rcon.get_team_view.return_value["allies"]["squads"]["Able"]["kills"] = 15
+    monkeypatch.setattr(stats.EndMatchStatsUserConfig, "load_from_db", classmethod(
+        lambda cls, **kwargs: cls(enabled=True, include_players=True, include_squads=True)))
+    schedule = MagicMock()
+    monkeypatch.setattr(stats, "schedule_squad_message", schedule)
+    stats.send_end_match_stats(rcon, log)
+    assert schedule.call_count == 1
+    assert schedule.call_args.args[1:] == (1000, 15, 100)
+
+
 @pytest.mark.parametrize("case", ["old", "wrong_map", "incomplete", "new_match"])
 def test_unsafe_snapshot_is_not_sent(setup_match, monkeypatch, case):
     rcon, redis, log = setup_match
@@ -66,6 +97,26 @@ def test_unsafe_snapshot_is_not_sent(setup_match, monkeypatch, case):
 
 def test_empty_or_zero_values_are_omitted():
     assert stats.format_stats([{"name": "Alice", "kills": 0}]) is None
+
+
+def test_vietnam_squad_types_and_members_are_included_when_selected():
+    config = stats.EndMatchStatsUserConfig(include_players=True, include_squads=True)
+    assert {"mortar", "helicopter"}.issubset(config.unit_types)
+    teams = {"allies": {"squads": {
+        "Mortar": {"type": "mortar", "kills": 5, "players": [{"name": "Mortar player", "kills": 5}]},
+        "Air": {"type": "helicopter", "kills": 8, "players": [{"name": "Pilot", "kills": 8}]},
+    }}}
+    players, squads = stats.extract_team_view(teams, config, game=GameEnum.HLL_VIETNAM)
+    assert {p["name"] for p in players} == {"Mortar player", "Pilot"}
+    assert {s["name"] for s in squads} == {"Mortar (allies)", "Air (allies)"}
+    player_message, squad_message = stats.format_sections(players, config, squads)
+    assert "Pilot (8)" in player_message and "Air (allies) (8)" in squad_message
+
+
+def test_existing_explicit_unit_selection_remains_unchanged():
+    old = ["commander", "infantry", "armor", "artillery", "recon"]
+    assert stats.EndMatchStatsUserConfig.model_validate({"unit_types": old}).unit_types == old
+    assert stats.EndMatchStatsUserConfig(unit_types=["mortar", "helicopter"]).unit_types == ["mortar", "helicopter"]
 
 
 def test_squadless_players_count_individually_without_creating_a_squad():

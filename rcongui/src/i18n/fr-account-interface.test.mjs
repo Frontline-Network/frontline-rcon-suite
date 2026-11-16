@@ -19,7 +19,7 @@ test("French account and interface copy matches English keys and variables", () 
     }
   };
   for (const key of Object.keys(accountInterfaceFr)) compare(en[key], accountInterfaceFr[key], key);
-  assert.equal(count, 177);
+  assert.equal(count, 179);
   assert.match(accountInterfaceFr.accountPassword.sent, /Si un compte actif/);
   assert.match(accountInterfaceFr.accountPassword.saveFailed, /connexion a été interrompue/);
   assert.match(accountInterfaceFr.updates.preview, /ne confirment aucun déploiement réel/);

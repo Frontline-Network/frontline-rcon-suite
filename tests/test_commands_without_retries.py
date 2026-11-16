@@ -80,3 +80,28 @@ def test_disabling_retries_does_not_change_other_supervisor_threads(controller):
         assert not worker.is_alive()
     assert errors == []
     connection.exchange.assert_called_once()
+
+
+@pytest.mark.parametrize("command", ["MessagePlayer", "PunishPlayer", "ForceTeamSwitch", "KickPlayer", "AddMapToRotation", "RemoveMapFromRotation", "AddMapToSequence", "RemoveMapFromSequence", "MoveMapInSequence", "ChangeMap", "RemovePermanentBan", "SetWelcomeMessage", "FutureUnknownCommand"])
+@pytest.mark.parametrize("method", ["receive", "receive_optional"])
+def test_side_effect_command_is_not_retried_after_lost_response(command, method):
+    api = HLLServerCtl(ServerInfo(host="127.0.0.1", port=12345, password="test"), Mock())
+    connection = Mock()
+    api.with_connection = Mock(return_value=nullcontext(connection))
+    handle = Mock()
+    handle.request = SimpleNamespace(name=command, version=2, content={})
+    handle.receive.side_effect = OSError("response lost")
+    with pytest.raises(OSError, match="response lost"):
+        getattr(api, method)(handle)
+    connection.exchange.assert_not_called()
+
+
+@pytest.mark.parametrize("command", ["MessagePlayer", "PunishPlayer", "ForceTeamSwitch"])
+def test_side_effect_command_is_not_retried_after_send_error(command):
+    api = HLLServerCtl(ServerInfo(host="127.0.0.1", port=12345, password="test"), Mock())
+    connection = Mock()
+    connection.send.side_effect = OSError("uncertain send")
+    api.with_connection = Mock(return_value=nullcontext(connection))
+    with pytest.raises(OSError, match="uncertain send"):
+        api.send(command, 2, {})
+    connection.send.assert_called_once()

@@ -48,12 +48,15 @@ def apply_name_kick(
     for pattern in config.regular_expressions:
         if re.match(pattern, name):
             logger.info("%s matched player %s", pattern, name)
-            rcon.kick(
+            accepted = rcon.kick(
                 player_name=name,
                 reason=config.kick_reason,
                 by="NAME_KICK",
                 player_id=player_id,
             )
+            if accepted is not True:
+                logger.warning("Game server did not confirm nickname kick for %s", player_id)
+                return False
             try:
                 webhookurls: list[HttpUrl | None] | None
                 if config.discord_webhook_url is None:

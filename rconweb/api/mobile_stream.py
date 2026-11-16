@@ -62,12 +62,6 @@ class MobileIncidentStreamConsumer(AsyncJsonWebsocketConsumer):
             )
             if next_cursor != cursor:
                 cursor = next_cursor
-                if statuses:
-                    incidents = [
-                        incident
-                        for incident in incidents
-                        if incident["status"] in statuses
-                    ]
                 if server_numbers:
                     server_set = {int(value) for value in server_numbers}
                     incidents = [
@@ -75,13 +69,16 @@ class MobileIncidentStreamConsumer(AsyncJsonWebsocketConsumer):
                         for incident in incidents
                         if incident["server_number"] in server_set
                     ]
-                await self.send_json(
-                    {
-                        "incidents": _json_value(incidents),
-                        "cursor": cursor,
-                        "error": None,
-                    }
-                )
+                payload = {"cursor": cursor, "error": None}
+                if statuses:
+                    # A changed incident outside the subscribed statuses must
+                    # also evict any older matching snapshot held by clients.
+                    payload["removed_incident_ids"] = [
+                        incident["id"] for incident in incidents if incident["status"] not in statuses
+                    ]
+                    incidents = [incident for incident in incidents if incident["status"] in statuses]
+                payload["incidents"] = _json_value(incidents)
+                await self.send_json(payload)
             await asyncio.sleep(0.5)
 
 

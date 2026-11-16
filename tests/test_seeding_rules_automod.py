@@ -503,6 +503,8 @@ def test_cycles_warn_punish_kick_armor_players(team_view):
     assert expected_warned_players == punitions.warning
     assert [] == punitions.punish
     assert [] == punitions.kick
+    for player in punitions.warning:
+        mod.player_warning_succeeded(player)
     time.sleep(config.warning_interval_seconds)
 
     punitions = mod.punitions_to_apply(
@@ -554,6 +556,8 @@ def test_cycles_warn_punish_kick_cap_fight_players(team_view):
     assert [expected_warned_players[0]] == punitions.warning
     assert [] == punitions.punish
     assert [] == punitions.kick
+    for player in punitions.warning:
+        mod.player_warning_succeeded(player)
     time.sleep(config.warning_interval_seconds)
 
     team_view["allies"]["squads"]["able"]["players"][0]["offense"] += 1
@@ -765,6 +769,7 @@ def test_position_boundary_applies_to_both_teams_regardless_of_score(
     first = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
     assert [player["player_id"]] == [p.player_id for p in first.warning]
     assert not first.punish
+    mod.player_warning_succeeded(first.warning[0])
 
     # Capturing/losing the middle must not restart the warning grace period.
     snapshot.update({score_key: 5 - score, other_key: score})
@@ -776,6 +781,7 @@ def test_position_boundary_applies_to_both_teams_regardless_of_score(
     second = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
     assert [player["player_id"]] == [p.player_id for p in second.warning]
     assert not second.punish
+    mod.player_warning_succeeded(second.warning[0])
     watch_status.warned[player["name"]][-1] -= timedelta(seconds=61)
     punished = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
     assert [player["player_id"]] == [p.player_id for p in punished.punish]
@@ -1326,6 +1332,7 @@ def test_pending_spawn_guard_does_not_repeatedly_reset_role_warnings(
     player["world_position"] = {"x": 0, "y": 0, "z": 0}
     first = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
     assert [p.player_id for p in first.warning] == [player["player_id"]]
+    mod.player_warning_succeeded(first.warning[0])
     if position_lost:
         player["world_position"] = None
     second = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)

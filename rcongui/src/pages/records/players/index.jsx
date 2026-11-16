@@ -8,6 +8,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
+  Alert,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
@@ -27,6 +28,8 @@ import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoPlayerRecords, isFakeMode } from "@/mirage/demo-data";
 import { useStorageState } from "@/hooks/useStorageState";
+import SessionEventReview from "./SessionEventReview";
+import AutomodActionReview from "./AutomodActionReview";
 
 // Create a memoized version of PlayerCard
 const MemoizedPlayerCard = memo(PlayerCard);
@@ -130,6 +133,7 @@ export const loader = async ({ request }) => {
         ? Math.ceil(Number(playersRecords.result.total) / page_size)
         : 1,
     total: Number(playersRecords.result.total),
+    localOnlineSnapshotAvailable: playersRecords.result.local_online_snapshot_available,
     page: Number(page),
     fields,
   };
@@ -144,6 +148,7 @@ export default function PlayersRecords() {
     total_pages,
     total,
     page,
+    localOnlineSnapshotAvailable,
   } = useLoaderData();
   const navigation = useNavigation();
   const isCompactViewport = useMediaQuery((theme) =>
@@ -296,6 +301,11 @@ export default function PlayersRecords() {
         title={t("records.players.title")}
         subtitle={t("records.players.subtitle")}
       />
+      {localOnlineSnapshotAvailable === false && (
+        <Alert severity="warning">{t("records.players.liveSnapshotUnavailable")}</Alert>
+      )}
+      <SessionEventReview />
+      <AutomodActionReview />
       {selectedPlayerIds.size > 0 ? (
         <Stack data-theme-surface="panel"
           component="section"

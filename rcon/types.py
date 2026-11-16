@@ -176,7 +176,7 @@ class GameEnum(enum.StrEnum):
 
     @classmethod
     def from_int(cls, value: int) -> "GameEnum":
-        return cls(GameIntEnum(value).name)
+        return cls[GameIntEnum(value).name]
 
 
 class GameIntEnum(enum.IntEnum):
@@ -1186,8 +1186,8 @@ class MapRotationResponse(TypedDict):
 
 class GetMapRotation(TypedDict):
     maps: list["Layer"]
-    current_index: int
-    next_index: int
+    current_index: int | None
+    next_index: int | None
 
 
 class ScoreDataType(TypedDict):

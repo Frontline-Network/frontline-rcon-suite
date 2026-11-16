@@ -32,7 +32,7 @@ class EndMatchStatsUserConfig(BaseUserConfig):
     kpm: bool = Field(default=False, strict=True)
     include_players: bool = Field(default=True, strict=True)
     include_squads: bool = Field(default=False, strict=True)
-    unit_types: list[Literal["commander", "infantry", "armor", "artillery", "recon"]] = Field(default_factory=lambda: ["commander", "infantry", "armor", "artillery", "recon"], min_length=1)
+    unit_types: list[Literal["commander", "infantry", "armor", "artillery", "recon", "mortar", "helicopter"]] = Field(default_factory=lambda: ["commander", "infantry", "armor", "artillery", "recon", "mortar", "helicopter"], min_length=1)
     top_count: int = Field(default=1, ge=1, le=3)
     message_gap_seconds: int = Field(default=15, ge=5, le=30)
     support_multiplier: float = Field(default=1.5, ge=0, le=5, allow_inf_nan=False)

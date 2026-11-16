@@ -10,6 +10,7 @@ UNREADABLE_NAME_PATTERN = r"(^[^a-zA-Z0-9äöüÄÖÜß\[\]]+$)"
 
 def test_roster_scan_kicks_existing_matching_player_without_profile_lookup():
     rcon = Mock()
+    rcon.kick.return_value = True
     rcon.get_player_ids.return_value = [
         ("Гук в Шльопках", "invalid-player"),
         ("[FLN]Biene", "valid-player"),
@@ -34,6 +35,17 @@ def test_roster_scan_kicks_existing_matching_player_without_profile_lookup():
         by="NAME_KICK",
         player_id="invalid-player",
     )
+
+
+def test_rejected_name_kick_is_not_counted_or_audited_as_success():
+    rcon = Mock()
+    rcon.get_player_ids.return_value = [("invalid", "player-id")]
+    rcon.kick.return_value = False
+    config = NameKickUserConfig(regular_expressions=["invalid"], whitelist_flags=[])
+    with patch("rcon.auto_kick.send_to_discord_audit") as audit:
+        assert scan_current_players(rcon, config=config) == 0
+    rcon.kick.assert_called_once()
+    audit.assert_not_called()
 
 
 def test_player_with_whitelist_flag_is_not_kicked():

@@ -41,6 +41,7 @@ from rcon.player_history import (
 from rcon.rcon import Rcon, StructuredLogLineWithMetaData, do_run_commands
 from rcon.recent_actions import get_recent_actions
 from rcon.types import (
+    GameEnum,
     MessageVariableContext,
     MostRecentEvents,
     PlayerFlagType,
@@ -274,7 +275,10 @@ def remind_vote_map(_, struct_log):
     if vm.enabled:
         logger.info("Match ended reminding to vote map. %s", struct_log)
         vm.apply_results()
-        vm.send_reminder(force=vm.config.remind_on_match_end)
+        if vm.config.remind_on_match_end:
+            vm.send_reminder(force=True, scope=f"event:end:{struct_log['timestamp_ms']}")
+        else:
+            vm.send_reminder(force=False)
 
 
 @on_match_start
@@ -360,7 +364,10 @@ def handle_new_match_start(rcon: Rcon, struct_log):
                     flatten=False,
                 )
             vm.restart()
-            vm.send_reminder(force=vm.config.remind_on_match_start)
+            if vm.config.remind_on_match_start:
+                vm.send_reminder(force=True, scope=f"event:start:{struct_log['timestamp_ms']}")
+            else:
+                vm.send_reminder(force=False)
     except Exception:
         logger.exception("Unable to update map vote after recording match start")
 
@@ -654,6 +661,12 @@ def windows_store_player_check(rcon: Rcon, _, name: str, player_id: str):
     config = RconServerSettingsUserConfig.load_from_db().windows_store_players
 
     if not config.enabled or steam_utils.is_steam_id_64(player_id):
+        return
+
+    # HLL Vietnam supplies EOS IDs for multiple platforms. A non-Steam ID
+    # therefore cannot establish that a player uses the Windows Store.
+    if rcon.config.game == GameEnum.HLL_VIETNAM:
+        logger.warning("Skipping Windows Store rule: HLL Vietnam IDs do not identify the platform")
         return
 
     action = config.action

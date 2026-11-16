@@ -1,10 +1,12 @@
 import datetime
 import logging
+import os
 import re
 import sys
 import time
 from collections import defaultdict
 from functools import partial
+from pathlib import Path
 from typing import Callable, Dict, Iterable, DefaultDict
 
 import discord_webhook
@@ -21,7 +23,8 @@ from rcon.types import AllLogTypes, GameEnum, GameStateType, GetDetailedPlayers,
 from rcon.user_config.log_line_webhooks import LogLineWebhookUserConfig
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
 from rcon.user_config.webhooks import DiscordMentionWebhook
-from rcon.utils import LogsHistory, MapsHistory, layer_matches_match_log
+from rcon.utils import LogsHistory, MapsHistory, get_server_number, layer_matches_match_log
+from rcon.session_event_journal import SessionEventJournal
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +150,7 @@ def on_generic(key, func) -> Callable:
                 and f.args == func.args
                 and f.keywords == func.keywords
         ):
-            logger.info("Skipping %s %s already added", key, func)
+            logger.info("Skipping already registered generic hook for %s", key)
             return func
 
     HOOKS[key].append(func)
@@ -186,7 +189,7 @@ def send_log_line_webhook_message(
 
     wh = make_hook(webhook.url)
     if not wh:
-        logger.error("Error creating discord webhook for: %s", webhook.url)
+        logger.error("Error creating Discord log webhook")
         return
 
     allowed_mentions = make_allowed_mentions(mentions)
@@ -206,6 +209,9 @@ def send_log_line_webhook_message(
     started = time.perf_counter()
     try:
         wh.execute()
+    except Exception:
+        # Webhook transport exceptions can include the capability URL.
+        logger.error("Discord log webhook delivery failed")
     finally:
         logger.debug(
             "Discord log webhook completed in %.3fs",
@@ -221,6 +227,7 @@ def load_generic_hooks():
     """Load and validate all the subscribed log line webhooks from config.yml"""
     logger.info("Loading generic hooks")
     config = LogLineWebhookUserConfig.load_from_db()
+    configured_hooks = defaultdict(list)
     for hook in config.webhooks:
         # mentions = [h.user_mentions + h.role_mentions for h in conf.webhooks]
         func = partial(send_log_line_webhook_message, hook.webhook)
@@ -230,8 +237,19 @@ def load_generic_hooks():
         func.__module__ = __name__
 
         for log_type in hook.log_types:
-            logger.info("Adding log type %s, %s", func, log_type.value)
-            on_generic(log_type.value, func)
+            logger.info("Adding generic hook for log type %s", log_type.value)
+            existing = configured_hooks[log_type.value]
+            if not any(item.args == func.args and item.keywords == func.keywords for item in existing):
+                existing.append(func)
+
+    # Replace only dynamically configured log-webhook hooks. Keep built-in and
+    # independently registered hooks untouched when a webhook is removed.
+    for key in set(HOOKS) | set(configured_hooks):
+        retained = [
+            hook for hook in HOOKS[key]
+            if not (isinstance(hook, partial) and hook.func is send_log_line_webhook_message)
+        ]
+        HOOKS[key] = retained + configured_hooks[key]
 
 
 class LogLoop:
@@ -240,6 +258,12 @@ class LogLoop:
         self.red = get_redis_client()
         self.duplicate_guard_key = "unique_logs"
         self.log_history = self.get_log_history_list()
+        self.session_server_number = int(get_server_number())
+        journal_dir = Path(os.getenv("HLL_SESSION_JOURNAL_DIR", "/data/session-events"))
+        journal_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self.session_journal = SessionEventJournal(journal_dir / f"server-{self.session_server_number}.sqlite3")
+        self.session_cutover_us = self.session_journal.cutover_us((time.time_ns() // 1_000_000) * 1000)
+        self.session_last_prune = time.monotonic()
         self.ACTIVE_MAP_INDEX = 0
         self.RECORD_STATS = 30 # 0.5 minute
         self.RECORD_PLAYER_STATS_DELAY = 120 # 2 minutes
@@ -247,7 +271,7 @@ class LogLoop:
         self.CLEANUP_MIN = 180 # 3 hours
         self.CURR_MAP_END = 0
         self.now = 0
-        logger.info("Registered hooks: %s", HOOKS)
+        logger.info("Registered hooks for %s log types", len(HOOKS))
 
     @staticmethod
     def get_log_history_list():
@@ -378,6 +402,7 @@ class LogLoop:
         return curr_map_time_elapsed
 
     def process_logs(self):
+        self._drain_session_events()
         started = time.perf_counter()
         logs = self.rcon.get_structured_logs(since_min_ago=self.GET_LOGS_SINCE_MIN)
         logger.info(
@@ -385,6 +410,24 @@ class LogLoop:
             time.perf_counter() - started,
             len(logs["logs"]),
         )
+        # Store session-only events before any duplicate guard or general hook
+        # can discard the log. This transaction is local and synchronous.
+        session_events = []
+        unidentified_events = []
+        for log in logs["logs"]:
+            kind = {AllLogTypes.connected.value: "connect",
+                    AllLogTypes.disconnected.value: "disconnect"}.get(log.get("action"))
+            if kind:
+                event_us = int(log["timestamp_ms"]) * 1000
+                if log.get("player_id_1"):
+                    session_events.append((self.session_server_number, log["player_id_1"], kind, event_us))
+                else:
+                    unidentified_events.append((self.session_server_number, kind, event_us,
+                                                log.get("player_name_1") or "",
+                                                log.get("raw") or log.get("line_without_time") or ""))
+        added = self.session_journal.remember_batch(session_events, self.session_cutover_us, unidentified_events)
+        if unidentified_events and added:
+            logger.warning("Session log batch contains events without player IDs; retained for review")
         self.GET_LOGS_SINCE_MIN = 5
         current_map = MapsHistory().get_current_map()
         name_to_id = self._get_name_to_id(current_map) if current_map else {}
@@ -392,6 +435,35 @@ class LogLoop:
             line = self.record_line(log, name_to_id)
             if line:
                 self.process_hooks(line)
+        self._drain_session_events()
+
+    def _drain_session_events(self):
+        # A retry must never rerun the general hooks, which can send messages
+        # or issue bans. Only the idempotent session writes are replayed.
+        from rcon.player_history import save_start_player_session, save_end_player_session
+        from rcon.session_event_review import record_unidentified
+
+        def handle(server, player_id, kind, event_us):
+            if server != self.session_server_number:
+                raise ValueError("Session journal server mismatch")
+            if kind == "connect":
+                return save_start_player_session(player_id, event_us / 1_000_000,
+                                                 server_number=server)
+            save_end_player_session(player_id, event_us / 1_000_000)
+
+        try:
+            self.session_journal.drain(handle)
+            self.session_journal.publish_unidentified(record_unidentified)
+            now = time.monotonic()
+            if now - getattr(self, "session_last_prune", now) >= 3600:
+                # Keep acknowledgements longer than the three-hour log window.
+                # Never prune a pending event.
+                self.session_journal.prune_completed(int(time.time()) - 7 * 24 * 3600)
+                self.session_last_prune = now
+        except Exception:
+            # The local journal retains the entry until a later successful
+            # attempt, including when PostgreSQL is temporarily unavailable.
+            logger.exception("Unable to process queued session events; will retry")
 
     def get_detailed_players(self) -> GetDetailedPlayers:
         started = time.perf_counter()

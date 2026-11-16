@@ -1,0 +1,7 @@
+# Blacklist synchronization rollout
+
+Blacklist mutations and per-server deliveries commit in the same PostgreSQL transaction. Updated workers consume deliveries in order. They keep an unconfirmed action for operator review rather than replaying it. Overlapping changes that cannot be safely reconciled by the worker also require review. An operator must verify and, if needed, correct the game server's actual ban state against the current blacklists before acknowledging each entry. Acknowledgement does not run the original action.
+
+All producers and target workers sharing the same blacklist database must be updated to obtain durable delivery end to end. Updated producers no longer publish blacklist mutations through the legacy Pub/Sub channel: an older target worker cannot consume the new journal, so its deliveries wait until that target is updated. An older producer still emits legacy Pub/Sub notifications, which the new worker handles for compatibility, but those older-producer changes remain vulnerable to subscriber outages. The Barricade online-warning message still uses the separate legacy channel.
+
+During a partial rollout, do not promise reliable synchronization for old producers or old target workers. Before downgrading an updated worker, inspect the journal and arrange to update it again to process any queued deliveries. A rollback to older images must retain the new table; dropping it discards queued and review entries. The schema downgrade is intended for isolated tests or after operators have separately resolved and archived all entries.

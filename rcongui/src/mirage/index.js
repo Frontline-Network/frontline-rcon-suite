@@ -25,6 +25,7 @@ import {
 import {
   getDemoServerConnection,
   getDemoTeamView,
+  getDemoGameState,
   demoPlayerRecords,
   demoVietnamMapLayers,
   getDemoServerList,
@@ -38,6 +39,18 @@ import {
 export function makeServer({ environment = "development" } = {}) {
   let gameState = createGameState();
   let vipRewards = structuredClone(vipRewardDefaults);
+  let endMatchStats = {
+    enabled: false, language: "en", title: "", kills: true, defense: true,
+    support: true, combat: false, offense: false, vehicles_destroyed: false,
+    teamplay: false, offdef: false, kd: false, kpm: false,
+    include_players: true, include_squads: true,
+    unit_types: ["commander", "infantry", "armor", "artillery", "recon"],
+    top_count: 1, message_gap_seconds: 15, support_multiplier: 1.5, defense_multiplier: 1.5,
+  };
+  let seedVipReviewResolved = false;
+  let blacklistSyncReviewResolved = false;
+  let sessionEventReviewResolved = false;
+  let automodActionReviewResolved = false;
   let demoServerName = "[GER] Frontline Network | #2";
   let demoServerNameConfig = { ip: "127.0.0.1", port: 10011 };
   const disbandAttempts = new Map();
@@ -364,18 +377,21 @@ export function makeServer({ environment = "development" } = {}) {
       );
       this.get(
         "/get_gamestate",
-        trackProtectedRequest("/api/get_gamestate", () =>
-          ok({
+        trackProtectedRequest("/api/get_gamestate", () => {
+          const demoState = new URLSearchParams(window.location.search).has("demo_balance")
+            ? getDemoGameState()
+            : null;
+          return ok({
             current_map: currentLayer,
             next_map: nextLayer,
             raw_time_remaining: "00:57:07",
             time_remaining: 3427,
             allied_score: 3,
             axis_score: 2,
-            num_allied_players: 49,
-            num_axis_players: 49,
-          })
-        )
+            num_allied_players: demoState?.num_allied_players ?? 49,
+            num_axis_players: demoState?.num_axis_players ?? 49,
+          });
+        })
       );
       this.get(
         "/get_ingame_mods",
@@ -891,14 +907,86 @@ export function makeServer({ environment = "development" } = {}) {
       this.get("/get_name_kick_config", () => ok(autoMod(true)));
       this.get("/get_vac_game_bans_config", () => ok(autoMod(true)));
       this.get("/get_seed_vip_config", () => ok(autoMod(true)));
+      this.get("/get_seed_vip_journal", () => {
+        const showFixture = typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("demo_seed_review") === "1" &&
+          !seedVipReviewResolved;
+        const results = showFixture ? [{ id: 1, player_id: "fake-console-id", player_name: "Example Player", status: "review", target: "2026-01-02T12:00:00Z" }] : [];
+        return ok({ total: results.length, offset: 0, results });
+      });
+      this.post("/acknowledge_seed_vip_review", (_schema, request) => {
+        const { grant_id } = JSON.parse(request.requestBody);
+        if (grant_id !== 1 || seedVipReviewResolved) return ok(false);
+        seedVipReviewResolved = true;
+        return ok(true);
+      });
+      this.get("/get_blacklist_sync_reviews", () => {
+        const showFixture = typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("demo_blacklist_review") === "1" &&
+          !blacklistSyncReviewResolved;
+        const results = showFixture ? [{ id: 1, command: "EXPIRE_ALL", payload: { player_id: "fake-console-id" }, updated_at: "2026-01-02T12:00:00Z" }] : [];
+        return ok({ total: results.length, results });
+      });
+      this.post("/acknowledge_blacklist_sync_review", (_schema, request) => {
+        const { delivery_id } = JSON.parse(request.requestBody);
+        if (delivery_id !== 1 || blacklistSyncReviewResolved) return ok(false);
+        blacklistSyncReviewResolved = true;
+        return ok(true);
+      });
+      this.get("/get_pending_session_events", () => {
+        const showFixture = typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("demo_session_review") === "1" &&
+          !sessionEventReviewResolved;
+        const anonymous = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("anonymous") === "1";
+        const results = showFixture && anonymous ? [{ kind: "unidentified", event_kind: "disconnect",
+          fingerprint: "a".repeat(64), player_name: "", raw: "DISCONNECTED ()",
+          event_us: "1700000000000000", event_time: "2023-11-14T22:13:20+00:00" }] : showFixture ? [{ kind: "connect", player_id: "fake-console-id",
+          event_us: "1700000000000000", event_time: "2023-11-14T22:13:20+00:00", identity_exists: true,
+          legacy_candidates: [{ id: 12, start: "2023-11-14T22:13:20", end: null }] }] : [];
+        return ok({ results, more_connects: false, more_disconnects: false });
+      });
+      this.post("/resolve_pending_session_event", (_schema, request) => {
+        const payload = JSON.parse(request.requestBody);
+        if (payload.event_us !== "1700000000000000" || !payload.reason || sessionEventReviewResolved) return ok(false);
+        sessionEventReviewResolved = true;
+        return ok(true);
+      });
+      this.get("/get_pending_automod_actions", () => {
+        const showFixture = typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("demo_automod_action_review") === "1" &&
+          !automodActionReviewResolved;
+        const globalHold = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("global_hold") === "1";
+        const teamkill = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("teamkill_hold") === "1";
+        return ok({ results: showFixture ? [{ token: "synthetic-token", player_id: globalHold ? "*" : "fake-console-id",
+          updated_at: "2023-11-14T22:13:20+00:00", actions: [{ rule: teamkill ? "AutoMod_TeamKillAfterConnect" : "AutoMod_NoLeaderWatch", action: teamkill ? "ban" : "message" }] }] : [], more: false });
+      });
+      this.post("/review_pending_automod_action", (_schema, request) => {
+        const payload = JSON.parse(request.requestBody);
+        if (payload.token !== "synthetic-token" || !payload.reason || automodActionReviewResolved) return ok(false);
+        automodActionReviewResolved = true;
+        return ok(true);
+      });
       this.get("/get_vip_rewards_config", () => ok(vipRewards));
+      this.get("/get_end_match_stats_config", () => ok(endMatchStats));
+      this.post("/validate_end_match_stats_config", () => ok(true));
+      this.post("/set_end_match_stats_config", (_schema, request) => {
+        endMatchStats = JSON.parse(request.requestBody).config;
+        return ok(true);
+      });
       this.post("/validate_vip_rewards_config", () => ok(true));
       this.post("/set_vip_rewards_config", (schema, request) => {
         vipRewards = JSON.parse(request.requestBody).config;
         return ok(true);
       });
       this.get("/get_vip_rewards_status", () => ok({ status: vipRewards.enabled ? "seeding" : "disabled", preview: vipRewards.dry_run, counts: { allies: 14, axis: 18 }, thresholds: { allies: 20, axis: 20 } }));
-      this.get("/get_vip_rewards_journal", () => ok({ total: 0, offset: 0, results: [] }));
+      this.get("/get_vip_rewards_journal", () => {
+        const showNotice = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo_vip_notice") === "1";
+        return ok({ total: showNotice ? 1 : 0, offset: 0, results: showNotice ? [{
+          id: 1, player_id: "synthetic-player", rule: "melee", occurred: 1700000000,
+          credited_seconds: 3600, requested_seconds: 3600, status: "awarded", reason: "",
+          notice: { status: "review", attempts: 1 },
+        }] : [] });
+      });
       this.get("/get_vip_rewards_progress", () => ok({ total: 0, round: 0, days: {} }));
       this.get("/get_chat_commands_config", () => ok(autoMod(true, true)));
       this.get("/get_rcon_chat_commands_config", () => ok(autoMod(true)));
@@ -1064,6 +1152,9 @@ export function makeServer({ environment = "development" } = {}) {
         });
       });
 
+      this.passthrough((request) =>
+        new URL(request.url, window.location.origin).pathname.endsWith("/language-chunks.json")
+      );
       // Account forms use the isolated Django preview, including its session
       // and CSRF checks; never simulate a successful password change.
       this.passthrough((request) =>

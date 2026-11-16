@@ -155,6 +155,30 @@ def live_profile_database(monkeypatch):
     engine.dispose()
 
 
+def test_live_profile_current_session_is_local_but_count_remains_global(live_profile_database, monkeypatch):
+    _engine, sessions = live_profile_database
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    with sessions.begin() as session:
+        player = PlayerID(player_id="synthetic-multiserver", steam_id=None, created=now)
+        session.add(player)
+        session.flush()
+        session.add_all([
+            PlayerSession(player_id_id=player.id, start=now-timedelta(minutes=30), end=None,
+                          created=now-timedelta(minutes=30), server_number=1, server_name="one"),
+            PlayerSession(player_id_id=player.id, start=now-timedelta(minutes=10), end=now-timedelta(minutes=1),
+                          created=now-timedelta(minutes=10), server_number=2, server_name="two"),
+        ])
+    local = get_live_profiles(["synthetic-multiserver"])[0]
+    assert local["sessions_count"] == 2
+    assert 1795 <= local["current_playtime_seconds"] <= 1810
+    monkeypatch.setenv("SERVER_NUMBER", "2")
+    other = get_live_profiles(["synthetic-multiserver"])[0]
+    assert other["sessions_count"] == 2 and other["current_playtime_seconds"] == 0
+    monkeypatch.setenv("SERVER_NUMBER", "3")
+    missing = get_live_profiles(["synthetic-multiserver"])[0]
+    assert missing["sessions_count"] == 2 and missing["current_playtime_seconds"] == 0
+
+
 def test_live_profile_query_count_is_constant_and_joins_scalar_relationships(
     live_profile_database,
 ):

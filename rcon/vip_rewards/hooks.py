@@ -2,6 +2,7 @@
 
 import time
 import logging
+import uuid
 
 from rcon.cache_utils import get_redis_client
 from rcon.logs.loop import (
@@ -16,23 +17,65 @@ from rcon.user_config.autobalancer import AutobalancerUserConfig
 from rcon.user_config.vip_rewards import VipRewardsUserConfig
 from rcon.utils import get_server_number
 from rcon.vip_rewards.service import enqueue, read_state
+from rcon.vip_rewards.locking import switch_state_lock
 
 
 def forced_key(pid):
     return f"vip-rewards-forced:{get_server_number()}:{pid}"
 
 
+def forced_pending_key(pid):
+    return f"vip-rewards-forced-pending:{get_server_number()}:{pid}"
+
+
+def forced_inflight_key(pid):
+    return f"vip-rewards-forced-inflight:{get_server_number()}:{pid}"
+
+
+def players_with_forced_switch(player_ids, now):
+    """Read while holding switch_state_lock; Redis failure must stop the snapshot."""
+    player_ids = list(player_ids)
+    with get_redis_client().pipeline(transaction=False) as pipe:
+        for pid in player_ids:
+            pipe.exists(forced_key(pid))
+            pipe.zcount(forced_pending_key(pid), now, "+inf")
+            pipe.zcount(forced_inflight_key(pid), now, "+inf")
+        values = pipe.execute()
+    return {pid for index, pid in enumerate(player_ids) if any(values[index * 3:index * 3 + 3])}
+
+
 def mark_forced(pid, on_death=False):
-    # Set before sending the switch command; a failed command errs on the safe side.
-    get_redis_client().setex(forced_key(pid), 86400 if on_death else 120, "1")
-    enqueue(
-        dict(
-            kind="forced",
-            player_id=pid,
-            time=time.time(),
-            key=f"forced:{pid}:{time.time_ns()}",
+    # Each command owns its marker: rejecting one command must not clear another.
+    token, started = uuid.uuid4().hex, time.time()
+    redis = get_redis_client()
+    with switch_state_lock(), redis.pipeline(transaction=True) as pipe:
+        pipe.zadd(forced_pending_key(pid), {token: started + (86400 if on_death else 120)})
+        pipe.zadd(forced_inflight_key(pid), {token: started + 86400})
+        pipe.expire(forced_pending_key(pid), 86400)
+        pipe.expire(forced_inflight_key(pid), 86400)
+        pipe.execute()
+    return token, started
+
+
+def finish_forced(pid, marker, rejected=False):
+    token, started = marker
+    with switch_state_lock():
+        if rejected:
+            with get_redis_client().pipeline(transaction=True) as pipe:
+                pipe.zrem(forced_pending_key(pid), token)
+                pipe.zrem(forced_inflight_key(pid), token)
+                pipe.execute()
+            return
+        enqueue(
+            dict(
+                kind="forced",
+                player_id=pid,
+                time=time.time(),
+                switch_started=started,
+                key=f"forced:{pid}:{token}",
+            )
         )
-    )
+        get_redis_client().zrem(forced_inflight_key(pid), token)
 
 
 def payload(kind, log):
@@ -118,11 +161,23 @@ def switch(rcon, log):
     if len(parts) != 2:
         return
     event.update(source=parts[0].strip(), target=parts[1].strip())
-    red = get_redis_client()
-    event["forced"] = bool(red.get(forced_key(event["player_id"])))
-    enqueue(event)
-    if event["forced"] and event["target"] in ("axis", "allies"):
-        red.delete(forced_key(event["player_id"]))
+    with switch_state_lock():
+        red = get_redis_client()
+        pid = event["player_id"]
+        pending_key = forced_pending_key(pid)
+        now = time.time()
+        red.zremrangebyscore(pending_key, "-inf", now)
+        markers = red.zrangebyscore(pending_key, now, "+inf")
+        legacy_marker = red.get(forced_key(pid))
+        event["forced"] = bool(markers or legacy_marker)
+        enqueue(event)
+        if event["forced"] and event["target"] in ("axis", "allies"):
+            # Concurrent commands cannot be matched to individual log lines.
+            # Preserve ambiguous markers until their individual expiry.
+            if len(markers) == 1:
+                red.zrem(pending_key, *markers)
+            if legacy_marker:
+                red.delete(forced_key(pid))
 
 
 on_generic("TEAMSWITCH", switch)

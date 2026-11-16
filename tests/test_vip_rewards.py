@@ -1,7 +1,7 @@
 """Offline policy and durable delivery tests. No game server is contacted."""
 
 import copy
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from unittest.mock import Mock
 
@@ -101,6 +101,57 @@ def test_melee_aliases(name):
     kill["weapon"] = name
     e.event(kill, NOW + 1)
     assert len(e.claims) == 1
+
+
+@pytest.mark.parametrize("game,name,expected", [
+    ("hllv", "Knife", True), ("hllv", "M3 Knife", True),
+    ("hll", "Knife", False), ("hll", "M3 Knife", True),
+    ("hllv", "M16A1", False),
+])
+def test_melee_rewards_follow_active_game_reference(game, name, expected):
+    e = Engine({}, config(melee={"enabled": True}), game=game)
+    e.snapshot(NOW, PLAYERS, COUNTS, THRESHOLDS)
+    kill = event()
+    kill["weapon"] = name
+    e.event(kill, NOW + 1)
+    assert bool(e.claims) is expected
+    if expected:
+        kill.update(key="event-2", time=NOW + 2)
+        e.event(kill, NOW + 2)
+        assert len(e.claims) == 1
+
+
+def test_challenge_progress_prunes_old_periods_without_losing_current_or_fixed():
+    cfg = config(challenges=[
+        {"id": "daily", "name": "Daily", "enabled": True, "weapons": ["M3 KNIFE"], "kills": 100, "period": "day"},
+        {"id": "weekly", "name": "Weekly", "enabled": True, "weapons": ["M3 KNIFE"], "kills": 100, "period": "week"},
+        {"id": "fixed", "name": "Fixed", "enabled": True, "weapons": ["M3 KNIFE"], "kills": 100, "period": "fixed", "start": "2026-11-01T00:00:00Z", "end": "2027-02-01T00:00:00Z"},
+    ])
+    e = engine(cfg)
+    for offset in range(30):
+        now = NOW + offset * 86400
+        e.snapshot(now, PLAYERS, COUNTS, THRESHOLDS)
+        kill = event()
+        kill.update(time=now + 1, key=f"kill-{offset}")
+        e.event(kill, now + 1)
+    progress = e.player("a")["challenges"]
+    day, week = periods(NOW + 29 * 86400, cfg.timezone)
+    assert progress[f"daily:{day}"] == 1
+    assert progress[f"weekly:{week}"] >= 1
+    assert progress["fixed:fixed"] == 30
+    assert len([key for key in progress if key.startswith("daily:")]) == 15
+    assert len([key for key in progress if key.startswith("weekly:")]) <= 3
+
+
+def test_removed_challenge_progress_is_pruned_but_completed_grants_remain():
+    cfg = config(challenges=[{"id": "keep", "name": "Keep", "enabled": False}])
+    e = engine(cfg)
+    p = e.player("a")
+    p["challenges"] = {"keep:fixed": 4, "removed:fixed": 3, "unknown-format": 2}
+    p["completed"] = {"challenge:removed:fixed": NOW - 100 * 86400}
+    e.snapshot(NOW + 30, PLAYERS, COUNTS, THRESHOLDS)
+    assert p["challenges"] == {"keep:fixed": 4, "unknown-format": 2}
+    assert "challenge:removed:fixed" in p["completed"]
 
 
 def test_opponent_guard_shared_between_melee_and_challenges():
@@ -240,6 +291,15 @@ def test_balance_cancelled_by_forced_switch_or_disconnect(kind):
     assert not e.player("a").get("balance")
 
 
+def test_delayed_forced_event_does_not_cancel_newer_signup():
+    e = engine(config(balance={"enabled": True}))
+    e.event(event("signup"), NOW + 1)
+    old_forced = event("forced")
+    old_forced["time"] = NOW
+    e.event(old_forced, NOW + 2)
+    assert e.player("a").get("balance")
+
+
 def test_snapshot_only_switch_is_not_rewarded():
     e = engine(config(balance={"enabled": True}))
     e.event(event("signup"), NOW + 1)
@@ -270,7 +330,7 @@ def delivery(monkeypatch):
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.ext.compiler import compiles
     from sqlalchemy.dialects.postgresql import JSONB
-    from rcon.models import VipRewardGrant, VipRewardState, VipRewardEvent
+    from rcon.models import SeedVipGrant, VipRewardGrant, VipRewardNotice, VipRewardState, VipRewardEvent
     from rcon.vip_rewards import service
 
     @compiles(JSONB, "sqlite")
@@ -280,6 +340,8 @@ def delivery(monkeypatch):
     db = create_engine("sqlite://")
     for table in (
         VipRewardGrant.__table__,
+        VipRewardNotice.__table__,
+        SeedVipGrant.__table__,
         VipRewardState.__table__,
         VipRewardEvent.__table__,
     ):
@@ -298,8 +360,10 @@ def delivery(monkeypatch):
     cfg = config(dry_run=False, melee={"enabled": True, "limit": 3})
     e = engine(cfg)
     monkeypatch.setattr(service, "enter_session", session)
+    monkeypatch.setattr(service, "get_session_maker", lambda: factory)
     monkeypatch.setattr(service, "vip_lock", no_lock)
     monkeypatch.setattr(service, "lock", no_lock)
+    monkeypatch.setattr(service, "switch_state_lock", no_lock)
     monkeypatch.setattr(service, "server", lambda: 1)
     monkeypatch.setattr(service.VipRewardsUserConfig, "load_from_db", lambda: cfg)
     monkeypatch.setattr(service.time, "time", lambda: NOW)
@@ -311,6 +375,8 @@ def delivery(monkeypatch):
     remote = {"vip": None}
     monkeypatch.setattr(service, "current_vip", lambda rcon, pid: remote["vip"])
     rcon = Mock()
+    rcon.without_retries.return_value = nullcontext()
+    rcon.message_player.return_value = True
 
     def write(**kwargs):
         remote["vip"] = dict(
@@ -348,6 +414,32 @@ def delivery(monkeypatch):
 
     yield service, cfg, rcon, remote, add, read_row
     db.dispose()
+
+
+def test_unresolved_seed_grant_blocks_other_vip_write(delivery):
+    from datetime import datetime, timezone
+    from rcon.models import SeedVipGrant
+
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    with service.enter_session() as session:
+        seed_grant = SeedVipGrant(server_number=1, preview=False, generation=1,
+                                  player_id="a", player_name="Fake", status="review",
+                                  reward_seconds=3600, cumulative=True,
+                                  reward_time=datetime.now(timezone.utc),
+                                  updated_at=datetime.now(timezone.utc))
+        session.add(seed_grant)
+        session.flush()
+        seed_id = seed_grant.id
+    service.deliver(rcon, grant_id)
+    assert read(grant_id)["reason"] == "previous_seed_write_needs_review"
+    assert read(grant_id)["status"] == "queued"
+    rcon.add_vip.assert_not_called()
+    with service.enter_session() as session:
+        session.get(SeedVipGrant, seed_id).status = "reviewed"
+    service.deliver(rcon, grant_id)
+    assert read(grant_id)["status"] == "awarded"
+    rcon.add_vip.assert_called_once()
 
 
 def test_delivery_exactly_once_and_preserves_description(delivery):
@@ -410,13 +502,13 @@ def test_shared_budget_partial_and_exhaustion(delivery):
 def test_preview_and_permanent_vip_do_not_write(delivery):
     service, cfg, rcon, remote, add, read = delivery
     cfg.dry_run = True
-    service.read_gate_state(True)["config"] = cfg.model_dump_json()
+    service.read_gate_state(True)["config"] = cfg.policy_signature()
     id_ = add(preview=True)
     service.deliver(rcon, id_)
     assert read(id_)["status"] == "preview"
     assert not rcon.add_vip.called and not rcon.message_player.called
     cfg.dry_run = False
-    service.read_gate_state(False)["config"] = cfg.model_dump_json()
+    service.read_gate_state(False)["config"] = cfg.policy_signature()
     remote["vip"] = dict(player_id="a", name="Permanent", vip_expiration=None)
     second = add("two")
     service.deliver(rcon, second)
@@ -428,8 +520,166 @@ def test_message_failure_does_not_repeat_vip(delivery):
     rcon.message_player.side_effect = TimeoutError()
     id_ = add()
     service.deliver(rcon, id_)
+    service.deliver_reward_notice(rcon, id_)
     service.deliver(rcon, id_)
     assert rcon.add_vip.call_count == 1 and read(id_)["status"] == "awarded"
+
+
+def test_reconciled_reward_creates_notice_without_repeating_grant(delivery):
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    write = rcon.add_vip.side_effect
+    def timeout_after_write(**kwargs):
+        write(**kwargs)
+        raise TimeoutError()
+    rcon.add_vip.side_effect = timeout_after_write
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    service.deliver(rcon, grant_id)
+    with service.enter_session() as session:
+        notice = session.get(VipRewardNotice, grant_id)
+        assert notice.status == "queued"
+    service.deliver_reward_notice(rcon, grant_id)
+    with service.enter_session() as session:
+        assert session.get(VipRewardNotice, grant_id).status == "sent"
+    assert rcon.add_vip.call_count == 1 and rcon.message_player.call_count == 1
+
+
+@pytest.mark.parametrize("result,expected", [(False, "queued"), (None, "review"), (TimeoutError(), "review")])
+def test_notice_retry_requires_confirmed_rejection(delivery, result, expected):
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    if isinstance(result, Exception):
+        rcon.message_player.side_effect = result
+    else:
+        rcon.message_player.return_value = result
+    service.deliver_reward_notice(rcon, grant_id)
+    service.deliver_reward_notice(rcon, grant_id)
+    with service.enter_session() as session:
+        notice = session.get(VipRewardNotice, grant_id)
+        assert notice.status == expected and notice.attempts == 1
+    assert rcon.message_player.call_count == 1 and rcon.add_vip.call_count == 1
+
+
+def test_rejected_notice_retries_after_delay_without_regrant(delivery, monkeypatch):
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    rcon.message_player.side_effect = [False, True]
+    service.deliver_reward_notice(rcon, grant_id)
+    monkeypatch.setattr(service.time, "time", lambda: NOW + service.NOTICE_RETRY_SECONDS + 1)
+    service.deliver_reward_notice(rcon, grant_id)
+    with service.enter_session() as session:
+        notice = session.get(VipRewardNotice, grant_id)
+        assert notice.status == "sent" and notice.attempts == 2
+    assert rcon.add_vip.call_count == 1 and rcon.message_player.call_count == 2
+
+
+def test_interrupted_notice_is_reviewed_and_never_replayed(delivery):
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    with service.enter_session() as session:
+        session.get(VipRewardNotice, grant_id).status = "sending"
+    service.recover_interrupted_reward_notices()
+    service.deliver_reward_notice(rcon, grant_id)
+    with service.enter_session() as session:
+        assert session.get(VipRewardNotice, grant_id).status == "review"
+    assert rcon.message_player.call_count == 0
+
+
+def test_repeated_notice_rejections_stop_after_three_attempts(delivery, monkeypatch):
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    rcon.message_player.return_value = False
+    for attempt in range(4):
+        monkeypatch.setattr(service.time, "time", lambda attempt=attempt: NOW + attempt * 31)
+        service.deliver_reward_notice(rcon, grant_id)
+    with service.enter_session() as session:
+        notice = session.get(VipRewardNotice, grant_id)
+        assert notice.status == "failed" and notice.attempts == 3
+    assert rcon.message_player.call_count == 3 and rcon.add_vip.call_count == 1
+
+
+def test_expired_notice_is_not_sent(delivery, monkeypatch):
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    monkeypatch.setattr(service.time, "time", lambda: NOW + service.NOTICE_LIFETIME_SECONDS + 1)
+    service.deliver_reward_notice(rcon, grant_id)
+    with service.enter_session() as session:
+        assert session.get(VipRewardNotice, grant_id).status == "expired"
+    rcon.message_player.assert_not_called()
+
+
+def test_reward_journal_shows_notice_outcome_without_message_body(delivery):
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    rcon.message_player.return_value = None
+    service.deliver_reward_notice(rcon, grant_id)
+    row = service.journal(preview="false")["results"][0]
+    assert row["notice"] == {"status": "review", "attempts": 1}
+    assert "message" not in row["notice"]
+
+
+def test_notice_is_not_sent_when_reservation_commit_fails(delivery):
+    from sqlalchemy import event as sqlalchemy_event
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    factory = service.get_session_maker()
+    def fail_commit(_session):
+        raise RuntimeError("synthetic commit failure")
+    sqlalchemy_event.listen(factory.class_, "before_commit", fail_commit)
+    try:
+        with pytest.raises(RuntimeError, match="synthetic commit failure"):
+            service.deliver_reward_notice(rcon, grant_id)
+    finally:
+        sqlalchemy_event.remove(factory.class_, "before_commit", fail_commit)
+    with service.enter_session() as session:
+        assert session.get(VipRewardNotice, grant_id).status == "queued"
+    rcon.message_player.assert_not_called()
+
+
+def test_reward_and_notice_queue_are_rolled_back_together(delivery):
+    from rcon.models import VipRewardGrant, VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    with pytest.raises(RuntimeError, match="synthetic rollback"):
+        with service.enter_session() as session:
+            grant = session.get(VipRewardGrant, grant_id)
+            grant.status = "awarded"
+            grant.credited_seconds = 3600
+            service.queue_reward_notice(session, grant, cfg, NOW)
+            raise RuntimeError("synthetic rollback")
+    with service.enter_session() as session:
+        assert session.get(VipRewardGrant, grant_id).status == "queued"
+        assert session.get(VipRewardNotice, grant_id) is None
+
+
+@pytest.mark.parametrize("language,expected", [
+    ("de", "VIP-Belohnung: +2 Stunden VIP. Vielen Dank!"),
+    ("en", "VIP reward: +2 hours of VIP. Thank you!"),
+    ("fr", "Récompense VIP : +2 heures de VIP. Merci !"),
+])
+def test_automatic_reward_notification_uses_configured_language(delivery, language, expected):
+    service, cfg, rcon, remote, add, read = delivery
+    cfg.message_language = language
+    service.read_gate_state(False)["config"] = cfg.policy_signature()
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    service.deliver_reward_notice(rcon, grant_id)
+    assert read(grant_id)["status"] == "awarded"
+    assert rcon.message_player.call_args.kwargs == {"player_id": "a", "message": expected}
 
 
 def test_durable_queue_tick_duplicate_and_restart(delivery, monkeypatch):
@@ -453,6 +703,24 @@ def test_durable_queue_tick_duplicate_and_restart(delivery, monkeypatch):
         assert session.query(VipRewardEvent).count() == 1
         assert session.query(VipRewardGrant).count() == 1
         assert session.query(VipRewardGrant).one().status == "awarded"
+    assert rcon.add_vip.call_count == 1
+
+
+def test_worker_uses_active_vietnam_profile_for_knife_rewards(delivery, monkeypatch):
+    from rcon.models import VipRewardGrant
+    from rcon.user_config.seed_vip import SeedVIPUserConfig
+    service, cfg, rcon, remote, add, read = delivery
+    rcon.game_profile.game = "hllv"
+    monkeypatch.setattr(service, "read_gate_state", service._test_read_gate)
+    monkeypatch.setattr(service, "observe", lambda *_: (PLAYERS, COUNTS, True))
+    monkeypatch.setattr(service.SeedVIPUserConfig, "load_from_db", lambda: SeedVIPUserConfig())
+    service.tick(rcon)
+    payload = event()
+    payload.update(weapon="Knife", time=NOW)
+    service.enqueue(payload)
+    service.tick(rcon)
+    with service.enter_session() as session:
+        assert session.query(VipRewardGrant).count() == 1
     assert rcon.add_vip.call_count == 1
 
 
@@ -686,6 +954,7 @@ def test_volunteer_switch_does_not_mark_as_forced(monkeypatch):
     forced = Mock()
     switch = Mock(return_value=True)
     monkeypatch.setattr(hooks, 'mark_forced', forced)
+    monkeypatch.setattr(hooks, 'finish_forced', Mock())
     monkeypatch.setattr(storage, 'before_manual_action', Mock())
     monkeypatch.setattr(ServerCtl, 'switch_player_now', switch)
     rcon = object.__new__(Rcon)
@@ -705,7 +974,7 @@ def test_award_calendar_boundaries(period, expected):
 def test_award_limit_survives_daily_budget_reset(delivery, monkeypatch, period):
     service, cfg, rcon, remote, add, read = delivery
     cfg.melee.limit_period = period
-    service.read_gate_state(False)["config"] = cfg.model_dump_json()
+    service.read_gate_state(False)["config"] = cfg.policy_signature()
     for key in ("one", "two", "three"):
         service.deliver(rcon, add(key))
     monkeypatch.setattr(service.time, "time", lambda: NOW + 86401)
@@ -714,3 +983,37 @@ def test_award_limit_survives_daily_budget_reset(delivery, monkeypatch, period):
     service.deliver(rcon, fourth)
     assert read(fourth)["reason"] == "rule_limit"
     assert rcon.add_vip.call_count == 3
+
+
+def test_dynamic_challenge_claim_and_config_preserve_weekly_limit():
+    from rcon.user_config.vip_rewards import ChallengeRule
+    from rcon.vip_rewards.service import reward_rule_config
+    rule = ChallengeRule(id="example", name="example", enabled=True, weapons=["test"], kills=1, period="day", limit=1, limit_period="week")
+    cfg = config(challenges=[rule])
+    state = {"observed": NOW, "healthy": True}
+    e = Engine(state, cfg)
+    e.event({"kind": "kill", "player_id": "a", "victim": "b", "weapon": "test", "time": NOW, "key": "one", "allowed": True}, NOW)
+    assert e.claims[0]["limit"] == 1
+    assert reward_rule_config(cfg, "challenge:example").limit_period == "week"
+
+
+def test_preexisting_unlimited_challenge_grant_respects_current_weekly_limit(delivery, monkeypatch):
+    from rcon.user_config.vip_rewards import ChallengeRule
+    from rcon.models import VipRewardGrant
+    service, cfg, rcon, remote, add, read = delivery
+    cfg.challenges = [ChallengeRule(id="example", name="example", enabled=True, weapons=["test"], limit=1, limit_period="week")]
+    service.read_gate_state(False)["config"] = cfg.policy_signature()
+    first, second = add("first"), add("second")
+    with service.enter_session() as sess:
+        for grant_id in (first, second):
+            row = sess.get(VipRewardGrant, grant_id)
+            row.rule = "challenge:example"
+            row.limit = 0
+    service.deliver(rcon, first)
+    later = NOW + 2 * 86400
+    monkeypatch.setattr(service.time, "time", lambda: later)
+    service.read_gate_state(False)["observed"] = later
+    service.deliver(rcon, second)
+    assert read(first)["status"] == "awarded"
+    assert read(second)["reason"] == "rule_limit"
+    assert rcon.add_vip.call_count == 1

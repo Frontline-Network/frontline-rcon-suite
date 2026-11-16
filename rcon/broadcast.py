@@ -69,19 +69,15 @@ def format_message(ctl, msg, player_id=None, context=None):
 
 def seeding_is_active(config: AutoModSeedingUserConfig, player_count: int) -> bool:
     """Return whether any configured seeding rule currently applies."""
-    if not config.enabled:
+    if not config.enabled or player_count < config.dont_do_anything_below_this_number_of_players:
         return False
-
-    limits = [config.enforce_cap_fight.max_players]
-    if config.disallowed_roles.roles:
-        limits.append(config.disallowed_roles.max_players)
-    if config.disallowed_weapons.weapons:
-        limits.append(config.disallowed_weapons.max_players)
-
-    return (
-        player_count >= config.dont_do_anything_below_this_number_of_players
-        and player_count <= max(limits)
+    rules = (
+        (config.enforce_cap_fight, True),
+        (config.disallowed_roles, bool(config.disallowed_roles.roles)),
+        (config.disallowed_weapons, bool(config.disallowed_weapons.weapons)),
     )
+    return any(rule.enabled and configured and rule.min_players <= player_count < rule.max_players
+               for rule, configured in rules)
 
 
 def campaign_is_eligible(

@@ -240,6 +240,13 @@ def expose_api_endpoint(
         errors_as_json: bool = False
         res: Any = None
         data = _get_data(request)
+        if not isinstance(data, dict):
+            return RconJsonResponse(
+                {"result": None, "command": command_name, "arguments": {},
+                 "failed": True, "error": "Expected a JSON object",
+                 "forward_results": None, "version": TAG_VERSION},
+                status=400,
+            )
 
         if isinstance(data, dict) and (
             data.get("forward") or "forward_server_numbers" in data
@@ -311,7 +318,7 @@ def expose_api_endpoint(
                 safe_response_data["code"] = "[redacted]"
 
         try:
-            logger.debug("%s %s", command_name, safe_arguments)
+            logger.debug("API command %s", command_name)
             res = func(**arguments)
 
             # A few get_ methods can be called w/ POST but don't modify anything
@@ -328,11 +335,13 @@ def expose_api_endpoint(
         # This is a bit janky but catch any UserConfig validation errors that have bubbled up and convert
         # the error message as required
         except pydantic.ValidationError as e:
+            failure = True
             if errors_as_json:
                 error = e.json()
             else:
                 error = str(e)
         except InvalidKeysConfigurationError as e:
+            failure = True
             if errors_as_json:
                 error = e.asdict()
             else:
@@ -363,7 +372,7 @@ def expose_api_endpoint(
                     json=data,
                 )
             except Exception as e:
-                logger.exception("Unexpected error while forwarding request: %s", e)
+                logger.warning("Unexpected forwarding error (%s)", type(e).__name__)
                 others = forwarding_unavailable_results(
                     data.get("forward_server_numbers")
                 )
@@ -377,7 +386,7 @@ def expose_api_endpoint(
                     json=data,
                 )
             except Exception as e:
-                logger.exception("Unexpected error while forwarding request: %s", e)
+                logger.warning("Unexpected forwarding error (%s)", type(e).__name__)
                 others = forwarding_unavailable_results(
                     data.get("forward_server_numbers")
                 )
@@ -557,6 +566,10 @@ ENDPOINT_PERMISSIONS: dict[Callable, list[str] | set[str] | str] = {
     rcon_api.get_perma_bans: "api.can_view_perma_bans",
     rcon_api.get_player_info: "api.can_view_player_info",
     rcon_api.get_player_profile: "api.can_view_player_profile",
+    rcon_api.get_pending_session_events: "api.can_view_player_profile",
+    rcon_api.get_pending_automod_actions: "api.can_view_player_profile",
+    rcon_api.review_pending_automod_action: ["api.can_view_player_profile", "api.can_run_raw_commands"],
+    rcon_api.resolve_pending_session_event: ["api.can_view_player_profile", "api.can_run_raw_commands"],
     rcon_api.get_player_ids: "api.can_view_playerids",
     rcon_api.get_player_comments: "api.can_view_player_comments",
     rcon_api.post_player_comment: "api.can_add_player_comments",
@@ -714,6 +727,8 @@ ENDPOINT_PERMISSIONS: dict[Callable, list[str] | set[str] | str] = {
     rcon_api.validate_log_stream_config: "api.can_change_log_stream_config",
     rcon_api.get_date_scoreboard: "api.can_view_date_scoreboard",
     rcon_api.get_blacklists: "api.can_view_blacklists",
+    rcon_api.get_blacklist_sync_reviews: "api.can_view_blacklists",
+    rcon_api.acknowledge_blacklist_sync_review: "api.can_change_blacklists",
     rcon_api.get_blacklist: "api.can_view_blacklists",
     rcon_api.create_blacklist: "api.can_create_blacklists",
     rcon_api.edit_blacklist: "api.can_change_blacklists",
@@ -741,6 +756,8 @@ ENDPOINT_PERMISSIONS: dict[Callable, list[str] | set[str] | str] = {
     rcon_api.get_vip_rewards_progress: "api.can_view_vip_ids",
     rcon_api.get_vip_rewards_journal: "api.can_view_vip_ids",
     rcon_api.acknowledge_vip_reward_review: "api.can_add_vip",
+    rcon_api.get_seed_vip_journal: "api.can_view_vip_ids",
+    rcon_api.acknowledge_seed_vip_review: "api.can_add_vip",
     rcon_api.set_seed_vip_config: "api.can_change_seed_vip_config",
     rcon_api.validate_seed_vip_config: "api.can_change_seed_vip_config",
     rcon_api.get_webhook_queue_overview: "api.can_view_webhook_queues",
@@ -850,6 +867,10 @@ RCON_ENDPOINT_HTTP_METHODS: dict[Callable, list[str]] = {
     rcon_api.get_perma_bans: ["GET"],
     rcon_api.get_player_info: ["GET"],
     rcon_api.get_player_profile: ["GET"],
+    rcon_api.get_pending_session_events: ["GET"],
+    rcon_api.get_pending_automod_actions: ["GET"],
+    rcon_api.review_pending_automod_action: ["POST"],
+    rcon_api.resolve_pending_session_event: ["POST"],
     rcon_api.get_player_ids: ["GET"],
     rcon_api.get_player_comments: ["GET"],
     rcon_api.post_player_comment: ["POST"],
@@ -878,6 +899,8 @@ RCON_ENDPOINT_HTTP_METHODS: dict[Callable, list[str]] = {
     rcon_api.get_vip_rewards_progress: ["GET"],
     rcon_api.get_vip_rewards_journal: ["GET"],
     rcon_api.acknowledge_vip_reward_review: ["POST"],
+    rcon_api.get_seed_vip_journal: ["GET"],
+    rcon_api.acknowledge_seed_vip_review: ["POST"],
     rcon_api.get_server_name_change_config: ["GET"],
     rcon_api.get_server_settings: ["GET"],
     rcon_api.get_slots: ["GET"],
@@ -1025,6 +1048,8 @@ RCON_ENDPOINT_HTTP_METHODS: dict[Callable, list[str]] = {
     rcon_api.watch_player: ["POST"],
     rcon_api.get_date_scoreboard: ["GET"],
     rcon_api.get_blacklists: ["GET"],
+    rcon_api.get_blacklist_sync_reviews: ["GET"],
+    rcon_api.acknowledge_blacklist_sync_review: ["POST"],
     rcon_api.get_blacklist: ["GET"],
     rcon_api.create_blacklist: ["POST"],
     rcon_api.edit_blacklist: ["POST"],

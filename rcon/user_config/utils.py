@@ -20,6 +20,7 @@ USER_CONFIG_CACHE_TTL_SECONDS = 2
 
 _USER_CONFIG_CACHE: dict[str, tuple[float, Any]] = {}
 _USER_CONFIG_CACHE_LOCK = threading.RLock()
+_USER_CONFIG_CACHE_GENERATION = 0
 
 
 # Sourced without modification from https://stackoverflow.com/a/17246726
@@ -113,9 +114,9 @@ class BaseUserConfig(pydantic.BaseModel):
             except pydantic.ValidationError as e:
                 if default_on_validation_error:
                     logger.error(
-                        f"Error loading {cls.KEY()}, returning defaults, validation errors:"
+                        "Error loading %s; returning defaults (%s validation errors)",
+                        cls.KEY(), e.error_count(),
                     )
-                    logger.error(e)
                     return cls()
                 else:
                     raise
@@ -150,11 +151,11 @@ class BaseUserConfig(pydantic.BaseModel):
 def _get_conf(sess, key):
     try:
         return sess.query(UserConfig).filter(UserConfig.key == key).one_or_none()
-    except SQLAlchemyError as e:
-        # Don't let a failed transaction block model creation
-        # the session context manager will handle this
+    except SQLAlchemyError:
+        # A database failure is not the same as an absent configuration.
+        # Propagate it so callers do not enable default actions by accident.
         sess.rollback()
-        return None
+        raise
 
 
 def get_user_config(key: str, default=None) -> dict[str, Any] | Any | None:
@@ -183,25 +184,31 @@ def _get_cached_user_config(key: str, default=None) -> dict[str, Any] | Any | No
             if expires_at > now:
                 return deepcopy(value)
             _USER_CONFIG_CACHE.pop(key, None)
+        generation = _USER_CONFIG_CACHE_GENERATION
 
     value = get_user_config(key, default=default)
     with _USER_CONFIG_CACHE_LOCK:
-        _USER_CONFIG_CACHE[key] = (
-            time.monotonic() + USER_CONFIG_CACHE_TTL_SECONDS,
-            deepcopy(value),
-        )
+        if generation == _USER_CONFIG_CACHE_GENERATION:
+            _USER_CONFIG_CACHE[key] = (
+                time.monotonic() + USER_CONFIG_CACHE_TTL_SECONDS,
+                deepcopy(value),
+            )
     return value
 
 
 def _invalidate_user_config_cache(key: str) -> None:
+    global _USER_CONFIG_CACHE_GENERATION
     with _USER_CONFIG_CACHE_LOCK:
+        _USER_CONFIG_CACHE_GENERATION += 1
         _USER_CONFIG_CACHE.pop(key, None)
 
 
 def _clear_user_config_cache() -> None:
     """Clear the process-local cache for tests and maintenance utilities."""
 
+    global _USER_CONFIG_CACHE_GENERATION
     with _USER_CONFIG_CACHE_LOCK:
+        _USER_CONFIG_CACHE_GENERATION += 1
         _USER_CONFIG_CACHE.clear()
 
 
@@ -240,7 +247,7 @@ def set_user_config(key: str, object_: dict[str, Any] | BaseUserConfig):
     if isinstance(object_, BaseUserConfig):
         object_ = object_.model_dump()
 
-    logger.debug("Setting user config for %s with %s", key, object_)
+    logger.debug("Setting user config for %s", key)
     _invalidate_user_config_cache(key)
     try:
         with enter_session() as sess:
@@ -260,12 +267,15 @@ def validate_user_config(
     data: dict[str, Any] | BaseUserConfig,
     dry_run: bool = True,
     reset_to_default: bool = False,
-) -> None:
-    if reset_to_default:
+) -> bool:
+    if reset_to_default and not dry_run:
+        # Reject invalid input before changing persisted settings.
+        model.save_to_db(values=data, dry_run=True)
         default = model()
         set_user_config(default.KEY(), default)
 
     model.save_to_db(values=data, dry_run=dry_run)
+    return True
 
 
 def mask_sensitive_data(

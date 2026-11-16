@@ -202,13 +202,12 @@ def make_hook(webhook_url) -> DiscordWebhook | None:
 def make_allowed_mentions(user_ids, role_ids):
     allowed_mentions = {}
     for r in user_ids + role_ids:
-        if match := re.match(r"<@\!(\d+)>", r):
+        if match := re.fullmatch(r"<@!?(\d+)>", r):
             allowed_mentions.setdefault("users", []).append(match.group(1))
-        if match := re.match(r"<@&(\d+)>", r):
+        if match := re.fullmatch(r"<@&(\d+)>", r):
             allowed_mentions.setdefault("roles", []).append(match.group(1))
         if r == "@everyone" or r == "@here":
             allowed_mentions["parse"] = r.replace("@", "")
-    print(allowed_mentions)
     # allowed_mentions = {"parse": ["users"]}
     return allowed_mentions
 

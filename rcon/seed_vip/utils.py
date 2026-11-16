@@ -37,8 +37,10 @@ def filter_indefinite_vip_steam_ids(current_vips: dict[str, VipPlayer]) -> set[s
 
 def has_indefinite_vip(player: VipPlayer | None) -> bool:
     """Return true if the player has an indefinite VIP status"""
-    if player is None or player.expiration_date is None:
+    if player is None:
         return False
+    if player.expiration_date is None:
+        return True
     expiration = player.expiration_date
     return expiration >= INDEFINITE_VIP_DATE
 
@@ -77,8 +79,12 @@ def calc_vip_expiration_timestamp(
         timestamp = from_time + config.reward.timeframe.as_timedelta
         return timestamp
 
+    if expiration.tzinfo is None and from_time.tzinfo is not None:
+        expiration = expiration.replace(tzinfo=timezone.utc)
+    elif expiration.tzinfo is not None and from_time.tzinfo is None:
+        from_time = from_time.replace(tzinfo=timezone.utc)
     if config.reward.cumulative:
-        return expiration + config.reward.timeframe.as_timedelta
+        return max(expiration, from_time) + config.reward.timeframe.as_timedelta
     else:
         # Don't step on the old expiration if it's further in the future than the new one
         timestamp = from_time + config.reward.timeframe.as_timedelta
@@ -241,6 +247,7 @@ def reward_players(
     logger.info(f"Rewarding players with VIP {config.dry_run=}")
     logger.info(f"Total={len(to_add_vip_steam_ids)} {to_add_vip_steam_ids=}")
     logger.info(f"Total={len(current_vips)=} {current_vips=}")
+    successful = set()
     for player_id in to_add_vip_steam_ids:
         player = current_vips.get(player_id)
         expiration_date = expiration_timestamps[player_id]
@@ -267,26 +274,36 @@ def reward_players(
             # Refresh and calculate inside the same lock used by other VIP writers.
             from rcon.vip_rewards.locking import vip_lock
             from rcon.vip_rewards.service import current_vip, expiration, permanent
-            with vip_lock(player_id):
-                current = current_vip(rcon, player_id)
-                if permanent(current):
-                    continue
-                current_expiration = expiration(current["vip_expiration"]) if current else None
-                expiration_date = calc_vip_expiration_timestamp(
-                    config, current_expiration,
-                    reward_time or datetime.now(timezone.utc),
-                )
-                expiration_timestamps[player_id] = expiration_date
-                rcon.add_vip(
-                    player_id=player_id,
-                    description=current["name"] if current else vip_name,
-                    expiration=expiration_date.isoformat(),
-                )
+            try:
+                with vip_lock(player_id):
+                    current = current_vip(rcon, player_id)
+                    if permanent(current):
+                        continue
+                    current_expiration = expiration(current["vip_expiration"]) if current else None
+                    expiration_date = calc_vip_expiration_timestamp(
+                        config, current_expiration,
+                        reward_time or datetime.now(timezone.utc),
+                    )
+                    expiration_timestamps[player_id] = expiration_date
+                    accepted = rcon.add_vip(
+                        player_id=player_id,
+                        description=current["name"] if current else vip_name,
+                        expiration=expiration_date.isoformat(),
+                    )
+                    if accepted is not True:
+                        logger.error("Seed VIP reward rejected for %s", player_id)
+                        continue
+                    successful.add(player_id)
+            except Exception:
+                logger.exception("Unable to award Seed VIP to %s; continuing with remaining players", player_id)
 
         else:
             logger.info(
                 f"{config.dry_run=} adding VIP to {player_id=} {player=} {vip_name=} {expiration_date=}",
             )
+            successful.add(player_id)
+
+    return successful
 
 
 def get_next_player_bucket(

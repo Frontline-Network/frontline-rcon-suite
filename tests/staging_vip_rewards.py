@@ -19,7 +19,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 
 from rcon import models
-from rcon.models import UserConfig, VipRewardEvent, VipRewardGrant, VipRewardState
+from rcon.models import SeedVipGrant, UserConfig, VipRewardEvent, VipRewardGrant, VipRewardState
 from rcon.user_config.seed_vip import SeedVIPUserConfig
 from rcon.user_config.vip_rewards import VipRewardsUserConfig
 from rcon.vip_rewards import service
@@ -71,6 +71,7 @@ class PostgreSQLSeedingTests(unittest.TestCase):
         os.environ["HLL_DB_URL"] = str(url.render_as_string(hide_password=False))
         os.environ["SERVER_NUMBER"] = "3"
         UserConfig.__table__.create(cls.db)
+        SeedVipGrant.__table__.create(cls.db)
         path = Path(__file__).parents[1] / "alembic/versions/c8e2a4f61009_vip_rewards.py"
         spec = importlib.util.spec_from_file_location("staging_migration", path)
         migration = importlib.util.module_from_spec(spec)
@@ -86,12 +87,13 @@ class PostgreSQLSeedingTests(unittest.TestCase):
             cls.migration.op = Operations(MigrationContext.configure(connection))
             cls.migration.downgrade()
         UserConfig.__table__.drop(cls.db)
+        SeedVipGrant.__table__.drop(cls.db)
         cls.db.dispose()
         models._ENGINE = None
 
     def setUp(self):
         with self.db.begin() as connection:
-            for table in (VipRewardGrant, VipRewardEvent, VipRewardState, UserConfig):
+            for table in (SeedVipGrant, VipRewardGrant, VipRewardEvent, VipRewardState, UserConfig):
                 connection.execute(table.__table__.delete())
         self.clock = [NOW]
         self.rcon = RecordingRcon()

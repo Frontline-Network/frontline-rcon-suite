@@ -144,7 +144,7 @@ DESCRIPTIONS.update({
     "set_map_rotation": ("Ersetzt die konfigurierte Kartenrotation durch map_names. Dies ändert die Kartenplanung, ohne selbst einen sofortigen Kartenwechsel auszulösen.", "Replaces the configured map rotation with map_names. This changes map planning without itself triggering an immediate map change."),
     "set_map_sequence": ("Ersetzt die vollständige Kartenfolge nach Prüfung aller Karten. Die Umsetzung erfolgt über mehrere Serveroperationen und ist nicht atomar.", "Replaces the complete map sequence after validating all maps. It uses multiple server operations and is not atomic."),
     "add_map_to_rotation": ("Fügt eine Karte zur Rotation hinzu; after_map_name gibt optional eine Bezugskarte für die Einfügeposition an.", "Adds a map to the rotation; after_map_name optionally specifies a reference map for the insertion position."),
-    "add_maps_to_rotation": ("Fügt mehrere Karten zur Rotation hinzu und liefert die Serverantwort je Karte.", "Adds multiple maps to the rotation and returns the server response for each map."),
+    "add_maps_to_rotation": ("Fügt mehrere Karten zur Rotation hinzu und liefert für jede bestätigte Einfügung Kartenkennung, Position und Status. Bei Fehlern kann die Rotation teilweise geändert sein.", "Adds multiple maps to the rotation and returns the map ID, index and status for each confirmed insertion. An error can leave a partial change."),
     "remove_map_from_rotation": ("Entfernt die angegebene Karte aus der Rotation. Die aktuell laufende Runde wird dadurch nicht unmittelbar gewechselt.", "Removes the specified map from the rotation without immediately changing the running round."),
     "remove_maps_from_rotation": ("Entfernt mehrere angegebene Karten aus der Rotation.", "Removes the specified maps from the rotation."),
     "get_map_shuffle_enabled": ("Prüft, ob die zufällige Kartenreihenfolge im Gameserver eingeschaltet ist.", "Checks whether the game server's map shuffle is enabled."),
@@ -316,7 +316,7 @@ DESCRIPTIONS.update({
     "mobile/v1/servers/{server_number}/live-status": ("Lädt die aktuelle Serverlage als reine Abfrage. Sichtbare Details richten sich nach den Benutzerrechten.", "Loads the current server situation as a read-only request. Visible details depend on user permissions."),
     "mobile/v1/servers/{server_number}/roster": ("Lädt die aktuelle Aufstellung der Teams und Squads des angegebenen Servers.", "Loads the current team and squad roster for the specified server."),
     "mobile/v1/servers/{server_number}/squads/{team}/{squad}": ("Lädt einen bestimmten Live-Squad einschließlich seiner Mitglieder.", "Loads one specific live squad, including its members."),
-    "ws/mobile/v1/incidents": ("Überträgt Änderungen an Vorfällen über WebSocket. Ein Zeitstempel-Cursor ermöglicht nach einem Verbindungsabbruch die Fortsetzung des Ereignisstroms.", "Streams incident changes over WebSocket. A timestamp cursor allows the event stream to resume after reconnecting."),
+    "ws/mobile/v1/incidents": ("Überträgt Vorfalländerungen mit einem fortsetzbaren Ereignis-Cursor. Bei Statusfiltern entfernt der Client die unter removed_incident_ids gemeldeten Vorfälle aus der gefilterten Ansicht.", "Streams incident changes with a resumable event cursor. For status filters, clients remove the incidents listed in removed_incident_ids from the filtered view."),
 })
 
 

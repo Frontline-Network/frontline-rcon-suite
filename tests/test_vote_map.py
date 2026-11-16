@@ -3,6 +3,7 @@ import pytest
 from fakeredis import FakeStrictRedis
 from unittest.mock import MagicMock, patch
 from rcon import maps
+from rcon.commands import HLLCommandFailedError
 from rcon.connection import HLLCommandError
 from rcon.game.hll.profile import HLL_PROFILE
 from rcon.game.hllv.profile import HLLV_PROFILE
@@ -193,6 +194,7 @@ def redis_client():
 def mock_rcon():
     """Fixture for mocking Rcon interactions."""
     rcon = MagicMock()
+    rcon.message_player.return_value = True
     rcon.game_profile = HLL_PROFILE
     rcon.get_maps.return_value = ALL_MAPS
     rcon.get_player_ids.return_value = [
@@ -243,6 +245,7 @@ def default_config_loader():
     return lambda: VoteMapUserConfig(
         enabled=True,
         default_method="least_played_from_suggestions",
+        allow_opt_out=False,
     )
 
 
@@ -333,7 +336,20 @@ def mock_maps_history():
 
 
 @pytest.fixture
-def votemap(redis_client, mock_rcon, default_config_loader, mock_maps_history):
+def votemap_journal(monkeypatch, tmp_path):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from rcon.vote_map import reminder_delivery
+    engine = create_engine("sqlite:///" + (tmp_path / "votemap-reminder.sqlite").as_posix())
+    reminder_delivery.metadata.create_all(engine)
+    monkeypatch.setattr(reminder_delivery, "get_session_maker", lambda: sessionmaker(engine))
+    monkeypatch.setattr("rcon.vote_map.service.get_server_number", lambda: 3)
+    yield
+    engine.dispose()
+
+
+@pytest.fixture
+def votemap(redis_client, mock_rcon, default_config_loader, mock_maps_history, votemap_journal):
     """Fixture for a VoteMap instance with injected dependencies."""
     with (
         patch("rcon.vote_map.state.get_redis_client", return_value=redis_client),
@@ -497,6 +513,43 @@ def test_register_vote(votemap):
     assert vote["map_id"] == selected_map.id
 
 
+@pytest.mark.parametrize("round_start,vote_time,allowed", [(2000, 1999, False), (2000, 2000, True),
+                                                               (2000, 2001, True), (None, 2001, False)])
+def test_register_vote_requires_current_round_start(votemap, round_start, vote_time, allowed):
+    player = mock_player_profile("fake", "Fake")
+    votemap.set_selection([HUR_WARFARE_DAY])
+    votemap._maps_history[0]["start"] = round_start
+    with patch.object(votemap, "apply_results") as apply:
+        if allowed:
+            votemap.register_vote(player, vote_time, 1)
+            assert votemap.get_vote("fake") is not None
+            apply.assert_called_once()
+        else:
+            with pytest.raises(VoteMapException):
+                votemap.register_vote(player, vote_time, 1)
+            assert votemap.get_vote("fake") is None
+            apply.assert_not_called()
+
+
+def test_choice_command_uses_original_event_time(votemap, mock_rcon):
+    from rcon.vote_map.service import VoteMapCommandHandler
+    handler = VoteMapCommandHandler(votemap, mock_rcon, VoteMapUserConfig(enabled=True))
+    with patch.object(handler, "handle_player_choice") as choose:
+        assert handler.execute({"event_time": datetime.now(), "timestamp_ms": 1999000,
+                                "sub_content": "!vm add car"}, "fake")
+    choose.assert_called_once_with("fake", "car", timestamp=1999)
+
+
+def test_stale_player_choice_does_not_change_selection(votemap, mock_rcon):
+    from rcon.vote_map.service import VoteMapCommandHandler
+    votemap._maps_history[0]["start"] = 2000
+    handler = VoteMapCommandHandler(votemap, mock_rcon, VoteMapUserConfig(enabled=True))
+    with patch.object(votemap, "register_player_choice") as choose:
+        with pytest.raises(VoteMapException, match="predates"):
+            handler.handle_player_choice("fake", SAMPLE_MAPS[0].map.tag.lower(), timestamp=1999)
+        choose.assert_not_called()
+
+
 def test_remove_winning_map_from_selection_reapplies_results(votemap, mock_rcon):
     player = mock_player_profile("123456", "player_1")
     votemap.set_selection([HUR_WARFARE_DAY, UTAH_WARFARE_DAY])
@@ -608,6 +661,18 @@ def test_ensure_next_map_with_empty_selection(votemap):
     votemap.apply_results()
     next_map = votemap.get_next_map()
     assert next_map in ALL_MAPS
+
+
+def test_rejected_winner_does_not_remove_existing_rotation(votemap, mock_rcon):
+    original = [CAR_WARFARE_DAY, CAR_WARFARE_NIGHT]
+    mock_rcon.get_map_rotation.return_value = {"maps": original.copy()}
+    mock_rcon.get_map_rotation.side_effect = None
+    mock_rcon.add_map_to_rotation.side_effect = RuntimeError("rejected")
+    with patch.object(votemap, "generate_next_map", return_value=UTAH_WARFARE_DAY):
+        with pytest.raises(HLLCommandFailedError, match="observed after failure"):
+            votemap.apply_results()
+    mock_rcon.remove_map_from_rotation.assert_not_called()
+
 
 def test_ensure_selection_when_no_maps_to_select_from(votemap):
     """Excludes last 3 played, HUR is the last played"""
@@ -774,13 +839,141 @@ def test_reminder_sent_while_enabled(votemap):
     assert t1 != t2
 
 
+@pytest.mark.parametrize("template", ["no placeholder", "{map_selection} {unknown}",
+    "{map_selection.__class__}", "{map_selection!r}", "{map_selection:>10}",
+    "{map_selection} {", "{{map_selection}}"])
+def test_votemap_rejects_invalid_reminder_when_saving(template):
+    values = VoteMapUserConfig().model_dump()
+    values["instruction_text"] = template
+    with pytest.raises(ValueError, match="Reminder|Invalid reminder format"):
+        VoteMapUserConfig.save_to_db(values, dry_run=True)
+
+
+def test_votemap_accepts_escaped_literal_braces_when_saving():
+    values = VoteMapUserConfig().model_dump()
+    values["instruction_text"] = "{{Rules}} {map_selection}"
+    VoteMapUserConfig.save_to_db(values, dry_run=True)
+
+
+def test_legacy_invalid_reminder_fails_safely_without_sending(votemap, mock_rcon):
+    votemap._VoteMap__config_loader = lambda: VoteMapUserConfig(enabled=True, instruction_text="{map_selection} {invalid}")
+    result = votemap.send_reminder(force=True)
+    assert result.ok is False
+    assert "placeholder" in result.message
+    mock_rcon.message_player.assert_not_called()
+
+
+def test_reminder_does_not_send_or_start_cooldown_when_optout_lookup_fails(votemap, mock_rcon):
+    from rcon.vote_map.service import ActionOutcome
+    votemap._VoteMap__config_loader = lambda: VoteMapUserConfig(enabled=True, allow_opt_out=True)
+    with patch("rcon.vote_map.service.enter_session", side_effect=OSError("database unavailable")):
+        result = votemap.send_reminder(force=True)
+    assert result.ok is False
+    assert result.outcome == ActionOutcome.RECIPIENTS_UNAVAILABLE
+    assert votemap.get_last_reminder_time() is None
+    mock_rcon.message_player.assert_not_called()
+
+
+def test_reminder_skips_optout_lookup_when_optouts_disabled(votemap, mock_rcon):
+    with patch("rcon.vote_map.service.enter_session", side_effect=OSError("database unavailable")) as lookup:
+        result = votemap.send_reminder(force=True)
+    assert result.ok is True
+    lookup.assert_not_called()
+    assert mock_rcon.message_player.call_count == 2
+
+
+def test_reminder_respects_successfully_loaded_optouts(votemap, mock_rcon):
+    from types import SimpleNamespace
+    votemap._VoteMap__config_loader = lambda: VoteMapUserConfig(enabled=True, allow_opt_out=True)
+    session = MagicMock()
+    session.query.return_value.join.return_value.filter.return_value.all.return_value = [
+        SimpleNamespace(player=SimpleNamespace(player_id="71234567890"))]
+    context = MagicMock()
+    context.__enter__.return_value = session
+    with patch("rcon.vote_map.service.enter_session", return_value=context):
+        result = votemap.send_reminder(force=True)
+    assert result.ok is True
+    assert mock_rcon.message_player.call_count == 1
+    assert mock_rcon.message_player.call_args.kwargs["player_id"] == "0j8dkd3fj948h9fhv3m9thvm578"
+
+
 def test_reminder_continues_after_one_player_message_fails(votemap, mock_rcon):
     mock_rcon.message_player.side_effect = [
         HLLCommandError(500, "player already disconnected"),
-        None,
+        True,
     ]
 
     result = votemap.send_reminder(force=True)
 
-    assert result.ok is True
+    assert result.ok is False
+    assert result.outcome.value == "partial"
     assert mock_rcon.message_player.call_count == 2
+
+
+def test_partial_event_reminder_resumes_only_rejected_player(votemap, mock_rcon):
+    mock_rcon.message_player.side_effect = [True, False, True]
+    with patch("rcon.vote_map.reminder_delivery.time.time", return_value=100):
+        first = votemap.send_reminder(force=True, scope="event:start:123")
+    assert first.outcome.value == "partial"
+    assert votemap.get_last_reminder_time() is None
+    with patch("rcon.vote_map.reminder_delivery.time.time", return_value=130):
+        second = votemap.send_reminder()
+    assert second.ok is True
+    calls = [call.kwargs["player_id"] for call in mock_rcon.message_player.call_args_list]
+    assert calls == ["0j8dkd3fj948h9fhv3m9thvm578", "71234567890", "71234567890"]
+    assert votemap.get_last_reminder_time() is not None
+    with patch("rcon.vote_map.reminder_delivery.time.time", return_value=131):
+        duplicate = votemap.send_reminder(force=True, scope="event:start:123")
+    assert duplicate.outcome.value == "on_cooldown"
+    assert mock_rcon.message_player.call_count == 3
+
+
+def test_unknown_reminder_result_never_repeats_on_automatic_run(votemap, mock_rcon):
+    mock_rcon.message_player.side_effect = [True, TimeoutError("lost response")]
+    first = votemap.send_reminder(force=True, scope="event:end:123")
+    assert not first.ok and first.outcome.value == "partial"
+    assert "1 uncertain" in first.message
+    second = votemap.send_reminder()
+    assert second.outcome.value == "on_cooldown"
+    assert mock_rcon.message_player.call_count == 2
+
+
+def test_reminder_fails_closed_if_round_identity_unknown(votemap, mock_rcon):
+    votemap._maps_history[0]["start"] = None
+    result = votemap.send_reminder(force=True)
+    assert result.outcome.value == "round_unavailable"
+    mock_rcon.message_player.assert_not_called()
+
+
+def test_database_cooldown_survives_lost_redis_cooldown(votemap, mock_rcon):
+    first = votemap.send_reminder(force=True, scope="event:start:123")
+    assert first.ok
+    votemap.reset_last_reminder_time()
+    second = votemap.send_reminder()
+    assert second.outcome.value == "on_cooldown"
+    assert mock_rcon.message_player.call_count == 2
+
+
+def test_rejected_reminders_retry_bounded_then_use_short_failure_cooldown(votemap, mock_rcon):
+    mock_rcon.message_player.return_value = False
+    for now in (100, 130, 160):
+        with patch("rcon.vote_map.reminder_delivery.time.time", return_value=now):
+            assert not votemap.send_reminder().ok
+    assert mock_rcon.message_player.call_count == 6
+    assert votemap.get_last_reminder_time() is None
+    with patch("rcon.vote_map.reminder_delivery.time.time", return_value=161):
+        assert votemap.send_reminder().outcome.value == "on_cooldown"
+    assert mock_rcon.message_player.call_count == 6
+    with patch("rcon.vote_map.reminder_delivery.time.time", return_value=460):
+        assert not votemap.send_reminder().ok
+    assert mock_rcon.message_player.call_count == 8
+
+
+def test_round_change_stops_remaining_old_reminders(votemap, mock_rcon):
+    def move_to_new_round(**_kwargs):
+        votemap._maps_history[0]["start"] += 1
+        return True
+    mock_rcon.message_player.side_effect = move_to_new_round
+    result = votemap.send_reminder(force=True)
+    assert not result.ok
+    assert mock_rcon.message_player.call_count == 1

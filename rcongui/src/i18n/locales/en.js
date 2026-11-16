@@ -635,6 +635,7 @@ const en = {
       title: "Player records",
       eyebrow: "Moderation",
       subtitle: "Search, select and manage players across servers.",
+      liveSnapshotUnavailable: "Current player status is unavailable. Last-seen times may be incomplete.",
       results: "{{count}} results",
       selected: "Selected: {{count}}",
       created: "Created",
@@ -5221,7 +5222,7 @@ const en = {
     lastChecked: "Last checked",
     latestRelease: "Latest release",
   },
-  language: { label: "Language", de: "Deutsch", en: "English", fr: "Français" },
+  language: { label: "Language", de: "Deutsch", en: "English", fr: "Français", loadFailed: "The language could not be loaded. Please try again.", storageUnavailable: "Browser storage is unavailable. Local settings last only for this visit." },
 };
 
 Object.assign(en.maps.votemapSettings, {

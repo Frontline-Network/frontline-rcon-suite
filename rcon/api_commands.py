@@ -3,7 +3,7 @@ import inspect
 import re
 import unicodedata
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import Any, Dict, Iterable, Literal, Optional, Sequence, Type
 
@@ -91,7 +91,7 @@ from rcon.user_config.webhooks import (
     KillsWebhooksUserConfig,
     WatchlistWebhooksUserConfig,
 )
-from rcon.utils import MISSING
+from rcon.utils import MISSING, get_server_number
 from rcon.vote_map import VoteMap
 from rcon.watchlist import PlayerWatch
 
@@ -208,13 +208,18 @@ class RconAPI(Rcon):
             reset_to_default=reset_to_default,
         )
 
-        if res:
-            audit_user_config_differences(
-                old_model=old_model,
-                new_model=data,
-                command_name=command_name,
-                author=by,
-            )
+        if res and not dry_run:
+            try:
+                audit_user_config_differences(
+                    old_model=old_model,
+                    new_model=model.load_from_db(),
+                    command_name=command_name,
+                    author=by,
+                )
+            except Exception:
+                # Saving already succeeded; do not invite a retry or claim that
+                # the configuration was rejected because audit delivery failed.
+                logger.error("Unable to audit configuration change for %s", command_name)
         return res
 
     def get_blacklists(self) -> list[BlacklistType]:
@@ -465,6 +470,48 @@ class RconAPI(Rcon):
         # TODO: allow clearing specific cache keys
         return RedisCached.clear_all_caches(get_redis_pool())
 
+    def get_pending_session_events(self, limit: int = 50):
+        from rcon.session_event_review import list_pending
+        return list_pending(int(get_server_number()), limit)
+
+    def get_pending_automod_actions(self, limit: int = 50):
+        from rcon.automods import action_guard, tk_action_guard
+        server = int(get_server_number())
+        general = action_guard.list_pending(server, limit)
+        teamkill = tk_action_guard.list_pending(server, limit)
+        # ISO timestamps may carry different UTC offsets. Compare instants,
+        # not strings, and treat legacy naive database values as UTC.
+        from datetime import datetime, timezone
+
+        def sort_key(item):
+            timestamp = datetime.fromisoformat(item['updated_at'])
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+            return timestamp.astimezone(timezone.utc), item['token']
+
+        combined = sorted(general['results'] + teamkill['results'], key=sort_key)
+        return {'results': combined[:limit],
+                'more': general['more'] or teamkill['more'] or len(combined) > limit}
+
+    def review_pending_automod_action(self, player_id: str, token: str, reason: str, by: str):
+        from rcon.automods import action_guard, tk_action_guard
+        guard = tk_action_guard if token.startswith('tk-') else action_guard
+        return guard.review(int(get_server_number()), player_id, token, by, reason) > 0
+
+    def resolve_pending_session_event(
+        self, player_id: str, event_kind: str, event_us: int,
+        decision: str, reason: str, by: str, session_id: int | None = None,
+        fingerprint: str | None = None,
+    ):
+        from rcon.session_event_review import discard_unidentified, resolve
+        if event_kind == "unidentified":
+            if decision != "discard" or not fingerprint:
+                raise ValueError("Only discarding an unidentified event is supported")
+            return discard_unidentified(int(get_server_number()), fingerprint, reason, by)
+        config = RconServerSettingsUserConfig.load_from_db()
+        return resolve(int(get_server_number()), player_id, event_kind, event_us,
+                       decision, reason, by, session_id, server_name=config.short_name)
+
     def get_player_profile(
         self,
         player_id: str,
@@ -525,6 +572,22 @@ class RconAPI(Rcon):
         flags: str | list[str] | None = None,
         country: str | None = None,
     ):
+        try:
+            with self.without_retries():
+                pairs = self.get_player_ids()
+            if not isinstance(pairs, list) or any(
+                not isinstance(pair, tuple) or len(pair) != 2 or not isinstance(pair[1], str)
+                or not pair[1].strip() or len(pair[1]) > 100
+                for pair in pairs
+            ):
+                raise ValueError("Invalid player snapshot")
+            online_now_ids = {player_id for _, player_id in pairs}
+            if len(online_now_ids) != len(pairs):
+                raise ValueError("Duplicate player identity in snapshot")
+            observed_at = datetime.now(timezone.utc)
+        except Exception as error:
+            logger.warning("Unable to verify online players for history search: %s", type(error).__name__)
+            online_now_ids, observed_at = None, None
         return get_players_by_appearance(
             page=page,
             page_size=page_size,
@@ -538,6 +601,8 @@ class RconAPI(Rcon):
             ignore_accent=ignore_accent,
             flags=flags,
             country=country,
+            online_now_ids=online_now_ids,
+            observed_at=observed_at,
         )
 
     def flag_player(
@@ -1345,6 +1410,22 @@ class RconAPI(Rcon):
         self,
     ) -> SeedVIPUserConfig:
         return SeedVIPUserConfig.load_from_db()
+
+    def get_blacklist_sync_reviews(self, offset=0, limit=50):
+        from rcon.blacklist_sync_journal import list_reviews
+        return list_reviews(int(get_server_number()), offset, limit)
+
+    def acknowledge_blacklist_sync_review(self, delivery_id: int, by: str):
+        from rcon.blacklist_sync_journal import acknowledge_review
+        return acknowledge_review(int(get_server_number()), delivery_id, by)
+
+    def get_seed_vip_journal(self, offset=0, limit=50, status=None):
+        from rcon.seed_vip.journal import list_grants
+        return list_grants(int(get_server_number()), offset, limit, status)
+
+    def acknowledge_seed_vip_review(self, grant_id: int, by: str):
+        from rcon.seed_vip.journal import acknowledge_review
+        return acknowledge_review(int(get_server_number()), grant_id, by)
 
     def validate_seed_vip_config(
         self,

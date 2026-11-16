@@ -5,6 +5,7 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
+import Alert from "@mui/material/Alert";
 import Tooltip from "@mui/material/Tooltip";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -22,10 +23,16 @@ export default function LanguageSelector({
 }) {
   const { i18n, t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
+  const [loadError, setLoadError] = useState(false);
   const language = i18n.resolvedLanguage || "de";
 
   const selectLanguage = async (code) => {
-    if (await selectAppLanguage(code)) setAnchorEl(null);
+    setLoadError(false);
+    try {
+      if (await selectAppLanguage(code)) setAnchorEl(null);
+    } catch {
+      setLoadError(true);
+    }
   };
 
   return (
@@ -50,6 +57,7 @@ export default function LanguageSelector({
         anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
         transformOrigin={{ horizontal: "right", vertical: "top" }}
       >
+        {loadError && <Alert severity="error" role="alert">{t("language.loadFailed")}</Alert>}
         {languages.map(({ code, key }) => (
           <MenuItem
             key={code}

@@ -145,8 +145,8 @@
         "annotation": "list[str]"
       }
     },
-    "return_type": null,
-    "doc_string": "Add the given maps to the rotation, returns the game server response for each map",
+    "return_type": "list[dict[str, str | int]]",
+    "doc_string": "Append maps and return each server-confirmed insertion. Errors can leave a partial change.",
     "auto_settings_capable": true,
     "permissions_required": [
       "api.can_add_maps_to_rotation"
@@ -155,8 +155,8 @@
       "POST"
     ],
     "description_translations": {
-      "de": "Fügt mehrere Karten zur Rotation hinzu und liefert die Serverantwort je Karte.",
-      "en": "Adds multiple maps to the rotation and returns the server response for each map."
+      "de": "Fügt mehrere Karten zur Rotation hinzu und liefert für jede bestätigte Einfügung Kartenkennung, Position und Status. Bei Fehlern kann die Rotation teilweise geändert sein.",
+      "en": "Adds multiple maps to the rotation and returns the map ID, index and status for each confirmed insertion. An error can leave a partial change."
     }
   },
   {
@@ -8609,7 +8609,7 @@
     "endpoint": "ws/mobile/v1/incidents",
     "arguments": {},
     "return_type": "RconResponse",
-    "doc_string": "Stream incident changes from a reconnectable timestamp cursor.",
+    "doc_string": "Stream incident changes from a reconnectable event cursor. For status-filtered streams, remove IDs in removed_incident_ids from the filtered view.",
     "auto_settings_capable": false,
     "permissions_required": [
       "api.can_view_admin_incidents"
@@ -8618,8 +8618,8 @@
       "WEBSOCKET"
     ],
     "description_translations": {
-      "de": "Überträgt Änderungen an Vorfällen über WebSocket. Ein Zeitstempel-Cursor ermöglicht nach einem Verbindungsabbruch die Fortsetzung des Ereignisstroms.",
-      "en": "Streams incident changes over WebSocket. A timestamp cursor allows the event stream to resume after reconnecting."
+      "de": "Überträgt Vorfalländerungen mit einem fortsetzbaren Ereignis-Cursor. Bei Statusfiltern entfernt der Client die unter removed_incident_ids gemeldeten Vorfälle aus der gefilterten Ansicht.",
+      "en": "Streams incident changes with a resumable event cursor. For status filters, clients remove the incidents listed in removed_incident_ids from the filtered view."
     }
   }
 ]

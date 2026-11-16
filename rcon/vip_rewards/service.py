@@ -7,17 +7,21 @@ import time
 from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert
 
-from rcon.models import VipRewardEvent, VipRewardGrant, VipRewardState, enter_session
+from rcon.models import SeedVipGrant, VipRewardEvent, VipRewardGrant, VipRewardNotice, VipRewardState, enter_session, get_session_maker
 from rcon.service_runtime import stopping, wait
 from rcon.user_config.seed_vip import SeedVIPUserConfig
 from rcon.user_config.vip_rewards import VipRewardsUserConfig
 from rcon.utils import get_server_number
 from rcon.vip_rewards.engine import Engine, budget, gate
-from rcon.vip_rewards.locking import lock, vip_lock
+from rcon.vip_rewards.locking import lock, switch_state_lock, vip_lock
 
 logger = logging.getLogger(__name__)
+NOTICE_MAX_ATTEMPTS = 3
+NOTICE_RETRY_SECONDS = 30
+NOTICE_LIFETIME_SECONDS = 600
 
 
 def server():
@@ -90,23 +94,44 @@ def status_command_conflict(command):
     return False
 
 
+def reward_message(cfg, seconds):
+    hours = f"{seconds / 3600:g}"
+    return {
+        "de": f"VIP-Belohnung: +{hours} Stunden VIP. Vielen Dank!",
+        "en": f"VIP reward: +{hours} hours of VIP. Thank you!",
+        "fr": f"Récompense VIP : +{hours} heures de VIP. Merci !",
+    }[cfg.message_language]
+
+
 def status_message(cfg, state, pid, now):
     from rcon.vip_rewards.engine import periods
+    language = cfg.message_language
     if not cfg.weekly_support.enabled:
-        return "Wochenziel Unterstützung ist deaktiviert. / Weekly support reward is disabled."
+        return {
+            "de": "Das Wochenziel für Unterstützung ist deaktiviert.",
+            "en": "The weekly support goal is disabled.",
+            "fr": "L’objectif hebdomadaire de soutien est désactivé.",
+        }[language]
     week = periods(now, cfg.timezone)[1]
     player = state.get("players", {}).get(pid, {})
     progress = player.get("weekly_support", {})
     points = progress.get("points", 0) if progress.get("week") == week else 0
     reached = "weekly_support:" + week in player.get("completed", {})
-    result = (f"Wochenziel / Weekly support ({week}, {cfg.timezone}): "
-              f"{points} / {cfg.weekly_support.points} Punkte / points. "
-              f"Belohnung / Reward: {cfg.weekly_support.hours:g} h VIP. ")
+    heading = {"de": "Wochenziel Unterstützung", "en": "Weekly support goal", "fr": "Objectif hebdomadaire de soutien"}[language]
+    reward = {"de": "Belohnung", "en": "Reward", "fr": "Récompense"}[language]
+    unit = {"de": "Punkte", "en": "points", "fr": "points"}[language]
+    result = (f"{heading} ({week}, {cfg.timezone}): "
+              f"{points} / {cfg.weekly_support.points} {unit}. "
+              f"{reward}: {cfg.weekly_support.hours:g} h VIP. ")
     if reached:
-        result += "Ziel erreicht; Gutschrift separat bestätigt. / Goal reached; credit confirmed separately. "
+        result += {"de": "Ziel erreicht; Gutschrift wird separat bestätigt. ",
+                   "en": "Goal reached; credit is confirmed separately. ",
+                   "fr": "Objectif atteint ; l’attribution est confirmée séparément. "}[language]
     if gate(state, cfg, now) != "active":
-        result += "Erfassung pausiert / Tracking paused. "
-    return result + "Mo–So / Mon–Sun. VIP-Limit gilt / VIP cap applies."
+        result += {"de": "Erfassung pausiert. ", "en": "Tracking paused. ",
+                   "fr": "Suivi en pause. "}[language]
+    return result + {"de": "Mo–So. VIP-Limit gilt.", "en": "Mon–Sun. VIP cap applies.",
+                     "fr": "Lun–dim. La limite VIP s’applique."}[language]
 
 
 def journal(offset=0, limit=50, player_id=None, preview=None):
@@ -119,16 +144,22 @@ def journal(offset=0, limit=50, player_id=None, preview=None):
         )
         if player_id:
             query = query.filter_by(player_id=player_id)
-        return {
-            "total": query.count(),
-            "offset": offset,
-            "results": [
-                row.to_dict()
-                for row in query.order_by(VipRewardGrant.id.desc())
-                .offset(offset)
-                .limit(limit)
-            ],
-        }
+        total = query.count()
+        rows = query.order_by(VipRewardGrant.id.desc()).offset(offset).limit(limit).all()
+        notices = {
+            notice.grant_id: notice
+            for notice in session.query(VipRewardNotice)
+            .filter(VipRewardNotice.server_number == server(),
+                    VipRewardNotice.grant_id.in_([row.id for row in rows]))
+            .all()
+        } if rows else {}
+        results = []
+        for row in rows:
+            result = row.to_dict()
+            notice = notices.get(row.id)
+            result["notice"] = {"status": notice.status, "attempts": notice.attempts} if notice else None
+            results.append(result)
+        return {"total": total, "offset": offset, "results": results}
 
 
 def acknowledge_review(grant_id, by):
@@ -163,9 +194,9 @@ def enqueue(payload):
     payload = dict(payload)
     payload["allowed"] = (
         gate(state, cfg, now) == "active"
-        and state.get("config") == cfg.model_dump_json()
+        and state.get("config") == cfg.policy_signature()
     )
-    payload["config"] = cfg.model_dump_json()
+    payload["config"] = cfg.policy_signature()
     key = hashlib.sha256(str(payload["key"]).encode()).hexdigest()
     payload["key"] = key
     with enter_session() as session:
@@ -226,8 +257,8 @@ def tick(rcon):
             observe(rcon, cfg) if cfg.enabled else ({}, {"allies": 0, "axis": 0}, False)
         )
         round_id = current_round() if cfg.enabled and (cfg.round.enabled or cfg.weekly_support.enabled) else None
-        now = time.time()
-        with enter_session() as session:
+        with switch_state_lock(), enter_session() as session:
+            now = time.time()
             row = session.get(VipRewardState, (server(), cfg.dry_run))
             if row is None:
                 row = VipRewardState(
@@ -235,7 +266,7 @@ def tick(rcon):
                 )
                 session.add(row)
             data = copy.deepcopy(row.data)
-            engine = Engine(data, cfg)
+            engine = Engine(data, cfg, game=getattr(getattr(rcon, "game_profile", None), "game", "hll"))
             # A current failure or population drop also blocks queued events.
             thresholds = {
                 "allies": seed.requirements.max_allies,
@@ -277,7 +308,14 @@ def tick(rcon):
                 VipRewardEvent.processed.is_(True),
                 VipRewardEvent.payload["time"].as_float() < now - 172800,
             ).delete(synchronize_session=False)
-            engine.snapshot(now, players, counts, thresholds, healthy)
+            from rcon.vip_rewards.hooks import players_with_forced_switch
+            balance_players = [pid for pid, player in data["players"].items() if player.get("balance")]
+            blocked_balances = players_with_forced_switch(balance_players, now) if balance_players else set()
+            # A later forced event may still be beyond this batch; do not
+            # award a balance claim until the complete backlog is processed.
+            if len(events) == 5000:
+                blocked_balances.update(balance_players)
+            engine.snapshot(now, players, counts, thresholds, healthy, blocked_balances)
             row.data = data
             for claim in engine.claims:
                 session.execute(
@@ -315,6 +353,18 @@ def tick(rcon):
                 deliver(rcon, grant_id)
             except Exception:
                 logger.exception("VIP reward delivery failed for grant %s", grant_id)
+        with enter_session() as session:
+            notice_ids = [item.grant_id for item in session.query(VipRewardNotice.grant_id)
+                          .filter(VipRewardNotice.server_number == server(),
+                                  VipRewardNotice.status == "queued",
+                                  VipRewardNotice.due_at <= time.time())
+                          .order_by(VipRewardNotice.due_at, VipRewardNotice.grant_id)
+                          .limit(500).all()]
+        for grant_id in notice_ids:
+            try:
+                deliver_reward_notice(rcon, grant_id)
+            except Exception:
+                logger.exception("VIP reward notice processing failed for grant %s", grant_id)
 
 
 def current_vip(rcon, player_id):
@@ -362,6 +412,81 @@ def award_period_start(now, period, timezone_name):
     return start.timestamp()
 
 
+def reward_rule_config(config, rule):
+    kind, separator, rule_id = rule.partition(":")
+    if separator and kind in {"event", "challenge"}:
+        rules = config.events if kind == "event" else config.challenges
+        return next((item for item in rules if item.id == rule_id), None)
+    return getattr(config, rule, None)
+
+
+def queue_reward_notice(session, grant, cfg, now):
+    """Commit a notice atomically with the confirmed grant, never backfill legacy awards."""
+    if not cfg.notify_player or grant.preview:
+        return
+    session.execute(
+        insert(VipRewardNotice).values(
+            grant_id=grant.id, server_number=grant.server_number,
+            player_id=grant.player_id, message=reward_message(cfg, grant.credited_seconds),
+            status="queued", attempts=0, created_at=now, due_at=now,
+            expires_at=now + NOTICE_LIFETIME_SECONDS, updated_at=now,
+        ).on_conflict_do_nothing(index_elements=["grant_id"])
+    )
+
+
+def deliver_reward_notice(rcon, grant_id):
+    """Reserve before sending; uncertain responses never become retryable."""
+    cfg = VipRewardsUserConfig.load_from_db()
+    if not cfg.enabled or cfg.dry_run or not cfg.notify_player:
+        return
+    now = time.time()
+    notice = None
+    with get_session_maker()() as session, session.begin():
+        session.execute(
+            update(VipRewardNotice)
+            .where(VipRewardNotice.grant_id == grant_id,
+                   VipRewardNotice.server_number == server(),
+                   VipRewardNotice.status == "queued",
+                   VipRewardNotice.expires_at <= now)
+            .values(status="expired", updated_at=now)
+        )
+        notice = session.execute(
+            update(VipRewardNotice)
+            .where(VipRewardNotice.grant_id == grant_id,
+                   VipRewardNotice.server_number == server(),
+                   VipRewardNotice.status == "queued",
+                   VipRewardNotice.due_at <= now,
+                   VipRewardNotice.expires_at > now,
+                   VipRewardNotice.attempts < NOTICE_MAX_ATTEMPTS)
+            .values(status="sending", attempts=VipRewardNotice.attempts + 1, updated_at=now)
+            .returning(VipRewardNotice.player_id, VipRewardNotice.message,
+                       VipRewardNotice.attempts, VipRewardNotice.expires_at)
+        ).one_or_none()
+    if notice is None:
+        return
+    result = None
+    try:
+        with rcon.without_retries():
+            result = rcon.message_player(player_id=notice.player_id, message=notice.message)
+    except Exception:
+        logger.exception("VIP reward notice result is uncertain for grant %s", grant_id)
+    now = time.time()
+    if result is True:
+        status = "sent"
+    elif result is False:
+        status = "queued" if notice.attempts < NOTICE_MAX_ATTEMPTS and now + NOTICE_RETRY_SECONDS < notice.expires_at else "failed"
+    else:
+        status = "review"
+    with get_session_maker()() as session, session.begin():
+        session.execute(
+            update(VipRewardNotice)
+            .where(VipRewardNotice.grant_id == grant_id,
+                   VipRewardNotice.server_number == server(),
+                   VipRewardNotice.status == "sending")
+            .values(status=status, due_at=now + NOTICE_RETRY_SECONDS, updated_at=now)
+        )
+
+
 def deliver(rcon, grant_id):
     with enter_session() as session:
         row = session.get(VipRewardGrant, grant_id)
@@ -384,7 +509,7 @@ def deliver(rcon, grant_id):
                 ):
                     row.status, row.reason = "skipped", "disabled_or_paused"
                     return
-                rule_config = getattr(cfg, row.rule, None)
+                rule_config = reward_rule_config(cfg, row.rule)
                 period = getattr(rule_config, "limit_period", "rolling_day")
                 period_start = award_period_start(now, period, cfg.timezone)
                 old = (
@@ -400,7 +525,9 @@ def deliver(rcon, grant_id):
                 )
                 used = sum(g.credited_seconds for g in old if g.written_at > now - 86400)
                 allowed = budget(row.requested_seconds, used, cfg.daily_hours * 3600)
-                if row.limit and sum(g.rule == row.rule and g.written_at >= period_start for g in old) >= row.limit:
+                configured_limit = getattr(rule_config, "limit", 0)
+                limit = min(row.limit, configured_limit) if row.limit and configured_limit else row.limit or configured_limit
+                if limit and sum(g.rule == row.rule and g.written_at >= period_start for g in old) >= limit:
                     allowed = 0
                     row.reason = "rule_limit"
                 if not allowed:
@@ -417,10 +544,25 @@ def deliver(rcon, grant_id):
                         VipRewardGrant.server_number == server(),
                         VipRewardGrant.player_id == pid,
                         VipRewardGrant.preview == row.preview,
-                        VipRewardGrant.status == "review",
+                        VipRewardGrant.status.in_(["prepared", "review"]),
                     )
                     .first()
                 )
+                unresolved_seed = (
+                    session.query(SeedVipGrant.id)
+                    .filter(
+                        SeedVipGrant.server_number == server(),
+                        SeedVipGrant.player_id == pid,
+                        SeedVipGrant.preview == row.preview,
+                        SeedVipGrant.status.in_(["prepared", "review"]),
+                    )
+                    .first()
+                )
+                if unresolved_seed:
+                    # Nothing was sent for this grant. Retry after the seed
+                    # write is reviewed rather than discarding the reward.
+                    row.reason = "previous_seed_write_needs_review"
+                    return
                 if unresolved:
                     row.status, row.reason = "skipped", "previous_write_needs_review"
                     return
@@ -457,6 +599,8 @@ def deliver(rcon, grant_id):
                 row = session.get(VipRewardGrant, grant_id)
                 row.status = "awarded" if confirmed else "review"
                 row.reason = "reconciled" if confirmed else "uncertain_write"
+                if confirmed:
+                    queue_reward_notice(session, row, cfg, now)
             return
         try:
             result = rcon.add_vip(
@@ -483,15 +627,17 @@ def deliver(rcon, grant_id):
             row.status = "awarded" if confirmed else "review"
             if not confirmed:
                 row.reason = "readback_mismatch"
-            seconds = row.credited_seconds
-        if confirmed and cfg.notify_player:
-            try:
-                rcon.message_player(
-                    player_id=pid,
-                    message=f"VIP-Belohnung: +{seconds / 3600:g} Stunden VIP. Vielen Dank!",
-                )
-            except Exception:
-                logger.exception("Reward delivered; player message failed for %s", pid)
+            if confirmed:
+                queue_reward_notice(session, row, cfg, now)
+
+
+def recover_interrupted_reward_notices():
+    """Call only under the worker lock before starting a new consumer."""
+    with get_session_maker()() as session, session.begin():
+        session.execute(update(VipRewardNotice)
+                        .where(VipRewardNotice.server_number == server(),
+                               VipRewardNotice.status == "sending")
+                        .values(status="review", updated_at=time.time()))
 
 
 def run(stop_event=None):
@@ -500,6 +646,9 @@ def run(stop_event=None):
     rcon = get_rcon_api()
     # A fresh process never estimates attendance during its downtime, even <60 s.
     with lock(f"vip-rewards-worker:{server()}"):
+        # A previous process could have sent a notice before losing its reply.
+        # Never turn those reservations back into automatic retries.
+        recover_interrupted_reward_notices()
         with enter_session() as session:
             for state in session.query(VipRewardState).filter_by(
                 server_number=server()

@@ -82,6 +82,14 @@ function getCopy() {
     review: tr("Prüfung erforderlich"),
     reviewed: tr("Manuell geprüft"),
   };
+  const noticeResults = {
+    queued: tr("Nachricht vorgemerkt"),
+    sending: tr("Nachricht wird gesendet"),
+    sent: tr("Nachricht vom Server angenommen"),
+    review: tr("Nachrichtenergebnis unklar"),
+    failed: tr("Nachricht wiederholt abgelehnt"),
+    expired: tr("Nachricht abgelaufen"),
+  };
   const reasons = {
     daily_budget: tr("24-Stunden-Budget erreicht"),
     rule_limit: tr("Regellimit erreicht"),
@@ -105,7 +113,7 @@ function getCopy() {
     events: tr("Events"),
     challenges: tr("Waffen-Challenges"),
   };
-  return { labels, notes, results, reasons, awardPeriods, ruleLabels };
+  return { labels, notes, results, noticeResults, reasons, awardPeriods, ruleLabels };
 }
 const isRuleEnabled = (config, key) =>
   Array.isArray(config[key])
@@ -397,7 +405,7 @@ function localTime(value) {
 
 export default function VipRewards() {
   useTranslation("vipRewards");
-  const { labels, notes, results, reasons, ruleLabels } = getCopy();
+  const { labels, notes, results, noticeResults, reasons, ruleLabels } = getCopy();
   const { permissions } = useAuth();
   const has = (key) =>
     permissions?.is_superuser ||
@@ -723,6 +731,20 @@ export default function VipRewards() {
                   (v) => change("notify_player", v)
                 )}
               </Stack>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                sx={{ mt: 2, mb: 2 }}
+                label={tr("Sprache der Spielernachrichten")}
+                helperText={tr("Gilt für automatische VIP-Benachrichtigungen und die private Statusantwort.")}
+                value={config.message_language || "de"}
+                onChange={(e) => change("message_language", e.target.value)}
+              >
+                <MenuItem value="de">{tr("Deutsch")}</MenuItem>
+                <MenuItem value="en">{tr("Englisch")}</MenuItem>
+                <MenuItem value="fr">{tr("Französisch")}</MenuItem>
+              </TextField>
               <Typography variant="body2" sx={{ mb: 2 }}>
                 {tr(
                   "Seed-VIP-Zielzahlen müssen fünf Minuten gehalten werden. Prüfung alle 30 Sekunden. Vorschau und Livebetrieb haben getrennte Fortschritte und Budgets."
@@ -1686,6 +1708,9 @@ export default function VipRewards() {
                         >
                           {reasons[r.reason] || r.reason}
                         </Typography>
+                        {r.notice && <Typography variant="caption" display="block" color="text.secondary">
+                          {noticeResults[r.notice.status] || r.notice.status}
+                        </Typography>}
                         {r.status === "review" && (
                           <Typography variant="caption" display="block">
                             {tr("Zielablauf:")}

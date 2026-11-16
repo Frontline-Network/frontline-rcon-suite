@@ -541,11 +541,11 @@ def test_report_bot_moderation_commands_share_the_game_advertised_contract(
     )
 
 
-def test_rcon_internal_error_retries_message_player_once(monkeypatch):
+def test_rcon_internal_error_retries_read_command_once(monkeypatch):
     controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
     handle = Mock()
     handle.request = SimpleNamespace(
-        name="MessagePlayer",
+        name="GetServerInformation",
         version=2,
         content={"PlayerId": "player-id", "Message": "Hello"},
     )
@@ -564,7 +564,7 @@ def test_rcon_internal_error_retries_message_player_once(monkeypatch):
     sleep.assert_called_once()
     assert 0 < sleep.call_args.args[0] <= 8
     retry_connection.exchange.assert_called_once_with(
-        "MessagePlayer",
+        "GetServerInformation",
         2,
         {"PlayerId": "player-id", "Message": "Hello"},
     )
@@ -573,7 +573,7 @@ def test_rcon_internal_error_retries_message_player_once(monkeypatch):
 def test_rcon_internal_error_after_retry_is_not_downgraded_to_false(monkeypatch):
     controller = HLLServerCtl(ServerInfo(game=GameEnum.HLL_WW2), Mock())
     handle = Mock()
-    handle.request = SimpleNamespace(name="KickPlayer", version=2, content={})
+    handle.request = SimpleNamespace(name="GetServerInformation", version=2, content={})
     handle.receive.side_effect = HLLCommandError(500, "first failure")
     retry_response = Mock()
     retry_response.is_successful.side_effect = HLLCommandError(500, "second failure")
@@ -618,14 +618,14 @@ def test_broken_connection_retries_send_with_a_fresh_connection(monkeypatch):
     monkeypatch.setattr("rcon.commands.time.sleep", sleep)
 
     assert (
-        controller.send("MessagePlayer", 2, {"PlayerId": "player-id"}) is retry_handle
+        controller.send("GetServerInformation", 2, {"PlayerId": "player-id"}) is retry_handle
     )
     # Retries deliberately use a bounded jittered backoff so several CRCON
     # workers do not reconnect to the game server in lockstep.
     sleep.assert_called_once()
     assert 0 < sleep.call_args.args[0] <= 1
     retry_connection.send.assert_called_once_with(
-        "MessagePlayer", 2, {"PlayerId": "player-id"}
+        "GetServerInformation", 2, {"PlayerId": "player-id"}
     )
 
 
@@ -791,21 +791,59 @@ def test_map_sequence_replacement_keeps_one_entry_until_the_replacement_is_ready
     )
     remove = Mock()
     add = Mock()
+    monkeypatch.setattr("rcon.rcon.ServerCtl.get_maps", Mock(return_value=["new_a", "new_b", "new_c", "new_d", "new_e"]))
     monkeypatch.setattr("rcon.rcon.ServerCtl.remove_map_from_sequence_at_index", remove)
     monkeypatch.setattr("rcon.rcon.ServerCtl.add_map_to_sequence_at_index", add)
 
     ctl.set_map_sequence(["new_a", "new_b", "new_c", "new_d", "new_e"])
 
-    remove.assert_has_calls([call(1), call(0)])
+    remove.assert_has_calls([call(0), call(0)])
     add.assert_has_calls(
         [
-            call("new_a", 1),
-            call("new_b", 2),
-            call("new_c", 3),
-            call("new_d", 4),
-            call("new_e", 5),
+            call("new_a", 2),
+            call("new_b", 3),
+            call("new_c", 4),
+            call("new_d", 5),
+            call("new_e", 6),
         ]
     )
+
+
+@pytest.mark.parametrize("kind", ["rotation", "sequence"])
+@pytest.mark.parametrize("ctl_type,game", [(HLLRcon, GameEnum.HLL_WW2), (HLLVRcon, GameEnum.HLL_VIETNAM)])
+def test_map_replacement_does_not_remove_old_entries_if_add_is_rejected(monkeypatch, ctl_type, game, kind):
+    ctl = ctl_type(ServerInfo(game=game))
+    setattr(ctl, f"get_map_{kind}", Mock(return_value={"maps": [SimpleNamespace(id="old_a"), SimpleNamespace(id="old_b")]}))
+    add = Mock(side_effect=[None, HLLCommandFailedError("rejected")])
+    remove = Mock()
+    monkeypatch.setattr("rcon.rcon.ServerCtl.get_maps", Mock(return_value=["new_a", "bad"]))
+    monkeypatch.setattr(f"rcon.rcon.ServerCtl.get_map_{kind}", Mock(return_value={"maps": ["old_a", "old_b", "new_a"]}))
+    monkeypatch.setattr(f"rcon.rcon.ServerCtl.add_map_to_{kind}_at_index", add)
+    monkeypatch.setattr(f"rcon.rcon.ServerCtl.remove_map_from_{kind}_at_index", remove)
+    with pytest.raises(HLLCommandFailedError, match="observed after failure"):
+        getattr(ctl, f"set_map_{kind}")(["new_a", "bad"])
+    remove.assert_not_called()
+
+
+@pytest.mark.parametrize("ctl_type,game", [(HLLRcon, GameEnum.HLL_WW2), (HLLVRcon, GameEnum.HLL_VIETNAM)])
+def test_rotation_indices_and_after_map_use_the_actual_map_list(monkeypatch, ctl_type, game):
+    ctl = ctl_type(ServerInfo(game=game))
+    ctl.get_map_rotation = Mock(return_value={"maps": ["a", "b", "c", "d", "e"]})
+    add = Mock()
+    remove = Mock()
+    monkeypatch.setattr("rcon.rcon.ServerCtl.add_map_to_rotation_at_index", add)
+    monkeypatch.setattr("rcon.rcon.ServerCtl.remove_map_from_rotation_at_index", remove)
+
+    ctl.add_map_to_rotation_at_index("new", -1)
+    add.assert_called_with("new", 5)
+    ctl.remove_map_from_rotation_at_index(-2)
+    remove.assert_called_with(3)
+    ctl.add_map_to_rotation("new", after_map_name="b")
+    add.assert_called_with("new", 2)
+    with pytest.raises(ValueError):
+        ctl.remove_map_from_rotation_at_index(-6)
+    with pytest.raises(ValueError):
+        ctl.add_map_to_rotation_at_index("new", 6)
 
 
 @pytest.mark.parametrize(
@@ -843,6 +881,7 @@ def test_map_sequence_replacement_handles_a_single_existing_entry(
     )
     remove = Mock()
     add = Mock()
+    monkeypatch.setattr("rcon.rcon.ServerCtl.get_maps", Mock(return_value=["new_a"]))
     monkeypatch.setattr("rcon.rcon.ServerCtl.remove_map_from_sequence_at_index", remove)
     monkeypatch.setattr("rcon.rcon.ServerCtl.add_map_to_sequence_at_index", add)
 

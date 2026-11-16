@@ -4,20 +4,21 @@ SQLite replaces PostgreSQL; process locks and the game/Redis boundaries are loca
 fakes. These tests do not claim to verify network protocol or concurrent workers.
 """
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from copy import deepcopy
 from datetime import datetime, timezone
 from types import SimpleNamespace
 import json
 import socket
 
+import fakeredis
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
 
-from rcon.models import VipRewardEvent, VipRewardGrant, VipRewardState
+from rcon.models import SeedVipGrant, VipRewardEvent, VipRewardGrant, VipRewardNotice, VipRewardState
 from rcon.user_config.autobalancer import AutobalancerUserConfig
 from rcon.user_config.seed_vip import SeedVIPUserConfig
 from rcon.user_config.vip_rewards import VipRewardsUserConfig
@@ -69,6 +70,10 @@ class TestServer:
 
     def message_player(self, **data):
         self.messages.append(deepcopy(data))
+        return True
+
+    def without_retries(self):
+        return nullcontext()
 
     def tick(self, seconds=0):
         self.now += seconds
@@ -102,7 +107,7 @@ def world(request, monkeypatch, tmp_path):
     monkeypatch.setattr(socket.socket, "connect", deny_network)
     monkeypatch.setenv("SERVER_NUMBER", "99")
     db = create_engine("sqlite:///" + (tmp_path / "vip-simulation.sqlite").as_posix())
-    for model in (VipRewardEvent, VipRewardGrant, VipRewardState):
+    for model in (VipRewardEvent, VipRewardGrant, VipRewardNotice, VipRewardState, SeedVipGrant):
         model.__table__.create(db)
     sessions = sessionmaker(db)
 
@@ -117,8 +122,11 @@ def world(request, monkeypatch, tmp_path):
 
     server = TestServer(request.param)
     monkeypatch.setattr(service, "enter_session", session)
+    monkeypatch.setattr(service, "get_session_maker", lambda: sessions)
     monkeypatch.setattr(service, "lock", local_lock)
+    monkeypatch.setattr(service, "switch_state_lock", local_lock)
     monkeypatch.setattr(service, "vip_lock", local_lock)
+    monkeypatch.setattr(hooks, "switch_state_lock", local_lock)
     monkeypatch.setattr(service, "server", lambda: 99)
     monkeypatch.setattr(service.time, "time", lambda: server.now)
     monkeypatch.setattr(service, "current_round", lambda: server.round_id)
@@ -129,7 +137,8 @@ def world(request, monkeypatch, tmp_path):
     monkeypatch.setattr(SeedVIPUserConfig, "load_from_db", lambda: seed)
     monkeypatch.setattr(AutobalancerUserConfig, "load_from_db", lambda: AutobalancerUserConfig())
     monkeypatch.setattr(service, "status_command_conflict", lambda _: False)
-    monkeypatch.setattr(hooks, "get_redis_client", lambda: SimpleNamespace(set=lambda *a, **k: True))
+    redis = fakeredis.FakeStrictRedis(decode_responses=True)
+    monkeypatch.setattr(hooks, "get_redis_client", lambda: redis)
     try:
         yield server
     finally:
@@ -260,6 +269,85 @@ def test_balance_requires_chat_signup_voluntary_switch_and_full_stay(world):
     assert w.rows()[0]["rule"] == "balance"
     w.advance(60)
     assert len(w.writes) == 1
+
+
+def test_pending_rejected_forced_switch_pauses_then_resumes_balance_reward(world):
+    w = world
+    alice = w.player("Test-Volunteer")
+    for n in range(8):
+        w.player(f"Test-Ally-{n}")
+    for n in range(4):
+        w.player(f"Test-Opponent-{n}", "axis")
+    w.cfg = VipRewardsUserConfig(enabled=True, dry_run=False, pause_during_seeding=False,
+        balance={"enabled": True, "minutes": 1, "difference": 2, "hours": 2})
+    w.tick()
+    w.event("signup", alice)
+    w.tick()
+    w.event("switch", alice, source="allies", target="axis", forced=False)
+    w.players[alice]["team"] = "axis"
+    w.tick()
+    w.advance(30)
+    marker = hooks.mark_forced(alice)
+    w.advance(90)
+    assert not w.writes
+    hooks.finish_forced(alice, marker, rejected=True)
+    w.advance(60)
+    assert len(w.writes) == 1 and w.writes[0]["player_id"] == alice
+
+
+def test_unavailable_marker_store_cannot_credit_balance(world, monkeypatch):
+    w = world
+    alice = w.player("Test-Volunteer")
+    for n in range(8):
+        w.player(f"Test-Ally-{n}")
+    for n in range(4):
+        w.player(f"Test-Opponent-{n}", "axis")
+    w.cfg = VipRewardsUserConfig(enabled=True, dry_run=False, pause_during_seeding=False,
+        balance={"enabled": True, "minutes": 1, "difference": 2, "hours": 2})
+    w.tick()
+    w.event("signup", alice)
+    w.tick()
+    w.event("switch", alice, source="allies", target="axis", forced=False)
+    w.players[alice]["team"] = "axis"
+    w.tick()
+    w.advance(30)
+    with monkeypatch.context() as isolated:
+        def unavailable():
+            raise ConnectionError("marker store unavailable")
+        isolated.setattr(hooks, "get_redis_client", unavailable)
+        with pytest.raises(ConnectionError, match="marker store unavailable"):
+            w.tick(30)
+    assert not w.writes
+    w.advance(60)
+    assert len(w.writes) == 1 and w.writes[0]["player_id"] == alice
+
+
+def test_backlogged_forced_event_blocks_premature_balance_reward(world):
+    w = world
+    alice = w.player("Test-Volunteer")
+    for n in range(8):
+        w.player(f"Test-Ally-{n}")
+    for n in range(4):
+        w.player(f"Test-Opponent-{n}", "axis")
+    w.cfg = VipRewardsUserConfig(enabled=True, dry_run=False, pause_during_seeding=False,
+        balance={"enabled": True, "minutes": 1, "difference": 2, "hours": 2})
+    w.tick()
+    w.event("signup", alice)
+    w.tick()
+    w.event("switch", alice, source="allies", target="axis", forced=False)
+    w.players[alice]["team"] = "axis"
+    w.tick()
+    w.advance(30)
+    assert not w.writes
+    with service.enter_session() as session:
+        session.add_all([VipRewardEvent(server_number=99, preview=False, key=f"backlog-{n}", processed=False,
+            payload={"kind": "kill", "player_id": alice, "time": w.now, "key": f"backlog-{n}", "allowed": False})
+            for n in range(5000)])
+    w.event("forced", alice)
+    w.tick(30)
+    assert not w.writes
+    w.tick(30)
+    assert not w.writes
 
 
 @pytest.mark.parametrize("preview", [False, True])

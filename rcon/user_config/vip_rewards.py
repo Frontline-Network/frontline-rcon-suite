@@ -128,6 +128,7 @@ class VipRewardsUserConfig(BaseUserConfig):
     daily_hours: float = Field(default=24, gt=0, le=8760)
     timezone: str = "Europe/Berlin"
     notify_player: bool = True
+    message_language: Literal["de", "en", "fr"] = "de"
     status_command: str = "!rewards"
     excluded_player_ids: list[str] = Field(default_factory=list)
     opponent_cooldown_minutes: int = Field(default=30, ge=1)
@@ -139,6 +140,11 @@ class VipRewardsUserConfig(BaseUserConfig):
     balance: BalanceRule = Field(default_factory=BalanceRule)
     events: list[EventRule] = Field(default_factory=list, max_length=100)
     challenges: list[ChallengeRule] = Field(default_factory=list, max_length=100)
+
+    def policy_signature(self):
+        # Message language does not change eligibility. Excluding the new field
+        # also preserves signatures created before the language setting existed.
+        return self.model_dump_json(exclude={"message_language"})
 
     @field_validator("status_command")
     @classmethod

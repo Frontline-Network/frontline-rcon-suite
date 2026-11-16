@@ -85,6 +85,26 @@ def test_normalize_forward_server_numbers_rejects_invalid_values(value):
         forwarding.normalize_forward_server_numbers(value)
 
 
+def test_forward_command_never_logs_request_values(monkeypatch, caplog):
+    import logging
+
+    configure_targets(monkeypatch, {"frontend_1": "key-1", "frontend_2": "key-2"})
+    calls = []
+    def post(url, **kwargs):
+        calls.append(kwargs)
+        return FakeResponse(200, {"failed": False, "result": "ok"})
+    monkeypatch.setattr(forwarding.requests, "post", post)
+    with caplog.at_level(logging.DEBUG, logger=forwarding.__name__):
+        forwarding.forward_command(
+            path="/api/settings", sessionid="fake-cookie", auth_header="fake-token",
+            params={"secret": "fake-query-secret"}, json={"password": "fake-body-secret"},
+        )
+    assert calls[0]["json"]["password"] == "fake-body-secret"
+    assert calls[0]["params"]["secret"] == "fake-query-secret"
+    assert all(secret not in caplog.text for secret in
+               ("fake-cookie", "fake-token", "fake-query-secret", "fake-body-secret"))
+
+
 def test_forward_command_returns_deterministic_results_for_every_peer(monkeypatch):
     configure_targets(
         monkeypatch,

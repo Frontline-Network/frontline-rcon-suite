@@ -163,6 +163,7 @@ const StrengthBar = ({ allies, axis, label }) => {
 
 const AutobalancerCard = ({
   teams,
+  gameState,
   onHighlightPlayers,
   detailsExpanded,
   onDetailsExpandedChange,
@@ -202,9 +203,17 @@ const AutobalancerCard = ({
     };
   }, []);
 
+  const verifiedSettings = useMemo(() => ({
+    ...balanceSettings,
+    requireCountVerification: true,
+    authoritativeTeamCounts: {
+      allies: gameState?.num_allied_players,
+      axis: gameState?.num_axis_players,
+    },
+  }), [balanceSettings, gameState]);
   const liveStatus = useMemo(
-    () => buildLiveBalanceStatus(teams, balanceSettings),
-    [balanceSettings, teams]
+    () => buildLiveBalanceStatus(teams, verifiedSettings),
+    [verifiedSettings, teams]
   );
 
   const [held, setHeld] = useState(null);
@@ -227,9 +236,9 @@ const AutobalancerCard = ({
   const validated = useMemo(
     () =>
       (held?.items ?? []).map((item) =>
-        validateLiveRecommendation(teams, balanceSettings, item)
+        validateLiveRecommendation(teams, verifiedSettings, item)
       ),
-    [held, teams, balanceSettings]
+    [held, teams, verifiedSettings]
   );
   const recommendations = useMemo(
     () =>
@@ -576,6 +585,7 @@ const AutobalancerCard = ({
           recommendation: activeRecommendation,
           recipientIds: actionRecipients.map((player) => player.player_id),
           readTeams: () => cmd.GET_LIVE_TEAMS({ throwRouteError: false }),
+          readGameState: () => cmd.GET_GAME_STATE({ throwRouteError: false }),
           readSettings: async () =>
             settingsFromConfig(
               await cmd.GET_AUTOBALANCER_CONFIG({ throwRouteError: false })

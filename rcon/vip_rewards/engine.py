@@ -1,7 +1,9 @@
 """Pure reward policy; all timestamps are UTC epoch seconds, all state is JSON."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+
+from hllrcon import HLLVWeapon, WeaponType as ReferenceWeaponType
 
 MELEE = {"m3 knife", "feldspaten", "fairbairn-sykes", "mpl-50 spade", "mpl-50 spaten"}
 
@@ -14,6 +16,10 @@ def weapon(value):
         .strip("\"'")
         .translate(str.maketrans({"–": "-", "—": "-", "‑": "-", "_": "-"}))
     )
+
+
+VIETNAM_MELEE = frozenset(weapon(item.id) for item in HLLVWeapon.all()
+                          if item.type == ReferenceWeaponType.MELEE)
 
 
 def periods(ts, zone):
@@ -34,10 +40,35 @@ def day_segments(start, end, zone):
         start = stop
 
 
+def retained_challenge_progress(progress, challenges, now, zone):
+    """Keep active and recently ended periods; completed grants are separate."""
+    known_ids = {challenge.id for challenge in challenges}
+    cutoff = datetime.fromtimestamp(now, ZoneInfo(zone)).date() - timedelta(days=14)
+    retained = {}
+    for key, value in progress.items():
+        challenge_id, separator, period = key.rpartition(":")
+        if not separator:
+            # Preserve unknown formats rather than guessing how to migrate them.
+            retained[key] = value
+        elif challenge_id not in known_ids:
+            continue
+        elif period == "fixed":
+            retained[key] = value
+        else:
+            try:
+                period_date = date.fromisoformat(period)
+            except ValueError:
+                retained[key] = value
+            else:
+                if period_date >= cutoff:
+                    retained[key] = value
+    return retained
+
+
 def gate(state, cfg, now):
     if not cfg.enabled:
         return "disabled"
-    if state.get("config") is not None and state["config"] != cfg.model_dump_json():
+    if state.get("config") is not None and state["config"] != cfg.policy_signature():
         return "unknown"
     if (
         not state.get("observed")
@@ -51,14 +82,15 @@ def gate(state, cfg, now):
 
 
 class Engine:
-    def __init__(self, state, cfg):
+    def __init__(self, state, cfg, *, game="hll"):
         self.s, self.c = state, cfg
+        self.melee_weapons = VIETNAM_MELEE if game == "hllv" else MELEE
         self.claims = []
         state.setdefault("players", {})
         state.setdefault("opponents", {})
         state.setdefault("round_seconds", 0)
         # No interval crosses a configuration change or disabled period.
-        signature = cfg.model_dump_json()
+        signature = cfg.policy_signature()
         if state.get("config") != signature:
             old_rules = state.get("active_rules", [])
             state["config"] = signature
@@ -116,7 +148,7 @@ class Engine:
             )
         )
 
-    def snapshot(self, now, players, counts, thresholds, healthy=True):
+    def snapshot(self, now, players, counts, thresholds, healthy=True, blocked_balances=frozenset()):
         s, c = self.s, self.c
         previous_status = gate(s, c, now)
         previous_time = s.get("baseline")
@@ -145,6 +177,9 @@ class Engine:
         if valid_interval and s.get("round_known", True):
             s["round_seconds"] += delta
         for pid, p in s["players"].items():
+            p["challenges"] = retained_challenge_progress(
+                p.get("challenges", {}), c.challenges, now, c.timezone
+            )
             p["completed"] = {
                 k: t
                 for k, t in p["completed"].items()
@@ -203,13 +238,13 @@ class Engine:
                     )
                     p["events"][event.id] = p["events"].get(event.id, 0) + seconds
                     if seconds and p["events"][event.id] >= event.minutes * 60:
-                        self.claim(pid, "event:" + event.id, event.id, event.hours, now)
+                        self.claim(pid, "event:" + event.id, event.id, event.hours, now, event.limit)
             balance = p.get("balance")
             if balance:
                 if balance.get("switched"):
                     if info["team"] != balance["target"]:
                         p.pop("balance", None)
-                    elif valid_interval and same_team:
+                    elif valid_interval and same_team and pid not in blocked_balances:
                         balance["seconds"] += delta
                         if balance["seconds"] >= c.balance.minutes * 60:
                             self.claim(
@@ -272,7 +307,9 @@ class Engine:
         ts = event["time"]
         if kind == "forced":
             if pid in s["players"]:
-                s["players"][pid].pop("balance", None)
+                balance = s["players"][pid].get("balance")
+                if balance and balance.get("signup", ts) <= event.get("switch_started", ts):
+                    s["players"][pid].pop("balance", None)
             return
         if kind == "disconnect":
             s.get("online", {}).pop(pid, None)
@@ -371,7 +408,7 @@ class Engine:
                     r.period != "fixed" or r.start.timestamp() <= ts < r.end.timestamp()
                 )
             ]
-            if not (c.melee.enabled and w in MELEE) and not matching:
+            if not (c.melee.enabled and w in self.melee_weapons) and not matching:
                 return
             pair = pid + ":" + victim
             if (
@@ -380,7 +417,7 @@ class Engine:
             ):
                 return
             s["opponents"][pair] = ts
-            if c.melee.enabled and w in MELEE:
+            if c.melee.enabled and w in self.melee_weapons:
                 self.claim(
                     pid, "melee", event["key"], c.melee.hours, now, c.melee.limit
                 )
@@ -395,7 +432,7 @@ class Engine:
                 p["challenges"][key] = p["challenges"].get(key, 0) + 1
                 if p["challenges"][key] >= challenge.kills:
                     self.claim(
-                        pid, "challenge:" + challenge.id, period, challenge.hours, now
+                        pid, "challenge:" + challenge.id, period, challenge.hours, now, challenge.limit
                     )
 
 

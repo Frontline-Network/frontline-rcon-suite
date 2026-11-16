@@ -12,6 +12,7 @@ import pydantic
 from sqlalchemy import (
     JSON,
     TIMESTAMP,
+    BigInteger,
     CheckConstraint,
     Engine,
     Enum,
@@ -209,6 +210,70 @@ class VipRewardGrant(Base):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
+class VipRewardNotice(Base):
+    """A separate durable delivery record for one confirmed reward message."""
+
+    __tablename__ = "vip_reward_notice"
+    grant_id: Mapped[int] = mapped_column(
+        ForeignKey("vip_reward_grant.id", ondelete="CASCADE"), primary_key=True
+    )
+    server_number: Mapped[int] = mapped_column(index=True, nullable=False)
+    player_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    attempts: Mapped[int] = mapped_column(nullable=False, default=0)
+    created_at: Mapped[float] = mapped_column(nullable=False)
+    due_at: Mapped[float] = mapped_column(nullable=False)
+    expires_at: Mapped[float] = mapped_column(nullable=False)
+    updated_at: Mapped[float] = mapped_column(nullable=False)
+    __table_args__ = (
+        CheckConstraint("status IN ('queued', 'sending', 'sent', 'review', 'failed', 'expired')", name="ck_vip_reward_notice_status"),
+        CheckConstraint("attempts >= 0", name="ck_vip_reward_notice_attempts"),
+    )
+
+
+class SeedVipCycle(Base):
+    """Persistent observation state for one server and execution mode."""
+
+    __tablename__ = "seed_vip_cycle"
+    server_number: Mapped[int] = mapped_column(primary_key=True)
+    preview: Mapped[bool] = mapped_column(primary_key=True)
+    generation: Mapped[int] = mapped_column(nullable=False, default=0)
+    phase: Mapped[str] = mapped_column(String(16), nullable=False)
+    eligible: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False, default=dict)
+    seeded_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    __table_args__ = (
+        CheckConstraint("phase IN ('uninitialized', 'seeding', 'seeded')", name="ck_seed_vip_cycle_phase"),
+        CheckConstraint("generation >= 0", name="ck_seed_vip_cycle_generation"),
+    )
+
+
+class SeedVipGrant(Base):
+    """One durable, independently recoverable seed reward."""
+
+    __tablename__ = "seed_vip_grant"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    preview: Mapped[bool] = mapped_column(nullable=False)
+    generation: Mapped[int] = mapped_column(nullable=False)
+    player_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    player_name: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    reward_seconds: Mapped[float] = mapped_column(nullable=False)
+    cumulative: Mapped[bool] = mapped_column(nullable=False)
+    reward_time: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    target: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    __table_args__ = (
+        UniqueConstraint("server_number", "preview", "generation", "player_id", name="uq_seed_vip_grant_cycle_player"),
+        CheckConstraint("status IN ('queued', 'prepared', 'confirmed', 'rejected', 'skipped', 'review', 'reviewed', 'preview')", name="ck_seed_vip_grant_status"),
+        CheckConstraint("reward_seconds >= 0", name="ck_seed_vip_grant_reward_seconds"),
+    )
+
+
 class PlayerID(Base):
     __tablename__ = "steam_id_64"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -285,7 +350,11 @@ class PlayerID(Base):
         total = 0
 
         for i, s in enumerate(self.sessions):
-            if not s.end and s.start and i == 0:
+            if s.start_event_us is not None and s.end_event_us is not None:
+                total += max(0, (s.end_event_us - s.start_event_us) / 1_000_000)
+            elif s.start_event_us is not None and s.end is None and i == 0:
+                total += max(0, datetime.now(timezone.utc).timestamp() - s.start_event_us / 1_000_000)
+            elif not s.end and s.start and i == 0:
                 total += (datetime.now() - s.start).total_seconds()
             elif s.end and s.start:
                 total += (s.end - s.start).total_seconds()
@@ -296,6 +365,8 @@ class PlayerID(Base):
         if self.sessions:
             if self.sessions[0].end:
                 return 0
+            if self.sessions[0].start_event_us is not None:
+                return max(0, int(datetime.now(timezone.utc).timestamp() - self.sessions[0].start_event_us / 1_000_000))
             start = self.sessions[0].start or self.sessions[0].created
             return int((datetime.now() - start).total_seconds())
         return 0
@@ -730,6 +801,59 @@ class PlayerName(Base):
         }
 
 
+class UnidentifiedSessionEvent(Base):
+    """An identity-free log event retained for server-scoped review."""
+
+    __tablename__ = "unidentified_session_event"
+    fingerprint: Mapped[str] = mapped_column(String(64), primary_key=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    event_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    event_us: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    player_name: Mapped[str] = mapped_column(Text, nullable=False)
+    raw: Mapped[str] = mapped_column(Text, nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    resolved_by: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    resolution_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class SessionEventResolution(Base):
+    """Audit of an operator decision on an ambiguous session event."""
+
+    __tablename__ = "session_event_resolution"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    server_number: Mapped[int] = mapped_column(nullable=False, index=True)
+    player_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    event_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    event_us: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    decision: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    session_id: Mapped[int | None] = mapped_column(nullable=True)
+    actor: Mapped[str] = mapped_column(String(150), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+
+
+class PendingPlayerConnect(Base):
+    """An event that cannot safely be distinguished from a legacy session."""
+
+    __tablename__ = "pending_player_connect"
+    server_number: Mapped[int] = mapped_column(primary_key=True)
+    player_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    started_event_us: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    started_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False, default=datetime.utcnow)
+
+
+class PendingPlayerDisconnect(Base):
+    """A disconnect whose matching connect has not been recorded yet."""
+
+    __tablename__ = "pending_player_disconnect"
+    server_number: Mapped[int] = mapped_column(primary_key=True)
+    player_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    ended_event_us: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    ended_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP, nullable=False, default=datetime.utcnow)
+
+
 class PlayerSession(Base):
     __tablename__ = "player_sessions"
 
@@ -737,11 +861,13 @@ class PlayerSession(Base):
     player_id_id: Mapped[int] = mapped_column(
         "playersteamid_id", ForeignKey("steam_id_64.id"), nullable=False, index=True
     )
-    start: Mapped[datetime] = mapped_column()
-    end: Mapped[datetime] = mapped_column()
-    created: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    server_number: Mapped[int] = mapped_column()
-    server_name: Mapped[str] = mapped_column()
+    start: Mapped[datetime | None] = mapped_column()
+    end: Mapped[datetime | None] = mapped_column()
+    start_event_us: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    end_event_us: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    created: Mapped[datetime | None] = mapped_column(default=datetime.utcnow)
+    server_number: Mapped[int | None] = mapped_column()
+    server_name: Mapped[str | None] = mapped_column()
 
     player: Mapped[PlayerID] = relationship(back_populates="sessions")
 
@@ -749,8 +875,10 @@ class PlayerSession(Base):
         return {
             "id": self.id,
             PLAYER_ID: self.player.player_id,
-            "start": self.start,
-            "end": self.end,
+            "start": (datetime.fromtimestamp(self.start_event_us / 1_000_000, timezone.utc)
+                      if self.start_event_us is not None else self.start),
+            "end": (datetime.fromtimestamp(self.end_event_us / 1_000_000, timezone.utc)
+                    if self.end_event_us is not None else self.end),
             "created": self.created,
         }
 
@@ -1985,7 +2113,7 @@ class Blacklist(Base):
     sync: Mapped[BlacklistSyncMethod] = mapped_column(
         Enum(BlacklistSyncMethod), default=BlacklistSyncMethod.KICK_ONLY
     )
-    servers: Mapped[Optional[int]]
+    servers: Mapped[Optional[int]] = mapped_column(BigInteger)
 
     records: Mapped[list["BlacklistRecord"]] = relationship(
         back_populates="blacklist", cascade="all, delete"
@@ -2084,7 +2212,13 @@ class BlacklistRecord(Base):
             "admin_name": self.admin_name,
             "blacklist_name": self.blacklist.name,
         }
-        return self.reason.format_map(SafeStringFormat(**variables))
+        try:
+            return self.reason.format_map(SafeStringFormat(**variables))
+        except (ValueError, AttributeError, IndexError, KeyError, TypeError):
+            # Existing reasons may contain literal or malformed braces. Preserve
+            # them rather than blocking enforcement or the entire list view.
+            logger.warning("Invalid format in blacklist reason for record %s", self.id)
+            return self.reason
 
     # I know this isn't entirely representative but I cba to add 4 different types, 3 is already more than enough
     @overload

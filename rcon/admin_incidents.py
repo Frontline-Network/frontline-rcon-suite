@@ -263,10 +263,6 @@ def recent_report_players(
         for player in current_players
         if player.get("player_id")
     }
-    live_names = {
-        _normalize_message(str(player.get("name") or player.get("player_name") or ""))
-        for player in current_players
-    }
     reporter = next(
         (
             player
@@ -301,7 +297,6 @@ def recent_report_players(
         for slot in (1, 2):
             player_id = str(log.get(f"player_id_{slot}") or "")
             name = str(log.get(f"player_name_{slot}") or "").strip()
-            normalized_name = _normalize_message(name)
             player_context = cached_player_context.get(player_id) or {}
             unit = player_context.get("p_unit") or {}
             matches_commander_alias = (
@@ -314,7 +309,6 @@ def recent_report_players(
                 or not name
                 or player_id == reporter_id
                 or player_id in live_ids
-                or normalized_name in live_names
                 or not (
                     _name_is_mentioned(normalized_message, name)
                     or matches_commander_alias
@@ -1237,6 +1231,8 @@ def mutate_incident(
             target_name = str(payload.get("target_name") or "").strip()
             if not target_id or not target_name:
                 raise ValueError("target_id and target_name are required")
+            for subject in incident.subjects:
+                subject.is_primary = False
             incident.target_id = target_id[:100]
             incident.target_name = target_name[:255]
             existing_subject = next(
@@ -1370,6 +1366,8 @@ def mutate_incident_subject(
                     raise InvalidIncidentTransition(
                         "Only confirmed subjects can become primary"
                     )
+                for other in incident.subjects:
+                    other.is_primary = False
                 subject.is_primary = True
                 event_type = "subject_primary"
             else:

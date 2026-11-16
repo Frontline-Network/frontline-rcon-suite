@@ -1,12 +1,16 @@
 import datetime
+import hashlib
 import logging
 import math
 import os
+import re
+import time
 import unicodedata
+from contextlib import contextmanager
 from functools import cmp_to_key
 
 from dateutil import parser
-from sqlalchemy import func, or_
+from sqlalchemy import and_, case, func, literal, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, contains_eager, joinedload, selectinload
 from sqlalchemy.sql.functions import ReturnTypeFromArgs
@@ -14,19 +18,24 @@ from sqlalchemy.sql.functions import ReturnTypeFromArgs
 from rcon.commands import HLLCommandFailedError
 from rcon.models import (
     BlacklistRecord,
+    LogLine,
     PlayerAccount,
     PlayerActionState,
     PlayerComment,
     PlayerFlag,
     PlayerID,
     PlayerName,
+    PendingPlayerConnect,
+    PendingPlayerDisconnect,
     PlayersAction,
     PlayerSession,
     PlayerSoldier,
     PlayerVIP,
+    SessionEventResolution,
     SteamInfo,
     WatchList,
     enter_session,
+    get_session_maker,
 )
 from rcon.steam_utils import is_steam_id_64
 from rcon.types import (
@@ -298,8 +307,8 @@ def get_profiles(player_ids, nb_sessions=1):
         ]
 
 
-def _current_session_summary(sess, player_database_ids):
-    """Return session count and latest session without hydrating history rows."""
+def _current_session_summary(sess, player_database_ids, server_number):
+    """Return global session count and latest local session in one query."""
     if not player_database_ids:
         return {}
 
@@ -308,14 +317,19 @@ def _current_session_summary(sess, player_database_ids):
             PlayerSession.player_id_id.label("player_id_id"),
             PlayerSession.start.label("start"),
             PlayerSession.end.label("end"),
+            PlayerSession.start_event_us.label("start_event_us"),
             PlayerSession.created.label("created"),
+            PlayerSession.server_number.label("server_number"),
             func.count(PlayerSession.id)
             .over(partition_by=PlayerSession.player_id_id)
             .label("sessions_count"),
             func.row_number()
             .over(
                 partition_by=PlayerSession.player_id_id,
-                order_by=(PlayerSession.created.desc(), PlayerSession.id.desc()),
+                order_by=(
+                    case((PlayerSession.server_number == server_number, 0), else_=1),
+                    PlayerSession.created.desc(), PlayerSession.id.desc(),
+                ),
             )
             .label("session_rank"),
         )
@@ -326,13 +340,17 @@ def _current_session_summary(sess, player_database_ids):
     return {row.player_id_id: row for row in rows}
 
 
-def _current_playtime_seconds(session_summary) -> int:
+def _current_playtime_seconds(session_summary, *, now=None) -> int:
     if session_summary is None or session_summary.end:
         return 0
+    start_event_us = getattr(session_summary, "start_event_us", None)
+    if start_event_us is not None:
+        now = now or datetime.datetime.now(datetime.timezone.utc)
+        return max(0, int(now.timestamp() - start_event_us / 1_000_000))
     started_at = session_summary.start or session_summary.created
     if started_at is None:
         return 0
-    now = (
+    now = now or (
         datetime.datetime.now(tz=started_at.tzinfo)
         if started_at.tzinfo
         else datetime.datetime.now()
@@ -394,7 +412,8 @@ def get_live_profiles(
             return []
 
         database_ids = [player.id for player in players]
-        session_summaries = _current_session_summary(sess, database_ids)
+        this_server = int(get_server_number())
+        session_summaries = _current_session_summary(sess, database_ids, this_server)
 
         actions_by_player: dict[int, list[dict]] = {}
         action_cutoff = datetime.datetime.utcnow() - datetime.timedelta(
@@ -435,7 +454,6 @@ def get_live_profiles(
                 )
             )
 
-        this_server = int(get_server_number())
         profiles: list[LivePlayerProfileType] = []
         for player in players:
             summary = session_summaries.get(player.id)
@@ -450,7 +468,9 @@ def get_live_profiles(
                 {
                     "player_id": player.player_id,
                     "sessions_count": summary.sessions_count if summary else 0,
-                    "current_playtime_seconds": _current_playtime_seconds(summary),
+                    "current_playtime_seconds": _current_playtime_seconds(
+                        summary if summary and summary.server_number == this_server else None
+                    ),
                     "received_actions": actions_by_player.get(player.id, []),
                     "blacklists": blacklists,
                     "is_blacklisted": is_blacklisted,
@@ -495,7 +515,9 @@ def _get_set_player(
 
 
 def remove_accent(s):
-    return unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode("utf-8")
+    return unicodedata.normalize("NFC", "".join(
+        char for char in unicodedata.normalize("NFD", s) if not unicodedata.combining(char)
+    ))
 
 
 def get_players_by_appearance(
@@ -511,6 +533,8 @@ def get_players_by_appearance(
     ignore_accent: bool = True,
     flags: str | list[str] | None = None,
     country: str | None = None,
+    online_now_ids: set[str] | None = None,
+    observed_at: datetime.datetime | None = None,
 ):
     page = int(page)
     page_size = int(page_size)
@@ -520,6 +544,20 @@ def get_players_by_appearance(
 
     if isinstance(last_seen_till, str):
         last_seen_till = parser.parse(last_seen_till)
+
+    local_online_snapshot_available = online_now_ids is not None
+    online_now_ids = set(online_now_ids or ())
+    observed_at = observed_at or datetime.datetime.now(datetime.timezone.utc)
+    observed_local = observed_at.astimezone().replace(tzinfo=None)
+    observed_ms = int(observed_at.timestamp() * 1000)
+
+    def live_matches(bound, *, after):
+        # Naive filters retain the legacy local-time interpretation. Offset
+        # filters are compared as real instants; stored historical values keep
+        # their existing database semantics until their timezone is resolved.
+        current = observed_at.astimezone(datetime.timezone.utc) if bound.tzinfo else observed_local
+        threshold = bound.astimezone(datetime.timezone.utc) if bound.tzinfo else bound
+        return current >= threshold if after else current <= threshold
 
     blacklisted = strtobool(blacklisted)
     is_watched = strtobool(is_watched)
@@ -545,7 +583,12 @@ def get_players_by_appearance(
             .group_by(PlayerSession.player_id_id)
             .subquery()
         )
-        query = sess.query(PlayerID, sub.c.first, sub.c.last).outerjoin(
+        is_online = PlayerID.player_id.in_(online_now_ids) if online_now_ids else None
+        effective_last = (
+            case((is_online, literal(observed_local)), else_=sub.c.last)
+            if online_now_ids else sub.c.last
+        )
+        query = sess.query(PlayerID, sub.c.first, effective_last).outerjoin(
             sub, sub.c.player_id_id == PlayerID.id
         )
 
@@ -555,31 +598,25 @@ def get_players_by_appearance(
         if player_name:
             soldier_name = PlayerName.name
             account_name = PlayerAccount.name
+            search_name = literal(player_name)
             if ignore_accent:
                 soldier_name = unaccent(PlayerName.name)
-                player_name = remove_accent(player_name)
+                account_name = unaccent(PlayerAccount.name)
+                search_name = unaccent(search_name)
             if not exact_name_match:
-                query = (
-                    query.join(PlayerID.names)
-                    .join(PlayerID.account)
-                    .filter(
-                        or_(
-                            soldier_name.ilike("%{}%".format(player_name)),
-                            account_name.isnot(None)
-                            & account_name.ilike("%{}%".format(player_name)),
-                        )
-                    )
+                pattern = literal("%") + search_name + literal("%")
+                query = query.filter(
+                    and_(search_name != "", or_(
+                        PlayerID.names.any(soldier_name.ilike(pattern)),
+                        PlayerID.account.has(account_name.ilike(pattern)),
+                    ))
                 )
             else:
-                query = (
-                    query.join(PlayerID.names)
-                    .join(PlayerID.account)
-                    .filter(
-                        or_(
-                            soldier_name == player_name,
-                            account_name.isnot(None) & (account_name == player_name),
-                        )
-                    )
+                query = query.filter(
+                    and_(search_name != "", or_(
+                        PlayerID.names.any(soldier_name == search_name),
+                        PlayerID.account.has(account_name == search_name),
+                    ))
                 )
 
         if blacklisted is True:
@@ -607,24 +644,30 @@ def get_players_by_appearance(
             query = query.join(PlayerID.flags).filter(PlayerFlag.flag.in_(flags))
 
         if country:
-            query = (
-                query.join(PlayerID.steaminfo)
-                .join(PlayerID.account)
-                .filter(
-                    SteamInfo.country == country.upper()
-                    or PlayerAccount.country == country.upper()
+            query = query.filter(
+                or_(
+                    PlayerID.steaminfo.has(SteamInfo.country == country.upper()),
+                    PlayerID.account.has(PlayerAccount.country == country.upper()),
                 )
             )
 
         if last_seen_from:
-            query = query.filter(sub.c.last >= last_seen_from)
+            historical = sub.c.last >= last_seen_from
+            if is_online is not None:
+                historical = (or_(is_online, historical) if live_matches(last_seen_from, after=True)
+                              else and_(~is_online, historical))
+            query = query.filter(historical)
         if last_seen_till:
-            query = query.filter(sub.c.last <= last_seen_till)
+            historical = sub.c.last <= last_seen_till
+            if is_online is not None:
+                historical = (or_(is_online, historical) if live_matches(last_seen_till, after=False)
+                              else and_(~is_online, historical))
+            query = query.filter(historical)
 
         total = query.count()
         page = min(max(math.ceil(total / page_size), 1), page)
         players = (
-            query.order_by(func.coalesce(sub.c.last, PlayerID.created).desc())
+            query.order_by(func.coalesce(effective_last, PlayerID.created).desc())
             .limit(page_size)
             .offset((page - 1) * page_size)
             # All relations used in PlayerID.to_dict should be loaded here to avoid lazyloading in the for loop below
@@ -653,6 +696,7 @@ def get_players_by_appearance(
             v = v.lower()
             v2 = v2.lower()
             if ignore_accent:
+                search = remove_accent(search)
                 v = remove_accent(v)
                 v2 = remove_accent(v2)
 
@@ -664,6 +708,7 @@ def get_players_by_appearance(
 
         return {
             "total": total,
+            "local_online_snapshot_available": local_online_snapshot_available,
             "players": [
                 {
                     **p[0].to_dict(limit_sessions=0),
@@ -675,6 +720,7 @@ def get_players_by_appearance(
                         int(p[1].timestamp() * 1000) if p[1] else None
                     ),
                     "last_seen_timestamp_ms": (
+                        observed_ms if p[0].player_id in online_now_ids else
                         int(p[2].timestamp() * 1000) if p[2] else None
                     ),
                     "vip_expiration": p[0].vip.expiration if p[0].vip else None,
@@ -806,6 +852,189 @@ def safe_save_player_action(
         return False
 
 
+@contextmanager
+def player_session_event_session():
+    """Do not hide database failures while recording session events."""
+    with get_session_maker()() as session:
+        yield session
+
+
+def _lock_player_session_events(sess: Session, server_number: int, player_id: str):
+    """Serialize events even when the player's identity row does not yet exist."""
+    if sess.get_bind().dialect.name == "postgresql":
+        key = int.from_bytes(hashlib.sha256(f"session-event:{server_number}:{player_id}".encode()).digest()[:8], "big", signed=True)
+        sess.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+
+
+def _session_event_was_discarded(sess: Session, server_number: int, player_id: str,
+                                 event_kind: str, event_us: int) -> bool:
+    # Review decisions are durable tombstones. A later log replay must not
+    # recreate an event that an operator explicitly rejected.
+    return sess.query(SessionEventResolution.id).filter(
+        SessionEventResolution.server_number == server_number,
+        SessionEventResolution.player_id == player_id,
+        SessionEventResolution.event_kind == event_kind,
+        SessionEventResolution.event_us == event_us,
+        SessionEventResolution.decision == "discard",
+    ).first() is not None
+
+
+def _remember_disconnect(sess: Session, server_number: int, player_id: str, end_event_us: int):
+    key = {"server_number": server_number, "player_id": player_id, "ended_event_us": end_event_us}
+    if sess.get(PendingPlayerDisconnect, key) is None:
+        sess.add(PendingPlayerDisconnect(**key, ended_at=datetime.datetime.fromtimestamp(end_event_us / 1_000_000)))
+
+
+def _fixed_utc_timezone() -> bool:
+    """Legacy conversion requires an explicit UTC-history operator setting."""
+    return (os.getenv("HLL_SESSION_LEGACY_UTC", "").lower() == "true"
+            and time.timezone == 0 and time.daylight == 0)
+
+
+def _utc_legacy_event_us(value: datetime.datetime) -> int:
+    return round(value.replace(tzinfo=datetime.timezone.utc).timestamp() * 1_000_000)
+
+
+def _prepare_open_utc_legacy_sessions(sess: Session, player: PlayerID, server_number: int):
+    # Open sessions may have been created just before this version was
+    # installed. An exact, unique absolute connect log is evidence; without
+    # it only the explicit fixed-UTC history setting may interpret old values.
+    rows = sess.query(PlayerSession).filter(
+        PlayerSession.player_id_id == player.id,
+        PlayerSession.server_number == server_number,
+        PlayerSession.end.is_(None),
+        PlayerSession.start.is_not(None),
+        PlayerSession.start_event_us.is_(None),
+    ).all()
+    starts = dict(sess.query(PlayerSession.start, func.count(PlayerSession.id)).filter(
+        PlayerSession.player_id_id == player.id,
+        PlayerSession.server_number == server_number,
+        PlayerSession.start.in_({row.start for row in rows}),
+    ).group_by(PlayerSession.start).all()) if rows else {}
+    for row in rows:
+        if _fixed_utc_timezone():
+            if starts[row.start] == 1:
+                row.start_event_us = _utc_legacy_event_us(row.start)
+            continue
+        if starts[row.start] != 1:
+            continue
+        logs = sess.query(LogLine.raw).filter(
+            LogLine.server == str(server_number), LogLine.type == "CONNECTED",
+            LogLine.player1_player_id == player.id,
+            LogLine.event_time >= row.start - datetime.timedelta(seconds=1),
+            LogLine.event_time <= row.start + datetime.timedelta(seconds=1),
+        ).limit(3).all()
+        if len(logs) == 3:
+            # Do not infer uniqueness when the bounded read was truncated.
+            continue
+        matching = []
+        for (raw,) in logs:
+            found = re.search(r"\(([0-9]{10})\)", raw or "")
+            if found:
+                event_us = int(found.group(1)) * 1_000_000
+                if event_us == _utc_legacy_event_us(row.start):
+                    matching.append(event_us)
+        if len(matching) == 1:
+            # Do not merge two legacy rows onto the same connection.
+            duplicate = sess.query(PlayerSession.id).filter(
+                PlayerSession.player_id_id == player.id,
+                PlayerSession.server_number == server_number,
+                PlayerSession.start_event_us == matching[0],
+                PlayerSession.id != row.id,
+            ).first()
+            if duplicate is None:
+                row.start_event_us = matching[0]
+
+
+def _reconcile_pending_disconnects(sess: Session, player: PlayerID, server_number: int):
+    pending_events = (
+        sess.query(PendingPlayerDisconnect)
+        .filter(PendingPlayerDisconnect.server_number == server_number,
+                PendingPlayerDisconnect.player_id == player.player_id)
+        .order_by(PendingPlayerDisconnect.ended_event_us.asc())
+        .all()
+    )
+    for pending in pending_events:
+        target = (
+            sess.query(PlayerSession)
+            .filter(PlayerSession.player_id_id == player.id,
+                    PlayerSession.server_number == server_number,
+                    PlayerSession.start_event_us <= pending.ended_event_us)
+            .order_by(PlayerSession.start_event_us.desc(), PlayerSession.id.desc())
+            .first()
+        )
+        ambiguous_connect = (
+            sess.query(PendingPlayerConnect.started_event_us)
+            .filter(PendingPlayerConnect.server_number == server_number,
+                    PendingPlayerConnect.player_id == player.player_id,
+                    PendingPlayerConnect.started_event_us <= pending.ended_event_us)
+            .order_by(PendingPlayerConnect.started_event_us.desc())
+            .first()
+        )
+        if ambiguous_connect is not None and (target is None or ambiguous_connect[0] >= target.start_event_us):
+            # Until the connect is reviewed this disconnect could belong to
+            # it, so attaching it to an older known session is unsafe.
+            continue
+        if target is not None and (target.end_event_us is None or pending.ended_event_us < target.end_event_us):
+            if target.end is not None and target.end_event_us is None:
+                continue
+            displaced_end = target.end_event_us
+            target.end = pending.ended_at
+            target.end_event_us = pending.ended_event_us
+            sess.delete(pending)
+            if displaced_end is not None:
+                _remember_disconnect(sess, server_number, player.player_id, displaced_end)
+
+
+def _reassign_overlapping_disconnects(sess: Session, player: PlayerID, new_session: PlayerSession):
+    """Move an end to a later connect when that connect arrived out of order."""
+    overlaps = (
+        sess.query(PlayerSession)
+        .filter(PlayerSession.player_id_id == player.id,
+                PlayerSession.server_number == new_session.server_number,
+                PlayerSession.start_event_us < new_session.start_event_us,
+                PlayerSession.end_event_us >= new_session.start_event_us)
+        .order_by(PlayerSession.start_event_us.desc(), PlayerSession.id.desc())
+        .all()
+    )
+    for old in overlaps:
+        latest = (
+            sess.query(PlayerSession)
+            .filter(PlayerSession.player_id_id == player.id,
+                    PlayerSession.server_number == new_session.server_number,
+                    PlayerSession.start_event_us <= old.end_event_us)
+            .order_by(PlayerSession.start_event_us.desc(), PlayerSession.id.desc())
+            .first()
+        )
+        if latest is None or latest.id == old.id:
+            continue
+        if latest.end is not None and latest.end_event_us is None:
+            # An unverified legacy end cannot be ordered against an absolute
+            # event. Leave both historical rows untouched for review.
+            _remember_disconnect(sess, new_session.server_number, player.player_id, old.end_event_us)
+            continue
+        ambiguous_connect = (
+            sess.query(PendingPlayerConnect.started_event_us)
+            .filter(PendingPlayerConnect.server_number == new_session.server_number,
+                    PendingPlayerConnect.player_id == player.player_id,
+                    PendingPlayerConnect.started_event_us >= latest.start_event_us,
+                    PendingPlayerConnect.started_event_us <= old.end_event_us)
+            .first()
+        )
+        if ambiguous_connect is not None:
+            continue
+        displaced_end = old.end_event_us
+        old.end = None
+        old.end_event_us = None
+        if latest.end is None or (latest.end_event_us is not None and displaced_end < latest.end_event_us):
+            if latest.end_event_us is not None:
+                _remember_disconnect(sess, latest.server_number, player.player_id, latest.end_event_us)
+            latest.end = datetime.datetime.fromtimestamp(displaced_end / 1_000_000)
+            latest.end_event_us = displaced_end
+        else:
+            _remember_disconnect(sess, latest.server_number, player.player_id, displaced_end)
+
+
 def save_start_player_session(
     player_id: str,
     timestamp: float,
@@ -818,78 +1047,138 @@ def save_start_player_session(
 
     if server_number is None:
         server_number = int(get_server_number())
+    else:
+        server_number = int(server_number)
+    start_time = datetime.datetime.fromtimestamp(timestamp)
+    start_event_us = round(timestamp * 1_000_000)
+    pending_key = {"server_number": server_number, "player_id": player_id, "started_event_us": start_event_us}
 
-    with enter_session() as sess:
-        player = get_player(sess, player_id)
+    with player_session_event_session() as sess:
+        _lock_player_session_events(sess, server_number, player_id)
+        if _session_event_was_discarded(sess, server_number, player_id, "connect", start_event_us):
+            return True
+        # Serialize session events for this player, including events handled
+        # concurrently by different server workers sharing this database.
+        player = sess.query(PlayerID).filter(PlayerID.player_id == player_id).with_for_update().one_or_none()
         if not player:
-            logger.error(
-                "Can't record player session for %s, player not found", player_id
-            )
-            return
+            if sess.get(PendingPlayerConnect, pending_key) is None:
+                sess.add(PendingPlayerConnect(**pending_key, started_at=start_time))
+            sess.commit()
+            logger.warning("Deferred connect for %s until its identity is available", player_id)
+            return False
 
-        start_time = datetime.datetime.fromtimestamp(timestamp)
+        _prepare_open_utc_legacy_sessions(sess, player, server_number)
         already_saved = (
             sess.query(PlayerSession)
             .filter(PlayerSession.player == player)
-            .filter(PlayerSession.start == start_time)
+            .filter(PlayerSession.server_number == server_number)
+            .filter(PlayerSession.start_event_us == start_event_us)
             .first()
         )
+
+        if already_saved is None and _fixed_utc_timezone():
+            already_saved = (
+                sess.query(PlayerSession)
+                .filter(PlayerSession.player == player,
+                        PlayerSession.server_number == server_number,
+                        PlayerSession.start_event_us.is_(None),
+                        PlayerSession.start == start_time)
+                .first()
+            )
+            if already_saved is not None:
+                already_saved.start_event_us = start_event_us
+                if already_saved.end is not None:
+                    already_saved.end_event_us = _utc_legacy_event_us(already_saved.end)
+
+        if already_saved is None and not _fixed_utc_timezone():
+            legacy_match = (
+                sess.query(PlayerSession.id)
+                .filter(PlayerSession.player == player,
+                        PlayerSession.server_number == server_number,
+                        PlayerSession.start_event_us.is_(None),
+                        PlayerSession.start == start_time)
+                .first()
+            )
+            if legacy_match is not None:
+                if sess.get(PendingPlayerConnect, pending_key) is None:
+                    sess.add(PendingPlayerConnect(**pending_key, started_at=start_time))
+                sess.commit()
+                logger.warning("Deferred ambiguous legacy connect for %s on server %s", player_id, server_number)
+                return True
+
+        pending = sess.get(PendingPlayerConnect, pending_key)
+        if pending is not None:
+            sess.delete(pending)
+            sess.flush()
 
         if already_saved is not None:
             logger.info(
                 f"Player session starting at {start_time} for player {player_id} already recorded, skipping..."
             )
-            return
+            _reconcile_pending_disconnects(sess, player, server_number)
+            sess.commit()
+            return True
 
-        sess.add(
-            PlayerSession(
-                player=player,
-                start=start_time,
-                server_name=server_name,
-                server_number=server_number,
-            )
+        target = PlayerSession(
+            player=player,
+            start=start_time,
+            start_event_us=start_event_us,
+            server_name=server_name,
+            server_number=server_number,
         )
+        sess.add(target)
+        sess.flush()
+        _reassign_overlapping_disconnects(sess, player, target)
+        _reconcile_pending_disconnects(sess, player, server_number)
         logger.info(
             "Recorded player %s session start at %s",
             player_id,
             datetime.datetime.fromtimestamp(timestamp),
         )
         sess.commit()
+        return True
 
 
 def save_end_player_session(player_id: str, timestamp):
-    with enter_session() as sess:
-        player = get_player(sess, player_id)
+    server_number = int(get_server_number())
+    end_time = datetime.datetime.fromtimestamp(timestamp)
+    end_event_us = round(timestamp * 1_000_000)
+    with player_session_event_session() as sess:
+        _lock_player_session_events(sess, server_number, player_id)
+        if _session_event_was_discarded(sess, server_number, player_id, "disconnect", end_event_us):
+            return
+        player = sess.query(PlayerID).filter(PlayerID.player_id == player_id).with_for_update().one_or_none()
         if not player:
-            logger.error(
-                "Can't record player session for %s, player not found", player_id
-            )
+            _remember_disconnect(sess, server_number, player_id, end_event_us)
+            sess.commit()
+            logger.info("Deferred disconnect for %s until its session is recorded", player_id)
             return
 
-        last_session = (
+        # Replayed disconnect logs must not close an older still-open session.
+        _prepare_open_utc_legacy_sessions(sess, player, server_number)
+        already_saved = (
             sess.query(PlayerSession)
             .filter(PlayerSession.player == player)
-            .order_by(PlayerSession.created.desc())
+            .filter(PlayerSession.server_number == server_number)
+            .filter(PlayerSession.end_event_us == end_event_us)
             .first()
         )
-
-        if last_session is None:
-            logger.warning(
-                "Can't record player session for %s, last session not found",
-                player_id,
+        if already_saved is None and _fixed_utc_timezone():
+            already_saved = (
+                sess.query(PlayerSession)
+                .filter(PlayerSession.player == player,
+                        PlayerSession.server_number == server_number,
+                        PlayerSession.end_event_us.is_(None),
+                        PlayerSession.end == end_time)
+                .first()
             )
+        if already_saved is not None:
+            logger.info("Player session end %s for %s already recorded", end_time, player_id)
             return
 
-        if last_session.end:
-            logger.warning(
-                "Last session was already ended for %s. Creating a new one instead",
-                player_id,
-            )
-            last_session = PlayerSession(
-                player=player,
-            )
-        last_session.end = datetime.datetime.fromtimestamp(timestamp)
-        logger.info("Recorded player %s session end at %s", player_id, last_session.end)
+        _remember_disconnect(sess, server_number, player_id, end_event_us)
+        _reconcile_pending_disconnects(sess, player, server_number)
+        logger.info("Recorded or deferred player %s session end at %s", player_id, end_time)
         sess.commit()
 
 

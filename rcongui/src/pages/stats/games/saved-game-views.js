@@ -1,3 +1,5 @@
+import { browserStorage } from "@/utils/browser-storage";
+
 const STORAGE_KEY = "frontline.stats.games.saved-views.v1";
 const MAX_SAVED_VIEWS = 12;
 const VALID_PERIODS = new Set(["all", "7", "30"]);
@@ -39,7 +41,7 @@ export const loadSavedGameViews = () => {
   if (typeof window === "undefined") return [];
   try {
     return sanitizeSavedGameViews(
-      JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]")
+      JSON.parse(browserStorage.getItem(STORAGE_KEY) || "[]")
     );
   } catch {
     return [];
@@ -50,7 +52,7 @@ export const persistSavedGameViews = (views) => {
   const sanitized = sanitizeSavedGameViews(views);
   if (typeof window === "undefined") return sanitized;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+    browserStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
   } catch {
     // The archive remains usable when private browsing or storage policies
     // block persistence. The in-memory state is kept for the current visit.

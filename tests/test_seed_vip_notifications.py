@@ -1,6 +1,8 @@
 import unittest
 from collections import defaultdict
+from contextlib import nullcontext
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 from rcon.seed_vip import notifications, service, utils
@@ -23,6 +25,15 @@ class MemoryRedis:
 
     def execute(self):
         return []
+
+    def watch(self, key):
+        pass
+
+    def multi(self):
+        pass
+
+    def hget(self, key, field):
+        return self.data.get(key, {}).get(field)
 
     def expire(self, *args):
         return True
@@ -50,6 +61,7 @@ class NoticeTests(unittest.TestCase):
         self.queue = notifications.NotificationOutbox(self.red, '1')
         self.api = MagicMock()
         self.api.message_player.return_value = True
+        self.api.add_vip.return_value = True
         self.cfg = SeedVIPUserConfig(enabled=True, dry_run=False, language=None)
         for target, replacement in (
             ('rcon.seed_vip.notifications.time.time', lambda: self.clock),
@@ -67,7 +79,7 @@ class NoticeTests(unittest.TestCase):
         self.api.bulk_message_players.assert_not_called()
         self.api.add_vip.assert_not_called()
 
-    def test_broken_pipe_isolated_and_retried_after_restart(self):
+    def test_broken_pipe_is_not_retried_after_restart(self):
         self.queue.enqueue({'a': 'VIP granted', 'b': 'Server live'}, self.api)
         self.api.message_player.side_effect = [BrokenPipeError(), True, True]
         self.assertTrue(self.queue.flush(self.api))
@@ -76,22 +88,26 @@ class NoticeTests(unittest.TestCase):
         self.assertTrue(restarted.flush(self.api))
         self.assertEqual(self.api.message_player.call_count, 2)
         self.clock += 30
-        self.assertFalse(restarted.flush(self.api))
-        self.assertEqual(self.api.message_player.call_args.kwargs['player_id'], 'a')
+        self.assertTrue(restarted.flush(self.api))
+        self.assertEqual(self.api.message_player.call_count, 2)
         self.api.add_vip.assert_not_called()
 
-    def test_unacknowledged_and_offline_retries_bounded(self):
-        for failure in (False, TimeoutError()):
-            with self.subTest(failure=failure):
-                self.api.reset_mock()
-                self.api.message_player.side_effect = failure if isinstance(failure, Exception) else None
-                self.api.message_player.return_value = False
-                self.queue.enqueue({'a': 'Done'}, self.api)
-                for _ in range(5):
-                    self.queue.flush(self.api)
-                    self.clock += 30
-                self.assertEqual(self.api.message_player.call_count, 3)
-                self.assertFalse(self.queue.flush(self.api))
+    def test_explicit_rejection_retries_bounded(self):
+        self.api.message_player.return_value = False
+        self.queue.enqueue({'a': 'Done'}, self.api)
+        for _ in range(5):
+            self.queue.flush(self.api)
+            self.clock += 30
+        self.assertEqual(self.api.message_player.call_count, 3)
+        self.assertFalse(self.queue.flush(self.api))
+
+    def test_timeout_is_never_retried(self):
+        self.api.message_player.side_effect = TimeoutError()
+        self.queue.enqueue({'a': 'Done'}, self.api)
+        for _ in range(5):
+            self.queue.flush(self.api)
+            self.clock += 30
+        self.assertEqual(self.api.message_player.call_count, 1)
 
     def test_expired_and_corrupt_notices_not_sent(self):
         self.queue.enqueue({'a': 'Done'}, self.api)
@@ -107,12 +123,20 @@ class NoticeTests(unittest.TestCase):
         other.clear()
         self.assertEqual(self.red.hlen(self.queue.key), 1)
 
-    def test_redis_enqueue_failure_best_effort_without_crash(self):
+    def test_redis_enqueue_failure_does_not_risk_double_send(self):
         self.red.pipeline = Mock(side_effect=ConnectionError())
         self.api.message_player.side_effect = [BrokenPipeError(), True]
         self.queue.enqueue({'a': 'Done', 'b': 'Done'}, self.api)
-        self.assertEqual(self.api.message_player.call_count, 2)
+        self.api.message_player.assert_not_called()
         self.api.add_vip.assert_not_called()
+
+    def test_lost_enqueue_reply_does_not_send_directly_or_duplicate(self):
+        self.red.execute = Mock(side_effect=ConnectionError("reply lost"))
+        self.queue.enqueue({'a': 'Done'}, self.api)
+        self.api.message_player.assert_not_called()
+        self.red.execute = Mock(return_value=[])
+        self.queue.flush(self.api)
+        self.api.message_player.assert_called_once()
 
     def test_redis_read_failure_defers(self):
         self.red.hgetall = Mock(side_effect=ConnectionError())
@@ -131,7 +155,7 @@ class NoticeTests(unittest.TestCase):
         for _ in range(5):
             self.queue.flush(self.api)
             self.clock += 30
-        self.assertEqual(self.api.message_player.call_count, 3)
+        self.assertEqual(self.api.message_player.call_count, 1)
         self.api.add_vip.assert_not_called()
 
     def test_formatter_empty_defaultdict_and_two_recipient_groups(self):
@@ -158,15 +182,40 @@ class NoticeTests(unittest.TestCase):
         self.api.message_player.assert_not_called()
 
     def run_service(self, configs, snapshots):
+        from sqlalchemy import create_engine
+        from sqlalchemy.dialects.postgresql import JSONB
+        from sqlalchemy.ext.compiler import compiles
+        from sqlalchemy.orm import sessionmaker
+        from rcon.models import SeedVipCycle, SeedVipGrant, VipRewardGrant
+
+        @compiles(JSONB, 'sqlite')
+        def sqlite_json(_type, _compiler, **_kwargs):
+            return 'JSON'
+
+        db = create_engine('sqlite://')
+        for model in (SeedVipCycle, SeedVipGrant, VipRewardGrant):
+            model.__table__.create(db)
+        self.addCleanup(db.dispose)
+        maker = sessionmaker(db)
+        remote = {}
+        def add_vip(**kwargs):
+            remote[kwargs['player_id']] = dict(name=kwargs['description'], vip_expiration=kwargs['expiration'])
+            return True
+        self.api.add_vip.side_effect = add_vip
         with patch.object(service.SeedVIPUserConfig, 'load_from_db', side_effect=configs), \
              patch.object(service, 'get_rcon_api', return_value=self.api), \
              patch.object(service, 'NotificationOutbox', return_value=self.queue), \
              patch.object(service, 'get_server_snapshot', side_effect=snapshots), \
              patch.object(service, 'get_vips', return_value={}), \
+             patch.object(service, 'get_server_number', return_value='1'), \
+             patch('rcon.utils.get_server_number', return_value='1'), \
+             patch.object(service.journal, 'get_session_maker', return_value=maker), \
+             patch.object(service.journal, 'vip_lock', side_effect=lambda _player_id: nullcontext()), \
+             patch.object(service.journal, 'current_vip', side_effect=lambda _rcon, pid: remote.get(pid)), \
              patch.object(service, 'wait', side_effect=lambda _event, seconds: setattr(self, 'clock', self.clock + seconds) or False):
             service.run()
 
-    def test_complete_transition_retries_notice_without_second_reward(self):
+    def test_complete_transition_does_not_retry_uncertain_notice_or_reward(self):
         players = ServerPopulation(players={
             'a': Player(name='Eligible', player_id='a', current_playtime_seconds=600),
             'b': Player(name='New player', player_id='b', current_playtime_seconds=1),
@@ -178,7 +227,7 @@ class NoticeTests(unittest.TestCase):
         self.run_service([self.cfg]*4 + [off], [(players, low), (players, full), (players, full)])
         self.api.add_vip.assert_called_once()
         self.assertEqual(self.api.add_vip.call_args.kwargs['player_id'], 'a')
-        self.assertEqual(self.api.message_player.call_count, 3)
+        self.assertEqual(self.api.message_player.call_count, 2)
         self.api.bulk_message_players.assert_not_called()
 
     def test_restart_when_seeded_delivers_pending_without_any_reward(self):
@@ -188,6 +237,50 @@ class NoticeTests(unittest.TestCase):
         self.run_service([self.cfg, self.cfg, off], [(ServerPopulation(players={}), full)])
         self.api.message_player.assert_called_once()
         self.api.add_vip.assert_not_called()
+
+    def test_interrupted_send_is_not_replayed_after_restart(self):
+        self.queue.enqueue({'a': 'Done'}, self.api)
+        self.api.message_player.side_effect = KeyboardInterrupt()
+        with self.assertRaises(KeyboardInterrupt):
+            self.queue.flush(self.api)
+        self.api.message_player.side_effect = None
+        restarted = notifications.NotificationOutbox(self.red, '1')
+        self.clock += 60
+        self.assertTrue(restarted.flush(self.api))
+        self.assertEqual(self.api.message_player.call_count, 1)
+
+    def test_old_snapshot_cannot_claim_the_same_notice_twice(self):
+        import json
+        self.queue.enqueue({'a': 'Done'}, self.api)
+        ident, raw = next(iter(self.red.hgetall(self.queue.key).items()))
+        self.assertTrue(self.queue._claim(ident, raw, json.loads(raw)))
+        self.assertFalse(self.queue._claim(ident, raw, json.loads(raw)))
+
+    def test_pre_upgrade_attempt_is_uncertain_and_not_replayed(self):
+        import json
+        self.queue.enqueue({'a': 'Done'}, self.api)
+        ident, raw = next(iter(self.red.hgetall(self.queue.key).items()))
+        old = json.loads(raw)
+        old['attempts'] = 1
+        self.red.hset(self.queue.key, ident, json.dumps(old))
+        self.queue.flush(self.api)
+        self.clock += 30
+        self.queue.flush(self.api)
+        self.api.message_player.assert_not_called()
+        self.assertEqual(json.loads(self.red.hget(self.queue.key, ident))['state'], 'sending')
+
+    def test_webhook_failure_does_not_restart_seed_transition(self):
+        players = ServerPopulation(players={
+            'a': Player(name='Eligible', player_id='a', current_playtime_seconds=600),
+        })
+        low = {'num_allied_players': 1, 'num_axis_players': 1}
+        full = {'num_allied_players': 22, 'num_axis_players': 22, 'raw_time_remaining': 0}
+        cfg = self.cfg.model_copy(update={'hooks': [SimpleNamespace(url='https://example.invalid/secret')]})
+        off = self.cfg.model_copy(update={'enabled': False})
+        with patch.object(service, 'make_seed_announcement_embed', return_value=object()), \
+             patch.object(service.discord.SyncWebhook, 'from_url', side_effect=RuntimeError('webhook secret')):
+            self.run_service([cfg]*4 + [off], [(players, low), (players, full), (players, full)])
+        self.api.add_vip.assert_called_once()
 
     def test_disabled_and_dry_run_clear_pending(self):
         for cfg in (self.cfg.model_copy(update={'enabled': False}),

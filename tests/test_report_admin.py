@@ -33,7 +33,6 @@ from tests.test_leadership_vote_notifications import controller
 def setup(db, monkeypatch):
     # Legacy migrations allow NULL for an open session; ORM annotation predates
     # Optional typing. Match the real schema without changing production models.
-    monkeypatch.setattr(PlayerSession.__table__.c.end, "nullable", True)
     with db() as sess:
         for model in (PlayerID, PlayerSession, LogLine, MessageTemplate):
             model.__table__.create(sess.bind)

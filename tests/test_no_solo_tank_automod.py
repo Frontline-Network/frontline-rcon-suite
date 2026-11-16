@@ -459,6 +459,7 @@ def test_should_warn_twice(team_view):
     assert PunishStepState.WAIT == mod.should_warn_player(
         watch_status, "baker", aplayer
     )
+    watch_status.warned[aplayer.name][-1] = datetime.now()  # confirmed send
     time.sleep(config.warning_interval_seconds)
     assert PunishStepState.APPLY == mod.should_warn_player(
         watch_status, "baker", aplayer
@@ -466,6 +467,7 @@ def test_should_warn_twice(team_view):
     assert PunishStepState.WAIT == mod.should_warn_player(
         watch_status, "baker", aplayer
     )
+    watch_status.warned[aplayer.name][-1] = datetime.now()  # confirmed send
     time.sleep(config.warning_interval_seconds)
     assert PunishStepState.GO_TO_NEXT_STEP == mod.should_warn_player(
         watch_status, "baker", aplayer
@@ -486,6 +488,7 @@ def test_should_warn_infinite(team_view):
         assert PunishStepState.APPLY == mod.should_warn_player(
             watch_status, "able", aplayer
         )
+        watch_status.warned[aplayer.name][-1] = datetime.now()  # confirmed send
 
 
 def test_should_punish(team_view):

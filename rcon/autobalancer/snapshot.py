@@ -42,10 +42,17 @@ def _current_round(map_name: str, now: datetime) -> tuple[str, int, bool]:
     try:
         map_info = MapsHistory(max_len=1)[0]
         started_at = float(map_info.get("start") or 0)
-        recorded_name = str(map_info.get("name") or map_name)
+        recorded_name = str(map_info.get("name") or "")
     except (IndexError, TypeError, ValueError, ConnectionError):
         return f"unknown:{map_name}", 0, False
-    stable = bool(started_at and (recorded_name == map_name or map_name == "unknown"))
+    if not math.isfinite(started_at):
+        return f"unknown:{map_name}", 0, False
+    stable = bool(
+        0 < started_at <= now.timestamp()
+        and map_name
+        and map_name.lower() != "unknown"
+        and recorded_name == map_name
+    )
     elapsed = max(0, int(now.timestamp() - started_at)) if started_at else 0
     return f"{int(started_at)}:{recorded_name}", elapsed, stable
 

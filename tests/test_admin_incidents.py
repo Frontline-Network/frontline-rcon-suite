@@ -172,6 +172,25 @@ def test_parser_keeps_live_player_stats_in_confirmed_subject():
     assert subject["snapshot"]["map_playtime_seconds"] == 1200
 
 
+def test_recent_teamkiller_is_not_hidden_by_online_player_with_same_name():
+    players = [
+        {"player_id": "reporter", "name": "Reporter"},
+        {"player_id": "online", "name": "SameName"},
+    ]
+    recent = incidents.recent_report_players(
+        "!admin SameName teamkill", reporter_id="reporter", report_timestamp_ms=1_000_000,
+        current_players=players,
+        recent_logs=[{"timestamp_ms": 999_000, "action": "TEAM KILL",
+                      "player_id_1": "departed", "player_name_1": "SameName",
+                      "player_id_2": "reporter", "player_name_2": "Reporter"}],
+    )
+    parsed = incidents.parse_chat_report("!admin SameName teamkill", current_players=players + recent)
+    assert parsed["target_id"] == "departed"
+    by_id = {subject["player_id"]: subject for subject in parsed["subjects"]}
+    assert by_id["departed"]["state"] == "confirmed"
+    assert by_id["online"]["state"] == "suggested"
+
+
 def test_recent_teamkill_recovers_disconnected_target_with_cached_stats():
     report_timestamp_ms = 1_000_000
     recent = incidents.recent_report_players(
@@ -618,6 +637,38 @@ def test_player_and_squad_name_collision_keeps_both_contexts():
         ("player", "confirmed"),
         ("squad", "confirmed"),
     }
+
+
+@pytest.mark.parametrize("operation", ["set_primary", "link_target", "link_new_target"])
+def test_explicit_primary_selection_replaces_previous_target(incident_database, operation):
+    incident, _ = incidents.create_incident(
+        server_number=1, source="manual", reason="investigate", actor="tester",
+        subjects=[
+            {"kind": "player", "state": "confirmed", "is_primary": True,
+             "display_name": "First", "player_id": "first"},
+            {"kind": "player", "state": "confirmed", "display_name": "Second",
+             "player_id": "second"},
+        ],
+    )
+    if operation == "set_primary":
+        subject = next(s for s in incident["subjects"] if s["player_id"] == "second")
+        result = incidents.mutate_incident_subject(
+            incident["id"], actor="tester", expected_revision=incident["revision"],
+            operation="set_primary", payload={}, subject_id=subject["id"],
+            idempotency_key="primary-selection-test",
+        )
+        target = "second"
+    else:
+        target = "third" if operation == "link_new_target" else "second"
+        result = incidents.mutate_incident(
+            incident["id"], actor="tester", expected_revision=incident["revision"],
+            operation="link_target", payload={"target_id": target, "target_name": target},
+        )
+    assert result["target_id"] == target
+    assert [s["player_id"] for s in result["subjects"] if s["is_primary"]] == [target]
+    saved = incidents.get_incident(incident["id"])
+    assert saved["target_id"] == target
+    assert [s["player_id"] for s in saved["subjects"] if s["is_primary"]] == [target]
 
 
 def test_duplicate_chat_report_is_collapsed_for_sixty_seconds(incident_database):

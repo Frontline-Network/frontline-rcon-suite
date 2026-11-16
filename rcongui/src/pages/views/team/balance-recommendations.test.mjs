@@ -78,6 +78,22 @@ test("incomplete data never masquerades as balanced teams", () => {
   assert.doesNotMatch(notice.description, /nicht mehr benötigt/);
 });
 
+test("independent game-state counts block incomplete team snapshots", () => {
+  const snapshot = teams();
+  const selected = choice(snapshot);
+  const settings = {
+    requireCountVerification: true,
+    authoritativeTeamCounts: { allies: 3, axis: 4 },
+  };
+  const status = buildLiveBalanceStatus(snapshot, settings);
+  assert.ok(status.block_reasons.length);
+  assert.equal(validateLiveRecommendation(snapshot, settings, selected), null);
+  assert.ok(buildLiveBalanceStatus(snapshot, { requireCountVerification: true }).block_reasons.length);
+  assert.equal(buildLiveBalanceStatus(snapshot, {
+    ...settings, authoritativeTeamCounts: { allies: 5, axis: 1 },
+  }).block_reasons.length, 0);
+});
+
 test("invalid selections in an open review give an available next step", () => {
   for (const context of [{}, { balanced: true }, { blocked: true }]) {
     const notice = recommendationNotice({
@@ -237,6 +253,7 @@ test("final confirmation reads fresh teams/settings and rejects invalid or edite
       return snapshot;
     },
     readSettings: async () => ({}),
+    readGameState: async () => ({ num_allied_players: 5, num_axis_players: 1 }),
   });
   await preflight([{ player_id: id }]);
   assert.equal(reads, 1);
@@ -247,6 +264,21 @@ test("final confirmation reads fresh teams/settings and rejects invalid or edite
   snapshot.allies.squads[id].players[0].role = "commander";
   await assert.rejects(preflight([{ player_id: id }]), /nicht mehr gültig/);
   assert.equal(reads, 2);
+});
+
+test("final confirmation rejects missing or mismatched independent team counts", async () => {
+  const snapshot = teams();
+  const selected = choice(snapshot);
+  for (const gameState of [null, { num_allied_players: 3, num_axis_players: 4 }]) {
+    const preflight = balanceActionPreflight({
+      recommendation: selected,
+      recipientIds: [selected.player.player_id],
+      readTeams: async () => snapshot,
+      readSettings: async () => ({}),
+      readGameState: async () => gameState,
+    });
+    await assert.rejects(preflight([{ player_id: selected.player.player_id }]), /nicht mehr gültig/);
+  }
 });
 
 test("final confirmation fails closed when fresh data cannot be loaded", async () => {

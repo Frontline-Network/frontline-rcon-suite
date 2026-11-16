@@ -25,6 +25,9 @@ class MockRedis:
 
 
 class MockRedisDeleteUnavailable(MockRedis):
+    def set(self, *_args, **_kwargs):
+        raise redis.exceptions.RedisError
+
     def delete(self, *_keys):
         raise redis.exceptions.RedisError
 
@@ -150,11 +153,8 @@ def test_cold_lock_contention_does_not_sleep_before_fallback_execution():
 
 
 def test_method_cache_reuses_identical_arguments_and_isolates_variants():
-    values = {}
-    red = mock.Mock()
-    red.get.side_effect = lambda key: values.get(key)
-    red.set.return_value = True
-    red.setex.side_effect = lambda key, _ttl, value: values.__setitem__(key, value)
+    from fakeredis import FakeStrictRedis
+    red = FakeStrictRedis()
     function = mock.Mock(
         side_effect=lambda _instance, compact=False: {"compact": compact}
     )
@@ -197,6 +197,14 @@ def test_clear_for_tolerates_unavailable_redis():
     )
 
     cached.clear_for()
+
+
+def test_clear_for_still_deletes_cached_values_if_epoch_write_fails():
+    red = mock.Mock()
+    red.set.side_effect = redis.exceptions.RedisError("unavailable")
+    cached = RedisCached(pool=None, red=red, ttl_seconds=1, function=_needs_qual_name)
+    cached.clear_for()
+    red.delete.assert_called_once_with(cached.key(), cached.stale_key(cached.key()))
 
 
 def test_memory_cache_exposes_compatible_clear_for(monkeypatch):
@@ -276,6 +284,20 @@ def test_invalidates_for_clears_exact_key_before_and_after():
 
     assert cached_func.clear_for.call_count == 2
     cached_func.cache_clear.assert_not_called()
+
+
+@pytest.mark.parametrize("manager", [cache_utils.invalidates, invalidates_for])
+def test_invalidation_runs_after_failed_mutation(manager):
+    cached_func = mock.Mock()
+    if manager is cache_utils.invalidates:
+        cached_func.cache.function = lambda: None
+        cached_func.cache.is_method = False
+
+    with pytest.raises(ValueError, match="mutation failed"):
+        with manager(cached_func):
+            raise ValueError("mutation failed")
+
+    assert cached_func.clear_for.call_count == 2
 
 
 def test_invalidates_uses_exact_key_for_parameterless_function():

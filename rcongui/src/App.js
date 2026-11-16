@@ -10,7 +10,7 @@ import localforage from "localforage";
 import siteConfig from "./config/siteConfig";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "./queryClient";
-import { StrictMode } from "react";
+import { StrictMode, useSyncExternalStore } from "react";
 import AppTheme from "@/themes/AppTheme";
 import { CssBaseline } from "@mui/material";
 import { useAppStore } from "./stores/app-state";
@@ -20,10 +20,14 @@ import { deDE, enUS, frFR } from "@mui/x-date-pickers/locales";
 import { dateLocale } from "./i18n/date-locale";
 import { useTranslation } from "react-i18next";
 import { useReleaseRefresh } from "./hooks/useReleaseRefresh";
+import Alert from "@mui/material/Alert";
+import { storageIsUnavailable, subscribeStorageAvailability } from "@/utils/browser-storage";
 
 const App = () => {
   useReleaseRefresh();
   const { i18n } = useTranslation();
+  const { t } = useTranslation();
+  const storageUnavailable = useSyncExternalStore(subscribeStorageAvailability, storageIsUnavailable, () => false);
   const language = dateLocale(i18n.resolvedLanguage);
   const pickerLocale = { de: deDE, en: enUS, fr: frFR }[language];
   // Dayjs plugins
@@ -58,6 +62,7 @@ const App = () => {
         >
           <AppTheme appearance={appearance}>
             <CssBaseline enableColorScheme />
+            {storageUnavailable && <Alert severity="warning" role="alert">{t("language.storageUnavailable")}</Alert>}
             <RouterProvider router={adminRouter} />
             {import.meta.env.MODE !== "fake" ? (
               <ReactQueryDevtools initialIsOpen={false} />

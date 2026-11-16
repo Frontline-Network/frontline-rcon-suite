@@ -18,6 +18,30 @@ VIP_RECONCILE_INTERVAL_SECONDS = 60
 logger = logging.getLogger(__name__)
 
 
+def _resolve_expired_vip(rcon_hook: Rcon, player_id: str, expected_expiration: datetime) -> str:
+    """Remove a confirmed expired VIP or its orphaned record under the VIP lock."""
+    from rcon.vip_rewards.locking import vip_lock
+    from rcon.vip_rewards.service import current_vip, expiration
+
+    with vip_lock(player_id):
+        current = current_vip(rcon_hook, player_id)
+        if current is not None:
+            return "removed" if rcon_hook.remove_vip(player_id, expected_expiration=expected_expiration) is True else "changed"
+        with enter_session() as session:
+            record = (session.query(PlayerVIP).join(PlayerID, PlayerVIP.player_id_id == PlayerID.id)
+                      .filter(PlayerVIP.server_number == get_server_number(), PlayerID.player_id == player_id)
+                      .with_for_update().one_or_none())
+            if record is None:
+                return "already_clean"
+            # The initial scan and live lookup may be separated by an extension.
+            # Recheck under the row lock before deleting anything locally.
+            if (expiration(record.expiration) != expiration(expected_expiration)
+                    or expiration(record.expiration) >= datetime.now(timezone.utc)):
+                return "changed"
+            session.delete(record)
+        return "orphan_cleaned"
+
+
 def restore_missing_vips(rcon_hook: Rcon) -> int:
     """Restore active database VIPs missing from the game server.
 
@@ -78,6 +102,7 @@ def remove_expired_vips(rcon_hook: Rcon, webhook_url: Optional[HttpUrl] = None):
     logger.info(f"Checking for expired VIPs")
 
     count = 0
+    orphan_count = 0
     server_number = get_server_number()
     with enter_session() as session:
         expired_vips: List[PlayerVIP] = (
@@ -89,28 +114,29 @@ def remove_expired_vips(rcon_hook: Rcon, webhook_url: Optional[HttpUrl] = None):
             .all()
         )
 
-        count = len(expired_vips)
         for vip in expired_vips:
             name: str
             try:
                 name = vip.player.names[0].name
             except IndexError:
                 name = "No name found"
-            message = f"Removing VIP from `{name}`/`{vip.player.player_id}` expired `{vip.expiration}`"
-            logger.info(message)
-
-            webhookurls: list[HttpUrl | None] | None
-            if webhook_url is None:
-                webhookurls = None
+            try:
+                outcome = _resolve_expired_vip(rcon_hook, vip.player.player_id, vip.expiration)
+            except Exception:
+                logger.exception("Unable to reconcile expired VIP %s", vip.player.player_id)
+                continue
+            if outcome == "removed":
+                count += 1
+                message = f"Removed VIP from `{name}`/`{vip.player.player_id}` expired `{vip.expiration}`"
+            elif outcome == "orphan_cleaned":
+                orphan_count += 1
+                message = f"Cleared expired local VIP record for `{name}`/`{vip.player.player_id}`; already absent on server"
             else:
-                webhookurls = [webhook_url]
-            send_to_discord_audit(
-                message=message,
-                command_name="remove_vip",
-                by=SERVICE_NAME,
-                webhookurls=webhookurls,
-            )
-            rcon_hook.remove_vip(vip.player.player_id, expected_expiration=vip.expiration)
+                logger.info("Expired VIP changed or was already reconciled; no removal recorded")
+                continue
+            logger.info(message)
+            send_to_discord_audit(message=message, command_name="remove_vip", by=SERVICE_NAME,
+                                  webhookurls=None if webhook_url is None else [webhook_url])
 
         # Look for anyone with VIP but without a record and create one for them
         vip_ids = rcon_hook.get_vip_ids()
@@ -176,7 +202,9 @@ def remove_expired_vips(rcon_hook: Rcon, webhook_url: Optional[HttpUrl] = None):
     if count > 0:
         logger.info(f"Removed VIP from {count} player(s)")
     else:
-        logger.info("No expired VIPs found")
+        logger.info("No game-server VIPs removed")
+    if orphan_count:
+        logger.info("Cleared %s expired local VIP record(s) already absent on server", orphan_count)
 
 
 def run(stop_event: threading.Event | None = None):

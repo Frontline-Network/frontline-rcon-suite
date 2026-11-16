@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum, IntFlag
 import functools
+import hashlib
 import logging
 import random
 import re
@@ -25,7 +26,12 @@ from rcon.maps import (
 )
 from rcon.models import PlayerID, PlayerOptins, enter_session
 from rcon.player_history import get_player
-from rcon.rcon import HLLCommandFailedError, Rcon, get_rcon
+from rcon.rcon import (
+    HLLCommandFailedError,
+    Rcon,
+    _raise_map_replacement_error,
+    get_rcon,
+)
 from rcon.types import (
     MapInfo,
     PlayerProfileType,
@@ -40,7 +46,7 @@ from rcon.user_config.vote_map import (
     DefaultMethods,
     VoteMapUserConfig,
 )
-from rcon.utils import MapsHistory
+from rcon.utils import MapsHistory, get_server_number
 
 from .exceptions import (
     InvalidMapParam,
@@ -87,6 +93,10 @@ class ActionOutcome(Enum):
     ON_COOLDOWN = "on_cooldown"
     PAUSED = "paused"
     INVALID_CONFIG = "invalid_config"
+    RECIPIENTS_UNAVAILABLE = "recipients_unavailable"
+    DELIVERY_UNAVAILABLE = "delivery_unavailable"
+    PARTIAL = "partial"
+    ROUND_UNAVAILABLE = "round_unavailable"
 
 
 @dataclass(frozen=True)
@@ -102,6 +112,10 @@ class ActionResult:
 class VotemapPermissions(IntFlag):
     REGISTER_VOTE = 1
     REGISTER_CHOICE = 2
+
+
+class ReminderOptOutUnavailable(Exception):
+    """Reminder recipients cannot be determined safely."""
 
 
 class VoteMap:
@@ -616,6 +630,9 @@ class VoteMap:
         if len(online_players) == 0:
             return []
 
+        if not self.config.allow_opt_out:
+            return online_players
+
         # Get players who opt-out from reminders
         opted_out = {}
         try:
@@ -635,19 +652,13 @@ class VoteMap:
                 opted_out = {p.player.player_id for p in res}
         except Exception:
             logger.exception("Cannot get votemap reminder optins.")
+            raise ReminderOptOutUnavailable from None
 
-        optin_players = list(
-            filter(
-                lambda player: (
-                    player[1] not in opted_out if self.config.allow_opt_out else True
-                ),
-                online_players,
-            )
-        )
+        optin_players = [player for player in online_players if player[1] not in opted_out]
         return optin_players
 
     @require_enabled
-    def send_reminder(self, force: bool = False) -> ActionResult:
+    def send_reminder(self, force: bool = False, *, scope: str | None = None) -> ActionResult:
         """
         Send vote reminder to all players except the ones
         who opted out of reminders.\n
@@ -657,35 +668,62 @@ class VoteMap:
         config = self.config
         instructions = config.instruction_text
 
-        if not self.is_time_for_reminder() and not force:
-            return ActionResult(
-                ok=False,
-                outcome=ActionOutcome.ON_COOLDOWN,
-                message="Cooldown not elapsed and reminder not forced.",
-            )
+        from rcon.user_config.vote_map import validate_instruction_text
+        from rcon.vote_map import reminder_delivery as journal
+
+        def round_signature():
+            try:
+                current = self._maps_history[0]
+                start, name = current["start"], current["name"]
+                if start is None or not name:
+                    return None
+                # The layer name can be refined after the start log; the
+                # persisted start timestamp identifies this round stably.
+                return hashlib.sha256(str(start).encode()).hexdigest()
+            except (IndexError, KeyError, TypeError):
+                return None
+
+        signature = round_signature()
+        if signature is None:
+            return ActionResult(False, ActionOutcome.ROUND_UNAVAILABLE, "Current round is unavailable; no reminder was sent.")
+        server = int(get_server_number())
+        try:
+            pending = journal.open_batches(server)
+            for batch in pending:
+                if batch["signature"] != signature:
+                    journal.abandon_batch(server, batch["batch_id"],
+                                          is_current=lambda: round_signature() == signature)
+            pending = [batch for batch in pending if batch["signature"] == signature]
+        except Exception:
+            logger.exception("Unable to load reminder delivery journal")
+            return ActionResult(False, ActionOutcome.DELIVERY_UNAVAILABLE, "Reminder delivery journal unavailable; no reminder was sent.")
 
         if self.paused and not force:
-            return ActionResult(
-                ok=False,
-                outcome=ActionOutcome.PAUSED,
-                message="Votemap is paused as admin set the next map and reminder not forced.",
-            )
+            pending = [batch for batch in pending if batch["scope"] != "periodic"]
+            if not pending:
+                return ActionResult(False, ActionOutcome.PAUSED, "Votemap is paused as admin set the next map and reminder not forced.")
+        if not force and not pending and not self.is_time_for_reminder():
+            return ActionResult(False, ActionOutcome.ON_COOLDOWN, "Cooldown not elapsed and reminder not forced.")
 
-        if "{map_selection}" not in instructions:
-            logger.error(
-                "Votemap is not configured properly, %s is not present in the instruction text.",
-                "map_selection",
-            )
+        try:
+            validate_instruction_text(instructions)
+        except ValueError as exc:
+            logger.error("Invalid votemap reminder template: %s", exc)
             return ActionResult(
                 ok=False,
                 outcome=ActionOutcome.INVALID_CONFIG,
-                message="'{map_selection}' missing from instruction text.",
+                message=str(exc),
             )
 
+        try:
+            optin_players = self._get_optin_players()
+        except ReminderOptOutUnavailable:
+            return ActionResult(ok=False, outcome=ActionOutcome.RECIPIENTS_UNAVAILABLE,
+                                message="Unable to check reminder opt-outs; no reminders were sent.")
         players_to_remind = list(
             filter(
                 lambda player: not self.has_player_voted(player[1]),
-                self._get_optin_players(),
+                optin_players,
             )
         )
 
@@ -699,23 +737,51 @@ class VoteMap:
                 player_choice=self.get_player_choice(),
             )
             reminder_message = instructions.format(map_selection=map_selection)
-        for name, player_id in players_to_remind:
-            try:
-                self._rcon.message_player(
-                    player_id=player_id,
-                    message=reminder_message,
+        eligible = {pid for _, pid in players_to_remind}
+        try:
+            if force or not pending:
+                batch_scope = scope if force and scope else "manual" if force else "periodic"
+                batch_id = journal.open_batch(
+                    server, batch_scope, signature, reminder_message, eligible,
+                    min_interval=config.reminder_frequency_minutes * 60,
+                    force=force, once=batch_scope.startswith("event:"),
+                    is_current=lambda: round_signature() == signature,
                 )
-            except (HLLCommandFailedError, HLLCommandError) as exc:
-                # A player may have disconnected between collecting the player
-                # list and sending the reminder. Continue with every remaining
-                # recipient instead of aborting the complete reminder run.
-                logger.warning("Unable to message %s: %s", name, exc)
+                if batch_id is None:
+                    if round_signature() != signature:
+                        return ActionResult(False, ActionOutcome.ROUND_UNAVAILABLE, "Round changed; no reminder was sent.")
+                    return ActionResult(False, ActionOutcome.ON_COOLDOWN, "Reminder already sent or cooldown not elapsed.")
+                batches = [batch_id]
+            else:
+                batches = [batch["batch_id"] for batch in pending]
 
-        self.set_last_reminder_time()
-        return ActionResult(
-            ok=True,
-            outcome=ActionOutcome.SUCCESS,
-        )
+            def send(pid, message):
+                with self._rcon.without_retries():
+                    return self._rcon.message_player(player_id=pid, message=message)
+
+            counts = Counter()
+            incomplete = False
+            for batch_id in batches:
+                result = journal.dispatch(server, batch_id, eligible, send,
+                                          lambda: round_signature() == signature)
+                counts.update(result["counts"])
+                incomplete |= not result["complete"] or result["stale"]
+            if not incomplete and (counts.get("sent", 0) or counts.get("unknown", 0) or not counts.get("rejected", 0)):
+                try:
+                    self.set_last_reminder_time()
+                except Exception:
+                    logger.exception("Unable to update legacy reminder cooldown")
+            if incomplete or counts.get("rejected", 0) or counts.get("unknown", 0):
+                logger.warning("Votemap reminder incomplete: accepted=%d rejected=%d uncertain=%d pending=%s",
+                               counts.get("sent", 0), counts.get("rejected", 0), counts.get("unknown", 0), incomplete)
+                return ActionResult(False, ActionOutcome.PARTIAL,
+                    f"Reminder incomplete: {counts.get('sent', 0)} accepted, "
+                    f"{counts.get('rejected', 0)} rejected, {counts.get('unknown', 0)} uncertain.")
+            return ActionResult(True, ActionOutcome.SUCCESS)
+        except Exception:
+            logger.exception("Votemap reminder delivery failed safely")
+            return ActionResult(False, ActionOutcome.DELIVERY_UNAVAILABLE,
+                                "Reminder delivery could not be completed; see the server logs.")
 
     def has_player_voted(self, player_id: str) -> bool:
         return True if self._state.get_vote(player_id) else False
@@ -835,26 +901,7 @@ class VoteMap:
                 f"Vote must be a number between {start} and {end - 1}"
             )
 
-        try:
-            current_map = self._maps_history[0]
-            map_start = current_map["start"]
-        except IndexError as e:
-            raise VoteMapNoInitialised(
-                "Map history is empty - Can't register vote"
-            ) from e
-        except KeyError as e:
-            raise VoteMapNoInitialised(
-                "Map history is corrupted - Can't register vote"
-            ) from e
-
-        if map_start is None or timestamp < map_start:
-            logger.warning(
-                "Vote is too old %s, %s, %d, %s",
-                player_name,
-                timestamp,
-                entry,
-                current_map,
-            )
+        self._validate_vote_round(timestamp)
 
         # Vote registered
         self._state.add_vote(player_id, player_name, selected_map, vote_count)
@@ -871,6 +918,26 @@ class VoteMap:
         self.apply_results()
 
         return selected_map
+
+    def _validate_vote_round(self, timestamp: int) -> None:
+        """Reject events that cannot belong to the current known round."""
+        try:
+            current_map = self._maps_history[0]
+            map_start = current_map["start"]
+        except IndexError as e:
+            raise VoteMapNoInitialised(
+                "Map history is empty - Can't register vote"
+            ) from e
+        except KeyError as e:
+            raise VoteMapNoInitialised(
+                "Map history is corrupted - Can't register vote"
+            ) from e
+
+        if map_start is None:
+            raise VoteMapNoInitialised("Current round start is unavailable - Can't register vote")
+        if timestamp < map_start:
+            logger.warning("Vote predates the current round")
+            raise VoteMapException("This vote predates the current round. Please vote again.")
 
     @validate_maps
     def register_player_choice(self, map_choice: Layer, player: PlayerProfileType):
@@ -1079,29 +1146,45 @@ class VoteMap:
 
         current_rotation = self._rcon.get_map_rotation()["maps"]
 
-        while len(current_rotation) > 1:
-            # Make sure only 1 map is in rotation
-            map_ = current_rotation.pop(1)
-            self._rcon.remove_map_from_rotation(map_.id)
+        # Add a missing winner before removing any existing entries. If the
+        # server rejects it, the original rotation remains intact.
+        phase = "adding votemap winner"
+        try:
+            if next_map not in current_rotation:
+                self._rcon.add_map_to_rotation(next_map.id)
 
-        current_next_map = current_rotation[0]
-        if current_next_map != next_map:
-            # Replace the only map left in rotation
-            self._rcon.add_map_to_rotation(next_map.id)
-            self._rcon.remove_map_from_rotation(current_next_map.id)
+            phase = "removing previous entries"
+            kept_winner = False
+            for map_ in current_rotation:
+                if map_ == next_map and not kept_winner:
+                    kept_winner = True
+                    continue
+                self._rcon.remove_map_from_rotation(map_.id)
+        except Exception as exc:
+            _raise_map_replacement_error(
+                "rotation", [map_.id for map_ in current_rotation], [next_map.id],
+                phase, self._rcon.get_map_rotation, exc,
+            )
 
         # Check that it worked
-        current_rotation = self._rcon.get_map_rotation()["maps"]
+        try:
+            current_rotation = self._rcon.get_map_rotation()["maps"]
+        except Exception as exc:
+            _raise_map_replacement_error(
+                "rotation", [map_.id for map_ in current_rotation], [next_map.id],
+                "verifying replacement", self._rcon.get_map_rotation, exc,
+            )
         if len(current_rotation) != 1 or current_rotation[0] != next_map:
-            if retries > 0:
-                return self.apply_results(retries - 1)
-            else:
-                logger.error(
-                    "Applying the votemap results failed. Next map %s. Rotation: %s",
-                    next_map,
-                    current_rotation,
-                )
-                return None
+            # The server may have applied only part of the replacement, or an
+            # administrator may have changed it concurrently. Do not replay a
+            # second series of mutations against an unverified new baseline.
+            logger.error(
+                "Applying the votemap results failed. Next map %s. Rotation: %s. "
+                "Inspect the current rotation before retrying.",
+                next_map,
+                current_rotation,
+            )
+            return None
 
         self.set_next_map(next_map)
         logger.info(
@@ -1153,10 +1236,10 @@ class VoteMapCommandHandler:
         message = (log.get("sub_content") or "").strip()
 
         try:
-            if match := self.VOTE_CMD_PATTERN.match(message):
+            if match := self.VOTE_CMD_PATTERN.fullmatch(message):
                 entry = int(match.group(2))
                 self.handle_vote(player_id, log, entry)
-            elif self.HELP_CMD_PATTERN.match(message):
+            elif self.HELP_CMD_PATTERN.fullmatch(message):
                 self.handle_help(player_id, log)
             elif self.SHOW_CMD_PATTERN.match(message):
                 self.handle_show_selection(player_id)
@@ -1170,13 +1253,14 @@ class VoteMapCommandHandler:
                 if len(args) < 1 or args[0] == "help":
                     self.handle_player_choice_help(player_id)
                 else:
-                    self.handle_player_choice(player_id, *args)
+                    self.handle_player_choice(player_id, *args, timestamp=log["timestamp_ms"] // 1000)
             else:
                 # fallback
                 message = "INVALID COMMAND!\n" + (
                     self.config.help_text or "Type '!votemap help' in the chat."
                 )
                 self.rcon.message_player(player_id=player_id, message=message)
+                return False
         except VoteMapException as e:
             self.rcon.message_player(player_id=player_id, message=str(e))
             return False
@@ -1225,6 +1309,7 @@ class VoteMapCommandHandler:
         self,
         player_id: str,
         *args,
+        timestamp: int | None = None,
     ):
         """
         Provide args in the following order:\n
@@ -1298,10 +1383,11 @@ class VoteMapCommandHandler:
         Your vote was registered.
         Type !vm too see the new selection"""
 
+        timestamp = int(datetime.now().timestamp()) if timestamp is None else timestamp
+        self.votemap._validate_vote_round(timestamp)
         player = self.votemap._get_player(player_id)
         self.votemap.register_player_choice(map_choice, player)
         # Automatically register player's vote for the selected map
-        timestamp = int(datetime.now().timestamp())
         self.votemap.register_vote(player, timestamp, entry=0)  # It's always at index 0
         self.rcon.message_player(player_id=player_id, message=success_msg)
 

@@ -94,6 +94,7 @@ def _clear_matching_cache_keys(red, match: str) -> int:
 
 class RedisCached:
     PREFIX = "cached_"
+    GLOBAL_EPOCH = "cache_epoch:global"
 
     def __init__(
         self,
@@ -126,11 +127,19 @@ class RedisCached:
     @staticmethod
     def clear_all_caches(pool) -> int:
         red = redis.Redis(connection_pool=pool)
+        try:
+            red.set(RedisCached.GLOBAL_EPOCH, uuid.uuid4().hex)
+        except redis.exceptions.RedisError:
+            logger.exception("Unable to invalidate in-flight cache refreshes")
         return _clear_matching_cache_keys(red, f"{RedisCached.PREFIX}*")
 
     @property
     def key_prefix(self):
         return f"{self.PREFIX}{self.function.__qualname__}"
+
+    @property
+    def epoch_key(self):
+        return f"cache_epoch:function:{self.function.__qualname__}"
 
     def key(self, *args, **kwargs):
         if self.is_method:
@@ -184,18 +193,41 @@ class RedisCached:
         except redis.exceptions.RedisError:
             logger.exception("Unable to release cache refresh lock")
 
-    def _store_cached_value(self, key, value) -> None:
+    def _store_cached_value(self, key, value, epochs) -> None:
         serialized = self.serializer(value)
-        self.red.setex(key, self.ttl_seconds, serialized)
-        self.red.setex(self.stale_key(key), self.stale_ttl_seconds, serialized)
+        try:
+            with self.red.pipeline() as pipe:
+                pipe.watch(self.GLOBAL_EPOCH, self.epoch_key)
+                if (pipe.get(self.GLOBAL_EPOCH), pipe.get(self.epoch_key)) != epochs:
+                    pipe.unwatch()
+                    return
+                pipe.multi()
+                pipe.setex(key, self.ttl_seconds, serialized)
+                pipe.setex(self.stale_key(key), self.stale_ttl_seconds, serialized)
+                pipe.execute()
+        except redis.exceptions.WatchError:
+            # Invalidation won the race; never retry an old value.
+            return
 
     def _refresh_cached_value(self, func, key):
+        epochs = None
+        try:
+            # Random persistent tokens also change after a Redis restart or
+            # eviction, so an old in-flight read cannot match a reset counter.
+            self.red.set(self.GLOBAL_EPOCH, uuid.uuid4().hex, nx=True)
+            self.red.set(self.epoch_key, uuid.uuid4().hex, nx=True)
+            epochs = (self.red.get(self.GLOBAL_EPOCH), self.red.get(self.epoch_key))
+            if None in epochs:
+                epochs = None
+        except redis.exceptions.RedisError:
+            logger.exception("Unable to read cache invalidation epochs")
         value = func()
         if not value and not self.cache_falsy:
             logger.debug("Caching falsy result is disabled for %s", self.__name__)
             return value
         try:
-            self._store_cached_value(key, value)
+            if epochs is not None:
+                self._store_cached_value(key, value, epochs)
         except redis.exceptions.RedisError:
             # The RCON call succeeded, so continue serving its result even if
             # Redis disappears between the read and the write.
@@ -304,13 +336,22 @@ class RedisCached:
         else:
             key = self.key(*args, **kwargs)
         logger.debug("Invalidating cache for %s", key)
+        if not key:
+            return
         try:
-            if key:
-                self.red.delete(key, self.stale_key(key))
+            self.red.set(self.epoch_key, uuid.uuid4().hex)
+        except redis.exceptions.RedisError:
+            logger.exception("Unable to invalidate in-flight cache refreshes")
+        try:
+            self.red.delete(key, self.stale_key(key))
         except redis.exceptions.RedisError:
             logger.exception("Unable to clear cache key %s", key)
 
     def clear_all(self) -> int:
+        try:
+            self.red.set(self.epoch_key, uuid.uuid4().hex)
+        except redis.exceptions.RedisError:
+            logger.exception("Unable to invalidate in-flight cache refreshes")
         return _clear_matching_cache_keys(self.red, f"{self.key_prefix}*")
 
 
@@ -456,9 +497,11 @@ def invalidates(*cached_funcs):
 
     for f in cached_funcs:
         clear_cached_func(f)
-    yield None
-    for f in cached_funcs:
-        clear_cached_func(f)
+    try:
+        yield None
+    finally:
+        for f in cached_funcs:
+            clear_cached_func(f)
 
 
 @contextmanager
@@ -466,6 +509,8 @@ def invalidates_for(*cached_funcs):
     """Invalidate the exact no-argument key for each cached function."""
     for f in cached_funcs:
         f.clear_for()
-    yield None
-    for f in cached_funcs:
-        f.clear_for()
+    try:
+        yield None
+    finally:
+        for f in cached_funcs:
+            f.clear_for()

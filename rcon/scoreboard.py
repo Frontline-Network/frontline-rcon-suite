@@ -107,7 +107,7 @@ class Webhook(Base):
 
     def __repr__(self) -> str:
         return (
-            f"Webhook(url={self.url} header_gamestate={self.header_gamestate}"
+            f"Webhook(url=<redacted> header_gamestate={self.header_gamestate}"
             f" map_rotation={self.map_rotation} player_stats={self.player_stats}"
             f" server_number={self.server_number})"
         )
@@ -127,7 +127,7 @@ def get_set_wh_row(
     res = session.scalars(stmt).one_or_none()
 
     if res is None:
-        logger.warning(f"{server_number=} {webhook_url} not in database, adding it")
+        logger.warning("Scoreboard webhook for server %s not in database, adding it", server_number)
         res = Webhook(url=webhook_url)
         session.add(res)
         session.commit()
@@ -152,61 +152,29 @@ def guess_current_map_rotation_positions(
     # As of U13 a map can be in a rotation more than once, but the index isn't
     # provided by RCON so we have to try to guess where we are in the rotation
 
-    # TODO: what about single map rotations
-    # TODO: use previous map to better estimate
-
-    # Between rounds
-    if current_map["id"] == UNKNOWN_MAP_NAME:
+    if not rotation or current_map["id"] == UNKNOWN_MAP_NAME:
         return []
-
     raw_names = [map.id for map in rotation]
-
-    # the current map is only in once then we know exactly where we are
-    if raw_names.count(current_map["id"]) == 1:
-        return [raw_names.index(current_map["id"])]
-
-    # the current map is in more than once, we must estimate
-    # if the next map is in only once then we know exactly where we are
-    current_map_idxs = []
-    for idx in [idx for idx, name in enumerate(raw_names) if name == next_map["id"]]:
-        # if raw_names.count(next_map.raw_name) == 1:
-        # next_map_idx = raw_names.index(next_map.raw_name)
-        # current_map_idx = None
-
-        # have to account for wrapping from the end to the start
-        # current map is the end of the rotation
-        if idx == 0:
-            current_map_idx = len(raw_names) - 1
-        # Somewhere besides the end of the rotation
-        else:
-            current_map_idx = idx - 1
-
-        current_map_idxs.append(current_map_idx)
-        # return [current_map_idx]
-
-    return current_map_idxs
-
-    # the current map is in more than once
-    # and the next map is in multiple times so we can't determine where we are
-    # return [idx for idx, name in enumerate(raw_names) if name == current_map.raw_name]
+    candidates = [idx for idx, name in enumerate(raw_names) if name == current_map["id"]]
+    if len(candidates) <= 1 or next_map["id"] == UNKNOWN_MAP_NAME:
+        return candidates
+    matching = [idx for idx in candidates if raw_names[(idx + 1) % len(raw_names)] == next_map["id"]]
+    # If the server overrides the next map, the current map may still be at
+    # any matching position. Do not invent a position belonging to another map.
+    return matching or candidates
 
 
 def guess_next_map_rotation_positions(
-    current_map_positions: list[int], rotation: list[Layer]
+    current_map_positions: list[int], rotation: list[Layer], next_map: LayerType
 ) -> list[int]:
     """Estimate the index(es) of the next map in the rotation based off current/next map"""
-    rotation_length = len(rotation)
-
-    positions: list[int] = []
-    for position in current_map_positions:
-        # handle wrapping back to the start of the rotation
-        if position == rotation_length - 1:
-            positions.append(0)
-        # otherwise the next map is immediately after the current map
-        else:
-            positions.append(position + 1)
-
-    return positions
+    if not rotation or next_map["id"] == UNKNOWN_MAP_NAME:
+        return []
+    candidates = [idx for idx, layer in enumerate(rotation) if layer.id == next_map["id"]]
+    adjacent = {(position + 1) % len(rotation) for position in current_map_positions
+                if 0 <= position < len(rotation)}
+    matching = [idx for idx in candidates if idx in adjacent]
+    return matching or candidates
 
 
 class TeamVIPCount(TypedDict):
@@ -361,7 +329,7 @@ def build_map_rotation_embed(
         rotation, gamestate["current_map"], gamestate["next_map"]
     )
     next_map_positions: list[int] = guess_next_map_rotation_positions(
-        current_map_positions, rotation
+        current_map_positions, rotation, gamestate["next_map"]
     )
 
     description = []
@@ -483,9 +451,8 @@ def run(stop_event=None):
     # Avoid circular imports
     from rcon.api_commands import get_rcon_api
 
-    rcon_api = get_rcon_api()
-
     try:
+        rcon_api = get_rcon_api()
         # Track the last updated time for each message key by webhook URL
         last_updated: defaultdict[str, defaultdict[str, datetime | None]] = defaultdict(
             lambda: defaultdict(lambda: None)
@@ -606,8 +573,11 @@ def run(stop_event=None):
                 return
 
     except Exception as e:
-        logger.exception("The bot stopped: %s", e)
-        raise
+        # Exceptions from webhook and database clients may embed capability URLs
+        # in their text or chained tracebacks. Preserve the error type only.
+        error_type = type(e).__name__
+        logger.error("The scoreboard stopped (%s)", error_type)
+        raise RuntimeError(f"Scoreboard stopped ({error_type})") from None
 
 
 if __name__ == "__main__":

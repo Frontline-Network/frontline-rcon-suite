@@ -121,13 +121,19 @@ def format_stats(players, config=None, squads=()):
     return "\n".join(format_sections(players, config, squads)) or None
 
 
-def send_delayed_squad_message(message, event_time):
+def send_delayed_squad_message(message, event_time, match_start=None):
     """Drop delayed jobs that could otherwise announce a stale match."""
     if time.time() - event_time > 90:
         logger.warning("Skipping stale end-of-match squad message")
         return
     config = EndMatchStatsUserConfig.load_from_db(default_on_validation_error=False)
     if not config.enabled or not config.include_squads:
+        return
+    history = MapsHistory()
+    # Older queued jobs do not contain a round identity; discard them safely.
+    if (match_start is None or not history or history[0].get("guessed")
+            or history[0].get("start") != match_start):
+        logger.info("Skipping squad message because the match has changed or is unknown")
         return
     from rcon.rcon import get_rcon
     send_message_once(get_rcon(), message, "squad")
@@ -148,10 +154,10 @@ def send_message_once(rcon, message, kind):
         return False
 
 
-def schedule_squad_message(message, event_time, seconds):
+def schedule_squad_message(message, event_time, seconds, match_start):
     from rcon.workers import get_queue
     get_queue().enqueue_in(timedelta(seconds=seconds), send_delayed_squad_message,
-                           message, event_time, ttl=90, result_ttl=300)
+                           message, event_time, match_start, ttl=90, result_ttl=300)
 
 
 @on_match_end
@@ -197,6 +203,6 @@ def send_end_match_stats(rcon, log):
             return
         send_message_once(rcon, messages[0], "first")
         if len(messages) > 1:
-            schedule_squad_message(messages[1], event_time, config.message_gap_seconds)
+            schedule_squad_message(messages[1], event_time, config.message_gap_seconds, start)
     except Exception:
         logger.exception("Could not send end-of-match stats")
