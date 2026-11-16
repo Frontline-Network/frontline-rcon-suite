@@ -106,3 +106,21 @@ def test_transition_hold_blocks_actions_until_audited_review(configured):
     assert action_guard.review(3, '*', token, 'operator', 'legacy actions checked') == 1
     assert blacklist.apply_blacklist_punishment(api, make_record(), 'synthetic', 'name')
     api.perma_ban.assert_called_once()
+
+
+def test_expire_all_journal_moves_to_review_under_global_hold(configured, monkeypatch):
+    journal.BlacklistSyncDelivery.__table__.create(configured.kw['bind'], checkfirst=True)
+    monkeypatch.setattr(journal, 'get_session_maker', lambda: configured)
+    monkeypatch.setattr(blacklist, 'get_server_number_mask', lambda: 4)
+    action_guard.reserve(3, '*', ['BlacklistEnforcement'], 'ban', legacy_global=True)
+    command = blacklist.BlacklistCommand(blacklist.BlacklistCommandType.EXPIRE_ALL, 4,
+                                         {'player_id': 'synthetic'})
+    with configured() as session, session.begin():
+        journal.enqueue(session, command.encode(), 4)
+    api = Mock()
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api
+    assert journal.process_one(3, handler.dispatch) == 'review'
+    api.get_temp_bans.assert_not_called()
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
