@@ -90,23 +90,44 @@ def status_command_conflict(command):
     return False
 
 
+def reward_message(cfg, seconds):
+    hours = f"{seconds / 3600:g}"
+    return {
+        "de": f"VIP-Belohnung: +{hours} Stunden VIP. Vielen Dank!",
+        "en": f"VIP reward: +{hours} hours of VIP. Thank you!",
+        "fr": f"Récompense VIP : +{hours} heures de VIP. Merci !",
+    }[cfg.message_language]
+
+
 def status_message(cfg, state, pid, now):
     from rcon.vip_rewards.engine import periods
+    language = cfg.message_language
     if not cfg.weekly_support.enabled:
-        return "Wochenziel Unterstützung ist deaktiviert. / Weekly support reward is disabled."
+        return {
+            "de": "Das Wochenziel für Unterstützung ist deaktiviert.",
+            "en": "The weekly support goal is disabled.",
+            "fr": "L’objectif hebdomadaire de soutien est désactivé.",
+        }[language]
     week = periods(now, cfg.timezone)[1]
     player = state.get("players", {}).get(pid, {})
     progress = player.get("weekly_support", {})
     points = progress.get("points", 0) if progress.get("week") == week else 0
     reached = "weekly_support:" + week in player.get("completed", {})
-    result = (f"Wochenziel / Weekly support ({week}, {cfg.timezone}): "
-              f"{points} / {cfg.weekly_support.points} Punkte / points. "
-              f"Belohnung / Reward: {cfg.weekly_support.hours:g} h VIP. ")
+    heading = {"de": "Wochenziel Unterstützung", "en": "Weekly support goal", "fr": "Objectif hebdomadaire de soutien"}[language]
+    reward = {"de": "Belohnung", "en": "Reward", "fr": "Récompense"}[language]
+    unit = {"de": "Punkte", "en": "points", "fr": "points"}[language]
+    result = (f"{heading} ({week}, {cfg.timezone}): "
+              f"{points} / {cfg.weekly_support.points} {unit}. "
+              f"{reward}: {cfg.weekly_support.hours:g} h VIP. ")
     if reached:
-        result += "Ziel erreicht; Gutschrift separat bestätigt. / Goal reached; credit confirmed separately. "
+        result += {"de": "Ziel erreicht; Gutschrift wird separat bestätigt. ",
+                   "en": "Goal reached; credit is confirmed separately. ",
+                   "fr": "Objectif atteint ; l’attribution est confirmée séparément. "}[language]
     if gate(state, cfg, now) != "active":
-        result += "Erfassung pausiert / Tracking paused. "
-    return result + "Mo–So / Mon–Sun. VIP-Limit gilt / VIP cap applies."
+        result += {"de": "Erfassung pausiert. ", "en": "Tracking paused. ",
+                   "fr": "Suivi en pause. "}[language]
+    return result + {"de": "Mo–So. VIP-Limit gilt.", "en": "Mon–Sun. VIP cap applies.",
+                     "fr": "Lun–dim. La limite VIP s’applique."}[language]
 
 
 def journal(offset=0, limit=50, player_id=None, preview=None):
@@ -163,9 +184,9 @@ def enqueue(payload):
     payload = dict(payload)
     payload["allowed"] = (
         gate(state, cfg, now) == "active"
-        and state.get("config") == cfg.model_dump_json()
+        and state.get("config") == cfg.policy_signature()
     )
-    payload["config"] = cfg.model_dump_json()
+    payload["config"] = cfg.policy_signature()
     key = hashlib.sha256(str(payload["key"]).encode()).hexdigest()
     payload["key"] = key
     with enter_session() as session:
@@ -513,7 +534,7 @@ def deliver(rcon, grant_id):
             try:
                 rcon.message_player(
                     player_id=pid,
-                    message=f"VIP-Belohnung: +{seconds / 3600:g} Stunden VIP. Vielen Dank!",
+                    message=reward_message(cfg, seconds),
                 )
             except Exception:
                 logger.exception("Reward delivered; player message failed for %s", pid)

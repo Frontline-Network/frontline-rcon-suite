@@ -124,6 +124,42 @@ def test_status_resets_display_at_week_boundary():
     e=setup();sample(e,NOW,0);sample(e,NOW+10,50)
     assert '0 / 100' in status_message(e.c,e.s,'a',NOW+7*86400)
 
+
+@pytest.mark.parametrize('language,heading,disabled', [
+    ('de', 'Wochenziel Unterstützung', 'deaktiviert'),
+    ('en', 'Weekly support goal', 'disabled'),
+    ('fr', 'Objectif hebdomadaire de soutien', 'désactivé'),
+])
+def test_player_status_uses_configured_language(language, heading, disabled):
+    from rcon.vip_rewards.service import status_message
+    e = setup(message_language=language)
+    sample(e, NOW, 100)
+    sample(e, NOW+10, 150)
+    message = status_message(e.c, e.s, 'a', NOW+10)
+    assert heading in message and '50 / 100' in message
+    e.c.weekly_support.enabled = False
+    assert disabled in status_message(e.c, e.s, 'a', NOW+10)
+
+
+def test_message_language_validation_and_legacy_default():
+    assert VipRewardsUserConfig.model_validate({}).message_language == 'de'
+    with pytest.raises(ValidationError):
+        VipRewardsUserConfig(message_language='es')
+
+
+def test_existing_policy_state_survives_message_language_upgrade():
+    import json
+    cfg = VipRewardsUserConfig(enabled=True)
+    legacy = cfg.model_dump(mode='json')
+    del legacy['message_language']
+    legacy_signature = json.dumps(legacy, ensure_ascii=False, separators=(',', ':'))
+    state = {'config': legacy_signature, 'players': {'a': {'balance': {'signup': NOW}}}}
+    engine = Engine(state, cfg)
+    assert engine.s['players']['a']['balance']['signup'] == NOW
+    cfg.message_language = 'fr'
+    engine = Engine(state, cfg)
+    assert engine.s['players']['a']['balance']['signup'] == NOW
+
 def test_status_command_conflict_checks_other_features(monkeypatch):
     from types import SimpleNamespace
     from rcon.vip_rewards import service

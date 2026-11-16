@@ -4,6 +4,11 @@ import french from "./copy-fr.json";
 // Keep the form's catalog in its lazy chunk. User names and configured text are
 // never passed through this dictionary.
 export const vipCopy = {
+  "Sprache der Spielernachrichten": "Player message language",
+  "Gilt für automatische VIP-Benachrichtigungen und die private Statusantwort.": "Applies to automatic VIP notifications and private status replies.",
+  Deutsch: "German",
+  Englisch: "English",
+  Französisch: "French",
   Nahkampf: "Melee",
   Rundentreue: "Round loyalty",
   Wochenaktivität: "Weekly activity",

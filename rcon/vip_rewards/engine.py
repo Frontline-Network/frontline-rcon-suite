@@ -43,7 +43,7 @@ def day_segments(start, end, zone):
 def gate(state, cfg, now):
     if not cfg.enabled:
         return "disabled"
-    if state.get("config") is not None and state["config"] != cfg.model_dump_json():
+    if state.get("config") is not None and state["config"] != cfg.policy_signature():
         return "unknown"
     if (
         not state.get("observed")
@@ -65,7 +65,7 @@ class Engine:
         state.setdefault("opponents", {})
         state.setdefault("round_seconds", 0)
         # No interval crosses a configuration change or disabled period.
-        signature = cfg.model_dump_json()
+        signature = cfg.policy_signature()
         if state.get("config") != signature:
             old_rules = state.get("active_rules", [])
             state["config"] = signature

@@ -455,13 +455,13 @@ def test_shared_budget_partial_and_exhaustion(delivery):
 def test_preview_and_permanent_vip_do_not_write(delivery):
     service, cfg, rcon, remote, add, read = delivery
     cfg.dry_run = True
-    service.read_gate_state(True)["config"] = cfg.model_dump_json()
+    service.read_gate_state(True)["config"] = cfg.policy_signature()
     id_ = add(preview=True)
     service.deliver(rcon, id_)
     assert read(id_)["status"] == "preview"
     assert not rcon.add_vip.called and not rcon.message_player.called
     cfg.dry_run = False
-    service.read_gate_state(False)["config"] = cfg.model_dump_json()
+    service.read_gate_state(False)["config"] = cfg.policy_signature()
     remote["vip"] = dict(player_id="a", name="Permanent", vip_expiration=None)
     second = add("two")
     service.deliver(rcon, second)
@@ -475,6 +475,21 @@ def test_message_failure_does_not_repeat_vip(delivery):
     service.deliver(rcon, id_)
     service.deliver(rcon, id_)
     assert rcon.add_vip.call_count == 1 and read(id_)["status"] == "awarded"
+
+
+@pytest.mark.parametrize("language,expected", [
+    ("de", "VIP-Belohnung: +2 Stunden VIP. Vielen Dank!"),
+    ("en", "VIP reward: +2 hours of VIP. Thank you!"),
+    ("fr", "Récompense VIP : +2 heures de VIP. Merci !"),
+])
+def test_automatic_reward_notification_uses_configured_language(delivery, language, expected):
+    service, cfg, rcon, remote, add, read = delivery
+    cfg.message_language = language
+    service.read_gate_state(False)["config"] = cfg.policy_signature()
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    assert read(grant_id)["status"] == "awarded"
+    assert rcon.message_player.call_args.kwargs == {"player_id": "a", "message": expected}
 
 
 def test_durable_queue_tick_duplicate_and_restart(delivery, monkeypatch):
@@ -768,7 +783,7 @@ def test_award_calendar_boundaries(period, expected):
 def test_award_limit_survives_daily_budget_reset(delivery, monkeypatch, period):
     service, cfg, rcon, remote, add, read = delivery
     cfg.melee.limit_period = period
-    service.read_gate_state(False)["config"] = cfg.model_dump_json()
+    service.read_gate_state(False)["config"] = cfg.policy_signature()
     for key in ("one", "two", "three"):
         service.deliver(rcon, add(key))
     monkeypatch.setattr(service.time, "time", lambda: NOW + 86401)
@@ -796,7 +811,7 @@ def test_preexisting_unlimited_challenge_grant_respects_current_weekly_limit(del
     from rcon.models import VipRewardGrant
     service, cfg, rcon, remote, add, read = delivery
     cfg.challenges = [ChallengeRule(id="example", name="example", enabled=True, weapons=["test"], limit=1, limit_period="week")]
-    service.read_gate_state(False)["config"] = cfg.model_dump_json()
+    service.read_gate_state(False)["config"] = cfg.policy_signature()
     first, second = add("first"), add("second")
     with service.enter_session() as sess:
         for grant_id in (first, second):

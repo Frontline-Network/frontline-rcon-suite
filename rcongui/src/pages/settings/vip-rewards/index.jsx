@@ -723,6 +723,20 @@ export default function VipRewards() {
                   (v) => change("notify_player", v)
                 )}
               </Stack>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                sx={{ mt: 2, mb: 2 }}
+                label={tr("Sprache der Spielernachrichten")}
+                helperText={tr("Gilt für automatische VIP-Benachrichtigungen und die private Statusantwort.")}
+                value={config.message_language || "de"}
+                onChange={(e) => change("message_language", e.target.value)}
+              >
+                <MenuItem value="de">{tr("Deutsch")}</MenuItem>
+                <MenuItem value="en">{tr("Englisch")}</MenuItem>
+                <MenuItem value="fr">{tr("Französisch")}</MenuItem>
+              </TextField>
               <Typography variant="body2" sx={{ mb: 2 }}>
                 {tr(
                   "Seed-VIP-Zielzahlen müssen fünf Minuten gehalten werden. Prüfung alle 30 Sekunden. Vorschau und Livebetrieb haben getrennte Fortschritte und Budgets."
