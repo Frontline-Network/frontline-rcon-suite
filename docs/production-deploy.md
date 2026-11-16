@@ -41,7 +41,7 @@ Backups and deployment metadata are written below `.deploy-backups/` and
 The Frontline override enables the HTTP and WebSocket readiness probe for managed
 backends 1–4, including when an older generated Compose file disabled its health
 check. The deployment helper additionally generates the same override for every
-configured backend up to number 32, without creating unconfigured services. The
+configured backend, without creating unconfigured services. The
 helper checks that each target backend image contains the probe and health endpoint
 before stopping workers; an incompatible image stops the deployment for review. The
 check reflects readiness; it does not prevent a brief interruption while a backend

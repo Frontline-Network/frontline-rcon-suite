@@ -9,10 +9,11 @@ from scripts.backend_health_override import backend_images, build_override
 
 
 def test_only_real_configured_backend_numbers_are_added():
-    names = ['backend_1', 'frontend_7', 'backend_7', 'backend_32',
-             'backend_0', 'backend_33', 'backend_01', 'backend_7', 'backend_8;bad']
+    names = ['backend_1', 'frontend_7', 'backend_7', 'backend_32', 'backend_33',
+             'backend_99999999999999999999', 'backend_0', 'backend_01', 'backend_7', 'backend_8;bad']
     result = build_override(names)['services']
-    assert set(result) == {'backend_1', 'backend_7', 'backend_32'}
+    assert set(result) == {'backend_1', 'backend_7', 'backend_32', 'backend_33',
+                           'backend_99999999999999999999'}
     for service in result.values():
         health = service['healthcheck']
         assert health['disable'] is False

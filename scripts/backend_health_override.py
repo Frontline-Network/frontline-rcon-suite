@@ -22,7 +22,7 @@ def build_override(service_names: list[str]) -> dict:
     services = {}
     for name in service_names:
         match = BACKEND.fullmatch(name)
-        if match and 1 <= int(match.group(1)) <= 32:
+        if match:
             services[name] = {"healthcheck": HEALTHCHECK.copy()}
     return {"services": services}
 
