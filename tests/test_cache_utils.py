@@ -199,6 +199,14 @@ def test_clear_for_tolerates_unavailable_redis():
     cached.clear_for()
 
 
+def test_clear_for_still_deletes_cached_values_if_epoch_write_fails():
+    red = mock.Mock()
+    red.set.side_effect = redis.exceptions.RedisError("unavailable")
+    cached = RedisCached(pool=None, red=red, ttl_seconds=1, function=_needs_qual_name)
+    cached.clear_for()
+    red.delete.assert_called_once_with(cached.key(), cached.stale_key(cached.key()))
+
+
 def test_memory_cache_exposes_compatible_clear_for(monkeypatch):
     monkeypatch.setenv("DEBUG", "1")
     monkeypatch.setattr(cache_utils, "get_redis_pool", lambda **kwargs: None)

@@ -336,10 +336,14 @@ class RedisCached:
         else:
             key = self.key(*args, **kwargs)
         logger.debug("Invalidating cache for %s", key)
+        if not key:
+            return
         try:
-            if key:
-                self.red.set(self.epoch_key, uuid.uuid4().hex)
-                self.red.delete(key, self.stale_key(key))
+            self.red.set(self.epoch_key, uuid.uuid4().hex)
+        except redis.exceptions.RedisError:
+            logger.exception("Unable to invalidate in-flight cache refreshes")
+        try:
+            self.red.delete(key, self.stale_key(key))
         except redis.exceptions.RedisError:
             logger.exception("Unable to clear cache key %s", key)
 
