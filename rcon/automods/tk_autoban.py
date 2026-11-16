@@ -15,12 +15,17 @@ from rcon.user_config.ban_tk_on_connect import BanTeamKillOnConnectUserConfig
 logger = logging.getLogger(__name__)
 
 
-def is_player_death(player, log):
-    return log["action"] == "KILL" and player == log["player_name_2"]
+def _matches_player(player_id, log, position):
+    value = log.get(f"player_id_{position}")
+    return value is not None and str(value) == str(player_id)
 
 
-def is_player_kill(player, log):
-    return log["action"] == "KILL" and player == log["player_name_1"]
+def is_player_death(player_id, log):
+    return log["action"] == "KILL" and _matches_player(player_id, log, 2)
+
+
+def is_player_kill(player_id, log):
+    return log["action"] == "KILL" and _matches_player(player_id, log, 1)
 
 
 @on_tk
@@ -38,6 +43,9 @@ def auto_ban_if_tks_right_after_connection(
 
     player_name = log["player_name_1"]
     player_id = log["player_id_1"]
+    if not player_id:
+        logger.warning("Skipping teamkill rule because the player ID is missing")
+        return
     player_profile = None
     vips = {}
     try:
@@ -49,9 +57,9 @@ def auto_ban_if_tks_right_after_connection(
     except:
         logger.exception("Unable to get VIPS")
 
-    last_logs = get_recent_logs(
-        end=500, player_search=player_name, exact_player_match=True
-    )
+    # Names are not unique and can change within a session. Match event
+    # identities after reading the same bounded history instead of filtering by name.
+    last_logs = get_recent_logs(end=500)
     logger.debug("Checking TK from %s", player_name)
     author = config.author_name
     reason = config.message
@@ -94,6 +102,10 @@ def auto_ban_if_tks_right_after_connection(
         logger.debug(log)
 
         if log["action"] == "CONNECTED":
+            if not _matches_player(player_id, log, 1):
+                if log.get("player_name_1") == player_name and not log.get("player_id_1"):
+                    last_action_is_connect = False
+                continue
             last_action_is_connect = log
             last_connect_time = log["timestamp_ms"]
             kill_counter = 0
@@ -101,7 +113,7 @@ def auto_ban_if_tks_right_after_connection(
             continue
         if (
                 log["action"] == "TEAM KILL"
-                and log["player_name_1"] == player_name
+                and _matches_player(player_id, log, 1)
                 and last_action_is_connect
         ):
             if excluded_weapons and log["weapon"].lower() in excluded_weapons:
@@ -162,11 +174,17 @@ def auto_ban_if_tks_right_after_connection(
                 # teamkills from the same connection. One scan must not issue
                 # another ban for the same player.
                 return result
-        elif is_player_death(player_name, log):
+        elif log["action"] in {"KILL", "TEAM KILL"} and any(
+            log.get(f"player_name_{position}") == player_name and not log.get(f"player_id_{position}")
+            for position in (1, 2)
+        ):
+            logger.warning("Skipping teamkill rule because a relevant event has no player ID")
+            return
+        elif is_player_death(player_id, log):
             death_counter += 1
             if death_counter >= ignore_after_death:
                 last_action_is_connect = False
-        elif is_player_kill(player_name, log):
+        elif is_player_kill(player_id, log):
             kill_counter += 1
             if kill_counter >= ignore_after_kill:
                 last_action_is_connect = False
