@@ -1,4 +1,5 @@
 import asyncio
+import os
 from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
@@ -6,6 +7,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 import django
 
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rconweb.rconweb.test_settings')
 django.setup()
 from api import barricade
 

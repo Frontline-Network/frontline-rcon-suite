@@ -1,11 +1,13 @@
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+import os
 
 import django
 import pytest
 from sqlalchemy import select
 
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rconweb.rconweb.test_settings')
 django.setup()
 from api import barricade
 from rcon import blacklist_sync_journal as journal
