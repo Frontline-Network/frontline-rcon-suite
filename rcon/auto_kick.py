@@ -32,6 +32,11 @@ def apply_name_kick(
     if config.whitelist_flags:
         try:
             profile = get_player_profile(player_id, 0)
+            if (not isinstance(profile, dict) or not isinstance(profile.get("flags"), list)
+                    or any(not isinstance(entry, dict) or not isinstance(entry.get("flag"), str)
+                           for entry in profile["flags"])):
+                logger.warning("Skipping nickname kick: player exemption flags are unavailable")
+                return False
             for flag in config.whitelist_flags:
                 if player_has_flag(profile, flag):
                     logger.debug(
@@ -41,9 +46,9 @@ def apply_name_kick(
                     )
                     return False
         except Exception:
-            # Profile lookup failures must not let an invalid nickname bypass
-            # the configured rules.
-            logger.exception("Unable to check player profile")
+            # A lookup failure cannot establish that the player is not exempt.
+            logger.exception("Skipping nickname kick: unable to check player exemptions")
+            return False
 
     for pattern in config.regular_expressions:
         if re.match(pattern, name):
