@@ -115,6 +115,30 @@ def test_expire_all_does_not_remove_bans_while_review_is_pending(fake_blacklist_
     server.remove_perma_ban.assert_not_called()
 
 
+def test_expire_all_fails_closed_if_guard_database_is_unavailable(monkeypatch):
+    monkeypatch.setattr(blacklist.action_guard, 'pending_players', Mock(side_effect=RuntimeError('database offline')))
+    server = Mock()
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = server
+    with pytest.raises(RuntimeError, match='database offline'):
+        handler.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+    server.assert_not_called()
+
+
+def test_expire_all_proceeds_for_an_unrelated_player(fake_blacklist_guard):
+    fake_blacklist_guard['other-player'] = 'synthetic-token'
+    server = Mock()
+    server.get_temp_bans.return_value = [{'player_id': 'synthetic'}]
+    server.get_perma_bans.return_value = [{'player_id': 'synthetic'}]
+    server.remove_temp_ban.return_value = True
+    server.remove_perma_ban.return_value = True
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = server
+    handler.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+    server.remove_temp_ban.assert_called_once_with('synthetic')
+    server.remove_perma_ban.assert_called_once_with('synthetic')
+
+
 def test_confirmed_action_with_failed_finalization_is_not_resent(monkeypatch, fake_blacklist_guard):
     record = SimpleNamespace(admin_name='tester', expires_at=None, get_formatted_reason=lambda: 'reason')
     server = Mock()
