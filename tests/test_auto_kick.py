@@ -1,5 +1,7 @@
 from unittest.mock import Mock, patch
 
+import pytest
+
 from rcon.api_commands import RconAPI
 from rcon.auto_kick import apply_name_kick, scan_current_players
 from rcon.player_history import get_available_player_flags
@@ -56,7 +58,7 @@ def test_player_with_whitelist_flag_is_not_kicked():
     )
 
     with (
-        patch("rcon.auto_kick.get_player_profile", return_value={}) as get_profile,
+        patch("rcon.auto_kick.get_player_profile", return_value={"flags": []}) as get_profile,
         patch("rcon.auto_kick.player_has_flag", return_value=True),
     ):
         kicked = apply_name_kick(
@@ -69,6 +71,40 @@ def test_player_with_whitelist_flag_is_not_kicked():
     assert kicked is False
     get_profile.assert_called_once_with("whitelisted-player", 0)
     rcon.kick.assert_not_called()
+
+
+@pytest.mark.parametrize('profile_value', [RuntimeError('database unavailable'), None, {}, {'flags': None}, {'flags': [{}]}])
+def test_name_kick_skips_if_exemption_cannot_be_checked(profile_value):
+    rcon = Mock()
+    config = NameKickUserConfig(regular_expressions=['invalid'], whitelist_flags=['exempt'])
+    lookup = {'side_effect': profile_value} if isinstance(profile_value, Exception) else {'return_value': profile_value}
+    with patch('rcon.auto_kick.get_player_profile', **lookup), \
+            patch('rcon.auto_kick.send_to_discord_audit') as audit:
+        assert apply_name_kick(rcon, 'invalid', 'synthetic-player', config=config) is False
+    rcon.kick.assert_not_called()
+    audit.assert_not_called()
+
+
+def test_name_kick_still_enforces_when_verified_flags_do_not_match():
+    rcon = Mock()
+    rcon.kick.return_value = True
+    config = NameKickUserConfig(regular_expressions=['invalid'], whitelist_flags=['exempt'])
+    with patch('rcon.auto_kick.get_player_profile', return_value={'flags': []}), \
+            patch('rcon.auto_kick.send_to_discord_audit'):
+        assert apply_name_kick(rcon, 'invalid', 'synthetic-player', config=config) is True
+    rcon.kick.assert_called_once()
+
+
+def test_roster_scan_continues_after_unavailable_exemption_profile():
+    rcon = Mock()
+    rcon.kick.return_value = True
+    rcon.get_player_ids.return_value = [('invalid-one', 'one'), ('invalid-two', 'two')]
+    config = NameKickUserConfig(regular_expressions=['invalid'], whitelist_flags=['exempt'])
+    with patch('rcon.auto_kick.get_player_profile', side_effect=[RuntimeError('unavailable'), {'flags': []}]), \
+            patch('rcon.auto_kick.send_to_discord_audit'):
+        assert scan_current_players(rcon, config=config) == 1
+    assert rcon.kick.call_args.kwargs['player_id'] == 'two'
+    rcon.kick.assert_called_once()
 
 
 def test_available_player_flags_are_counted_and_sorted_for_form_suggestions():
