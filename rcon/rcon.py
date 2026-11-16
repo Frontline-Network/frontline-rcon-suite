@@ -1506,15 +1506,34 @@ class Rcon(ServerCtl):
             for map_name in map_names:
                 super().remove_map_from_rotation(map_name)
 
-    def add_maps_to_rotation(self, map_names: list[str]):
-        """Add the given maps to the rotation, returns the game server response for each map"""
+    def add_maps_to_rotation(self, map_names: list[str]) -> list[dict[str, str | int]]:
+        """Append maps and return each server-confirmed insertion.
+
+        A failure may follow a partial change or an uncertain response; report
+        the observed rotation so callers can inspect it before trying again.
+        """
+        if not isinstance(map_names, list):
+            raise ValueError("Map names must be a list")
+        if not map_names:
+            return []
+        map_names = list(map_names)
         rotation = self.get_map_rotation()["maps"]
+        previous = [layer.id for layer in rotation]
+        _validate_map_replacement(map_names, super().get_maps())
         results = []
         with invalidates(
             Rcon.get_map_rotation, Rcon.get_map_sequence, Rcon.get_next_map
         ):
             for map_index, map_name in enumerate(map_names, start=len(rotation)):
-                super().add_map_to_rotation_at_index(map_name, map_index)
+                try:
+                    super().add_map_to_rotation_at_index(map_name, map_index)
+                except Exception as exc:
+                    _raise_map_replacement_error(
+                        "rotation", previous, map_names,
+                        f"adding {map_name!r} at index {map_index}",
+                        super().get_map_rotation, exc,
+                    )
+                results.append({"map_name": map_name, "index": map_index, "status": "confirmed"})
 
         return results
 

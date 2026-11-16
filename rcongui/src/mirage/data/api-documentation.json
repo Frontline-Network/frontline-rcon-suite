@@ -145,8 +145,8 @@
         "annotation": "list[str]"
       }
     },
-    "return_type": null,
-    "doc_string": "Add the given maps to the rotation, returns the game server response for each map",
+    "return_type": "list[dict[str, str | int]]",
+    "doc_string": "Append maps and return each server-confirmed insertion. Errors can leave a partial change.",
     "auto_settings_capable": true,
     "permissions_required": [
       "api.can_add_maps_to_rotation"
@@ -155,8 +155,8 @@
       "POST"
     ],
     "description_translations": {
-      "de": "Fügt mehrere Karten zur Rotation hinzu und liefert die Serverantwort je Karte.",
-      "en": "Adds multiple maps to the rotation and returns the server response for each map."
+      "de": "Fügt mehrere Karten zur Rotation hinzu und liefert für jede bestätigte Einfügung Kartenkennung, Position und Status. Bei Fehlern kann die Rotation teilweise geändert sein.",
+      "en": "Adds multiple maps to the rotation and returns the map ID, index and status for each confirmed insertion. An error can leave a partial change."
     }
   },
   {
