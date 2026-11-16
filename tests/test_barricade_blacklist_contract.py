@@ -83,3 +83,26 @@ def test_websocket_reply_marks_partial_failure_instead_of_success():
         assert response['response']['ban_ids'] == {'confirmed': '22'}
         assert 'None' not in response['response']['ban_ids'].values()
     asyncio.run(run())
+
+
+def test_unban_passes_requested_list_and_reports_actual_result():
+    with patch.object(barricade, 'remove_record_from_blacklist', return_value=False) as remove:
+        assert barricade.unban_player.func(11, 2) is False
+    remove.assert_called_once_with(record_id=11, expected_blacklist_id=2)
+    with patch.object(barricade, 'remove_record_from_blacklist', return_value=True):
+        assert barricade.unban_player.func(11, 2) is True
+
+
+def test_unban_rejects_wrong_list_and_reports_partial_result():
+    async def run():
+        consumer = barricade.BarricadeConsumer()
+        payload = barricade.UnbanPlayersRequestPayload.model_validate({
+            'ban_ids': ['11', '22'], 'config': {'banlist_id': '2'},
+        })
+        with patch.object(barricade, 'assert_blacklist_exists', AsyncMock()), \
+             patch.object(barricade, 'unban_player', AsyncMock(side_effect=[True, False])) as unban:
+            with pytest.raises(barricade.BarricadeRequestError) as error:
+                await consumer.unban_players(payload)
+        assert error.value.kwargs == {'ban_ids': ['11']}
+        assert [call.args for call in unban.await_args_list] == [(11, 2), (22, 2)]
+    asyncio.run(run())
