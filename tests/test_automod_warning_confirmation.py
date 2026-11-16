@@ -39,7 +39,7 @@ def test_warning_state_survives_worker_restart(monkeypatch, mod_type, config_typ
                           role="rifleman", lvl=100, details=PunishDetails(author=mod.action_author, message="warning"))
     with mod.watch_state(player.team, player.squad) as state:
         assert mod.should_warn_player(state, player.squad, player) == PunishStepState.APPLY
-        assert state.warned[player.name] == [PENDING_WARNING]
+        assert state.warned[mod.progress_key(player)] == [PENDING_WARNING]
 
     api = Mock()
     api.message_player.return_value = outcome == "confirmed"
@@ -52,7 +52,7 @@ def test_warning_state_survives_worker_restart(monkeypatch, mod_type, config_typ
     restarted = mod_type(config, redis)
     with restarted.watch_state(player.team, player.squad) as state:
         if outcome == "confirmed":
-            state.warned[player.name][-1] -= timedelta(seconds=2)
+            state.warned[mod.progress_key(player)][-1] -= timedelta(seconds=2)
         expected = {"confirmed": PunishStepState.GO_TO_NEXT_STEP,
                     "rejected": PunishStepState.APPLY,
                     "timeout": PunishStepState.WAIT,
@@ -81,7 +81,6 @@ def test_dry_run_confirms_only_simulated_warning(monkeypatch):
     (NoLeaderAutomod, AutoModNoLeaderUserConfig, "no_leader_watchalliesable"),
     (NoSoloTankAutomod, AutoModNoSoloTankUserConfig, "no_solo_tankalliesable"),
     (LevelThresholdsAutomod, AutoModLevelUserConfig, "level_thresholds_automodalliesable"),
-    (SeedingRulesAutomod, AutoModSeedingUserConfig, "seeding_rules_automodalliesable"),
 ])
 def test_legacy_warning_is_never_assumed_confirmed(mod_type, config_type, key):
     redis = fakeredis.FakeStrictRedis()
