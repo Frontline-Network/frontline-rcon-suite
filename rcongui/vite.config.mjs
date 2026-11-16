@@ -22,6 +22,19 @@ const jsxInJsPlugin = {
   },
 };
 
+// A failed ES-module fetch can be cached by the browser for the page lifetime.
+// Publish the generated URL so the language loader can retry with a fresh query.
+const languageChunkManifest = {
+  name: "language-chunk-manifest",
+  generateBundle(_options, bundle) {
+    const chunk = Object.values(bundle).find((item) =>
+      item.type === "chunk" && item.facadeModuleId?.replaceAll("\\", "/").endsWith("/src/i18n/locales/fr.js")
+    );
+    if (!chunk) throw new Error("French language chunk is missing from the build");
+    this.emitFile({ type: "asset", fileName: "language-chunks.json", source: JSON.stringify({ fr: chunk.fileName }) });
+  },
+};
+
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
@@ -93,7 +106,7 @@ export default defineConfig(({ command, mode }) => {
         "@": path.resolve(import.meta.dirname, "./src"),
       },
     },
-    plugins: [jsxInJsPlugin, react()],
+    plugins: [jsxInJsPlugin, react(), languageChunkManifest],
     server: {
       port: 3000,
       proxy: {

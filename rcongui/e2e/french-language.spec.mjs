@@ -6,7 +6,7 @@ const frenchAsset = /\/(?:src\/i18n\/locales\/fr\.js|assets\/fr-[\w-]+\.js)(?:\?
 test("failed language download keeps the current language and allows retry", async ({ page }) => {
   let failures = 0;
   await page.route(frenchAsset, async (route) => {
-    if (failures++ === 0) await route.abort();
+    if (failures++ < 2) await route.abort();
     else await route.continue();
   });
   await page.addInitScript(() => localStorage.setItem("crcon.language", "de"));
@@ -16,6 +16,10 @@ test("failed language download keeps the current language and allows retry", asy
   await expect(page.getByRole("alert").filter({ hasText: "Die Sprache konnte nicht geladen werden" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "de");
   expect(await page.evaluate(() => localStorage.getItem("crcon.language"))).toBe("de");
+  await page.getByRole("menuitem", { name: "Français", exact: true }).click();
+  await expect.poll(() => failures).toBeGreaterThanOrEqual(2);
+  await expect(page.getByRole("alert").filter({ hasText: "Die Sprache konnte nicht geladen werden" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "de");
   await page.getByRole("menuitem", { name: "Français", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "fr");
   expect(await page.evaluate(() => localStorage.getItem("crcon.language"))).toBe("fr");

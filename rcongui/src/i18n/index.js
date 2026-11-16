@@ -51,16 +51,36 @@ i18n
 // rapid sequence of language selections never installs a partial catalog.
 let frenchCatalogLoad;
 let frenchCatalogLoaded = false;
+let frenchLoadFailed = false;
+let frenchRetry = 0;
+
+async function retryFrenchCatalog() {
+  const base = new URL(import.meta.env.BASE_URL, window.location.origin);
+  let path = "src/i18n/locales/fr.js";
+  if (import.meta.env.PROD) {
+    const response = await fetch(new URL("language-chunks.json", base), { cache: "no-store" });
+    if (!response.ok) throw new Error("Language chunk manifest unavailable");
+    path = (await response.json()).fr;
+    if (typeof path !== "string" || !/^assets\/fr-[\w-]+\.js$/.test(path)) {
+      throw new Error("Invalid language chunk path");
+    }
+  }
+  const url = new URL(path, base);
+  url.searchParams.set("retry", String(++frenchRetry));
+  return import(/* @vite-ignore */ url.href);
+}
+
 export function ensureLanguageLoaded(language) {
   if (language !== "fr" || frenchCatalogLoaded) {
     return Promise.resolve();
   }
   if (!frenchCatalogLoad) {
-    frenchCatalogLoad = import("./locales/fr").then(({ default: fr }) => {
+    frenchCatalogLoad = (frenchLoadFailed ? retryFrenchCatalog() : import("./locales/fr")).then(({ default: fr }) => {
       i18n.addResourceBundle("fr", "translation", fr, true, true);
       frenchCatalogLoaded = true;
     }).catch((error) => {
       frenchCatalogLoad = undefined;
+      frenchLoadFailed = true;
       throw error;
     });
   }

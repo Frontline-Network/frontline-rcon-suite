@@ -1151,6 +1151,9 @@ export function makeServer({ environment = "development" } = {}) {
         });
       });
 
+      this.passthrough((request) =>
+        new URL(request.url, window.location.origin).pathname.endsWith("/language-chunks.json")
+      );
       // Account forms use the isolated Django preview, including its session
       // and CSRF checks; never simulate a successful password change.
       this.passthrough((request) =>
