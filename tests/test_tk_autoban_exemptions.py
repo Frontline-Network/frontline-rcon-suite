@@ -8,6 +8,10 @@ from rcon.user_config.ban_tk_on_connect import BanTeamKillOnConnectUserConfig, B
 
 @pytest.fixture
 def scenario(monkeypatch):
+    monkeypatch.setattr(tk_autoban, 'get_server_number', lambda: '3')
+    monkeypatch.setattr(tk_autoban.tk_action_guard, 'ensure_cutover', lambda *_: None)
+    monkeypatch.setattr(tk_autoban.tk_action_guard, 'reserve', lambda *_: 'tk-synthetic')
+    monkeypatch.setattr(tk_autoban.tk_action_guard, 'finish', lambda *_: 1)
     connected = {'action': 'CONNECTED', 'timestamp_ms': 100000,
                  'player_name_1': 'synthetic', 'player_id_1': 'synthetic-id'}
     tk = {'action': 'TEAM KILL', 'timestamp_ms': 101000,

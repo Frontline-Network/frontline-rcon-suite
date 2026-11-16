@@ -1,5 +1,6 @@
 import datetime
 from unittest import mock
+import pytest
 
 from rcon.automods.tk_autoban import (
     BanTeamKillOnConnectUserConfig,
@@ -7,6 +8,14 @@ from rcon.automods.tk_autoban import (
 )
 from rcon.types import StructuredLogLineWithMetaData
 from rcon.user_config.ban_tk_on_connect import BanTeamKillOnConnectWhiteList, TimeFrame
+
+
+@pytest.fixture(autouse=True)
+def simulated_guard(monkeypatch):
+    monkeypatch.setattr("rcon.automods.tk_autoban.get_server_number", lambda: "3")
+    monkeypatch.setattr("rcon.automods.tk_action_guard.ensure_cutover", lambda *_: None)
+    monkeypatch.setattr("rcon.automods.tk_action_guard.reserve", lambda *_: "tk-synthetic")
+    monkeypatch.setattr("rcon.automods.tk_action_guard.finish", lambda *_: 1)
 
 
 @mock.patch("rcon.automods.tk_autoban.get_player_profile", autospec=True, return_value=None)

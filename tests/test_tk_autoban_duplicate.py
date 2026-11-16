@@ -8,6 +8,14 @@ from rcon.automods import tk_autoban
 from rcon.user_config.ban_tk_on_connect import BanTeamKillOnConnectUserConfig
 
 
+@pytest.fixture(autouse=True)
+def simulated_guard(monkeypatch):
+    monkeypatch.setattr(tk_autoban, 'get_server_number', lambda: '3')
+    monkeypatch.setattr(tk_autoban.tk_action_guard, 'ensure_cutover', lambda *_: None)
+    monkeypatch.setattr(tk_autoban.tk_action_guard, 'reserve', lambda *_: 'tk-synthetic')
+    monkeypatch.setattr(tk_autoban.tk_action_guard, 'finish', lambda *_: 1)
+
+
 def test_only_one_ban_for_multiple_teamkills_in_one_history_scan(monkeypatch):
     connected = {'action': 'CONNECTED', 'timestamp_ms': 100000, 'player_name_1': 'synthetic', 'player_id_1': 'synthetic-id'}
     first = {'action': 'TEAM KILL', 'timestamp_ms': 101000, 'player_name_1': 'synthetic',
@@ -60,8 +68,7 @@ def test_lost_ban_response_is_not_retried_or_reported_as_success(monkeypatch):
     rcon = Mock()
     rcon.get_vip_ids.return_value = []
     config = BanTeamKillOnConnectUserConfig(enabled=True, teamkill_tolerance_count=0)
-    with pytest.raises(TimeoutError):
-        tk_autoban.auto_ban_if_tks_right_after_connection(rcon, tk, config=config)
+    assert tk_autoban.auto_ban_if_tks_right_after_connection(rcon, tk, config=config) is None
     ban.assert_called_once()
     audit.assert_not_called()
 

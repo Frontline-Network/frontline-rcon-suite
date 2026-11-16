@@ -475,12 +475,28 @@ class RconAPI(Rcon):
         return list_pending(int(get_server_number()), limit)
 
     def get_pending_automod_actions(self, limit: int = 50):
-        from rcon.automods.action_guard import list_pending
-        return list_pending(int(get_server_number()), limit)
+        from rcon.automods import action_guard, tk_action_guard
+        server = int(get_server_number())
+        general = action_guard.list_pending(server, limit)
+        teamkill = tk_action_guard.list_pending(server, limit)
+        # ISO timestamps may carry different UTC offsets. Compare instants,
+        # not strings, and treat legacy naive database values as UTC.
+        from datetime import datetime, timezone
+
+        def sort_key(item):
+            timestamp = datetime.fromisoformat(item['updated_at'])
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+            return timestamp.astimezone(timezone.utc), item['token']
+
+        combined = sorted(general['results'] + teamkill['results'], key=sort_key)
+        return {'results': combined[:limit],
+                'more': general['more'] or teamkill['more'] or len(combined) > limit}
 
     def review_pending_automod_action(self, player_id: str, token: str, reason: str, by: str):
-        from rcon.automods.action_guard import review
-        return review(int(get_server_number()), player_id, token, by, reason) > 0
+        from rcon.automods import action_guard, tk_action_guard
+        guard = tk_action_guard if token.startswith('tk-') else action_guard
+        return guard.review(int(get_server_number()), player_id, token, by, reason) > 0
 
     def resolve_pending_session_event(
         self, player_id: str, event_kind: str, event_us: int,

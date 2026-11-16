@@ -11,6 +11,8 @@ from rcon.player_history import get_player_profile, player_has_flag
 from rcon.rcon import Rcon
 from rcon.types import StructuredLogLineWithMetaData, BlacklistRecordWithBlacklistType
 from rcon.user_config.ban_tk_on_connect import BanTeamKillOnConnectUserConfig
+from rcon.utils import get_server_number
+from rcon.automods import tk_action_guard
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,12 @@ def auto_ban_if_tks_right_after_connection(
     player_id = log["player_id_1"]
     if not player_id:
         logger.warning("Skipping teamkill rule because the player ID is missing")
+        return
+    trigger_timestamp = log.get("timestamp_ms")
+    try:
+        tk_action_guard.ensure_cutover(int(get_server_number()), trigger_timestamp)
+    except Exception:
+        logger.exception("Unable to establish teamkill transition boundary; skipping teamkill ban")
         return
     whitelist_players = config.whitelist_players
     if whitelist_players.is_vip:
@@ -148,15 +156,37 @@ def auto_ban_if_tks_right_after_connection(
                 else:
                     expires_at = None
 
-                result = blacklist_or_ban(
-                    rcon=rcon,
-                    blacklist_id=config.blacklist_id,
-                    player_id=player_id,
-                    reason=reason,
-                    admin_name=author,
-                    expires_at=expires_at,
-                )
-                if result is not True and not (isinstance(result, dict) and result):
+                try:
+                    server = int(get_server_number())
+                    token = tk_action_guard.reserve(server, str(player_id), last_connect_time, trigger_timestamp)
+                except Exception:
+                    logger.exception("Unable to reserve teamkill ban; no action taken")
+                    return
+                if token is None:
+                    logger.warning("Teamkill ban is held by the durable guard or cutover for %s", player_id)
+                    return
+                try:
+                    result = blacklist_or_ban(
+                        rcon=rcon,
+                        blacklist_id=config.blacklist_id,
+                        player_id=player_id,
+                        reason=reason,
+                        admin_name=author,
+                        expires_at=expires_at,
+                    )
+                except Exception:
+                    logger.exception("Teamkill ban outcome uncertain; reservation requires review")
+                    return
+                confirmed = result is True or (isinstance(result, dict) and bool(result))
+                if confirmed or result is False:
+                    try:
+                        state = 'confirmed' if confirmed else 'rejected'
+                        if tk_action_guard.finish(server, str(player_id), token, state) != 1:
+                            raise RuntimeError("Teamkill reservation could not be finished")
+                    except Exception:
+                        logger.exception("Unable to finalize teamkill reservation; review is required")
+                        return result
+                if not confirmed:
                     logger.warning("Teamkill ban for %s was not confirmed", player_id)
                     return result
                 if isinstance(result, dict):
