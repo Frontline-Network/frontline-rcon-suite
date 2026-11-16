@@ -64,9 +64,33 @@ before stopping workers; an incompatible image stops the deployment for review. 
 check reflects readiness; it does not prevent a brief interruption while a backend
 container is replaced. A deployment started by an older helper can update backends
 1–4 immediately; additional instances need a later deployment run by the updated
-helper, or an explicitly reviewed update to their generated Compose file. Running
-`--deploy` again at the same revision is a no-op and does not repair them. Use the
-bootstrap procedure above before the first update to avoid this gap.
+helper, or the reconciliation procedure below. Running `--deploy` again at the
+same revision is a no-op and does not repair them. Use the bootstrap procedure
+above before the first update to avoid this gap.
+
+If an older helper has already updated an installation, reconcile its running
+backends explicitly. Obtain the Compose project name and ordered configuration
+files from the running backend's `com.docker.compose.project` and
+`com.docker.compose.project.config_files` labels. Supply every active file in
+that order, and any active profiles, to the command below; replace the example
+names with the installation's actual values. Do not print resolved Compose
+configuration, which can contain secrets.
+
+```sh
+python3 scripts/reconcile_backend_readiness.py --project-dir "$PWD" \
+  --project-name PROJECT -f compose.yaml -f ACTIVE-OVERLAY.yaml
+# After reviewing the preflight, repeat with --apply:
+python3 scripts/reconcile_backend_readiness.py --project-dir "$PWD" \
+  --project-name PROJECT -f compose.yaml -f ACTIVE-OVERLAY.yaml --apply
+```
+
+The preflight does not replace containers. Apply validates the running images
+and configuration, recreates only backends with an outdated probe, and checks
+their actual health. It attempts to restore the previous configuration if
+readiness fails and the inputs have not changed. Replacement briefly interrupts
+those backends. The generated `.deploy-state/backend-readiness-override.json`
+must be included last in subsequent direct Compose commands; the updated deploy
+helper generates its own readiness override for later deployments.
 
 ## Preserve password recovery on every rollout
 
