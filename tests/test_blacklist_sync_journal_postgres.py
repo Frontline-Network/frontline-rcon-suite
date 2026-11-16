@@ -12,6 +12,7 @@ from sqlalchemy.orm import sessionmaker
 import rcon.models
 from rcon import blacklist_sync_journal as journal
 from rcon import blacklist
+from rcon.automods import action_guard
 from rcon.models import Blacklist, BlacklistRecord, PlayerID, PlayerName
 from rcon.types import BlacklistSyncMethod
 
@@ -27,8 +28,11 @@ def database(monkeypatch):
         connection.execute(text(f'CREATE SCHEMA "{schema}"'))
     engine = create_engine(dsn, connect_args={"options": f"-csearch_path={schema}"}, pool_size=10)
     journal.BlacklistSyncDelivery.__table__.create(engine)
+    action_guard.metadata.create_all(engine)
+    action_guard.event_guard.metadata.create_all(engine)
     maker = sessionmaker(bind=engine, expire_on_commit=False)
     monkeypatch.setattr(journal, "get_session_maker", lambda: maker)
+    monkeypatch.setattr(action_guard, "get_session_maker", lambda: maker)
     monkeypatch.setattr(rcon.models, "get_engine", lambda: engine)
     try:
         yield maker
