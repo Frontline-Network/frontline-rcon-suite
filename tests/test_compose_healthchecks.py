@@ -42,3 +42,14 @@ def test_webhook_healthcheck_production_override_fails_closed():
         compose["services"]["webhook_service"]["healthcheck"]["test"]
         == EXPECTED_WEBHOOK_HEALTHCHECK
     )
+
+
+def test_managed_backend_overrides_replace_legacy_readiness_checks():
+    compose = _load_compose("compose.mobile-admin.yaml")
+    expected = ["CMD", "python", "/code/scripts/backend_healthcheck.py"]
+    for number in range(1, 5):
+        backend = compose["services"][f"backend_{number}"]
+        supervisor = compose["services"][f"supervisor_{number}"]
+        assert backend["healthcheck"]["disable"] is False
+        assert backend["healthcheck"]["test"] == expected
+        assert "healthcheck" not in supervisor
