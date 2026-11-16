@@ -16,7 +16,7 @@ from rcon.user_config.seed_vip import SeedVIPUserConfig
 from rcon.user_config.vip_rewards import VipRewardsUserConfig
 from rcon.utils import get_server_number
 from rcon.vip_rewards.engine import Engine, budget, gate
-from rcon.vip_rewards.locking import lock, vip_lock
+from rcon.vip_rewards.locking import lock, switch_state_lock, vip_lock
 
 logger = logging.getLogger(__name__)
 NOTICE_MAX_ATTEMPTS = 3
@@ -257,8 +257,8 @@ def tick(rcon):
             observe(rcon, cfg) if cfg.enabled else ({}, {"allies": 0, "axis": 0}, False)
         )
         round_id = current_round() if cfg.enabled and (cfg.round.enabled or cfg.weekly_support.enabled) else None
-        now = time.time()
-        with enter_session() as session:
+        with switch_state_lock(), enter_session() as session:
+            now = time.time()
             row = session.get(VipRewardState, (server(), cfg.dry_run))
             if row is None:
                 row = VipRewardState(
@@ -308,7 +308,14 @@ def tick(rcon):
                 VipRewardEvent.processed.is_(True),
                 VipRewardEvent.payload["time"].as_float() < now - 172800,
             ).delete(synchronize_session=False)
-            engine.snapshot(now, players, counts, thresholds, healthy)
+            from rcon.vip_rewards.hooks import players_with_forced_switch
+            balance_players = [pid for pid, player in data["players"].items() if player.get("balance")]
+            blocked_balances = players_with_forced_switch(balance_players, now) if balance_players else set()
+            # A later forced event may still be beyond this batch; do not
+            # award a balance claim until the complete backlog is processed.
+            if len(events) == 5000:
+                blocked_balances.update(balance_players)
+            engine.snapshot(now, players, counts, thresholds, healthy, blocked_balances)
             row.data = data
             for claim in engine.claims:
                 session.execute(

@@ -291,6 +291,15 @@ def test_balance_cancelled_by_forced_switch_or_disconnect(kind):
     assert not e.player("a").get("balance")
 
 
+def test_delayed_forced_event_does_not_cancel_newer_signup():
+    e = engine(config(balance={"enabled": True}))
+    e.event(event("signup"), NOW + 1)
+    old_forced = event("forced")
+    old_forced["time"] = NOW
+    e.event(old_forced, NOW + 2)
+    assert e.player("a").get("balance")
+
+
 def test_snapshot_only_switch_is_not_rewarded():
     e = engine(config(balance={"enabled": True}))
     e.event(event("signup"), NOW + 1)
@@ -354,6 +363,7 @@ def delivery(monkeypatch):
     monkeypatch.setattr(service, "get_session_maker", lambda: factory)
     monkeypatch.setattr(service, "vip_lock", no_lock)
     monkeypatch.setattr(service, "lock", no_lock)
+    monkeypatch.setattr(service, "switch_state_lock", no_lock)
     monkeypatch.setattr(service, "server", lambda: 1)
     monkeypatch.setattr(service.VipRewardsUserConfig, "load_from_db", lambda: cfg)
     monkeypatch.setattr(service.time, "time", lambda: NOW)
@@ -944,6 +954,7 @@ def test_volunteer_switch_does_not_mark_as_forced(monkeypatch):
     forced = Mock()
     switch = Mock(return_value=True)
     monkeypatch.setattr(hooks, 'mark_forced', forced)
+    monkeypatch.setattr(hooks, 'finish_forced', Mock())
     monkeypatch.setattr(storage, 'before_manual_action', Mock())
     monkeypatch.setattr(ServerCtl, 'switch_player_now', switch)
     rcon = object.__new__(Rcon)

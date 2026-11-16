@@ -148,7 +148,7 @@ class Engine:
             )
         )
 
-    def snapshot(self, now, players, counts, thresholds, healthy=True):
+    def snapshot(self, now, players, counts, thresholds, healthy=True, blocked_balances=frozenset()):
         s, c = self.s, self.c
         previous_status = gate(s, c, now)
         previous_time = s.get("baseline")
@@ -244,7 +244,7 @@ class Engine:
                 if balance.get("switched"):
                     if info["team"] != balance["target"]:
                         p.pop("balance", None)
-                    elif valid_interval and same_team:
+                    elif valid_interval and same_team and pid not in blocked_balances:
                         balance["seconds"] += delta
                         if balance["seconds"] >= c.balance.minutes * 60:
                             self.claim(
@@ -307,7 +307,9 @@ class Engine:
         ts = event["time"]
         if kind == "forced":
             if pid in s["players"]:
-                s["players"][pid].pop("balance", None)
+                balance = s["players"][pid].get("balance")
+                if balance and balance.get("signup", ts) <= event.get("switch_started", ts):
+                    s["players"][pid].pop("balance", None)
             return
         if kind == "disconnect":
             s.get("online", {}).pop(pid, None)

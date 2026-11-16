@@ -1281,11 +1281,29 @@ class Rcon(ServerCtl):
         return res
 
     def switch_player_now(self, player_id: str) -> bool:
-        from rcon.vip_rewards.hooks import mark_forced
-        mark_forced(player_id)
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id)
-        return super().switch_player_now(player_id)
+        return self._switch_forced(player_id, lambda: super(Rcon, self).switch_player_now(player_id))
+
+    def _switch_forced(self, player_id, command, on_death=False):
+        from rcon.vip_rewards.hooks import finish_forced, mark_forced
+        marker = mark_forced(player_id, on_death=on_death) if on_death else mark_forced(player_id)
+        try:
+            result = command()
+        except Exception:
+            # An unknown outcome may have executed; preserve the marker.
+            try:
+                finish_forced(player_id, marker)
+            except Exception:
+                logger.exception("Could not record an uncertain forced switch")
+            raise
+        try:
+            finish_forced(player_id, marker, rejected=result is False)
+        except Exception:
+            # The command has already completed; never turn a bookkeeping
+            # failure into a reason for callers to replay a side effect.
+            logger.exception("Could not finalize a forced switch marker")
+        return result
 
     def switch_volunteer_now(self, player_id: str) -> bool:
         """Internal autobalancer path for an explicitly registered volunteer."""
@@ -1306,11 +1324,11 @@ class Rcon(ServerCtl):
         return super().disband_squad(team_index, squad_index, reason)
 
     def switch_player_on_death(self, player_id, by) -> bool:
-        from rcon.vip_rewards.hooks import mark_forced
-        mark_forced(player_id, on_death=True)
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id, by)
-        return super().switch_player_on_death(player_id)
+        return self._switch_forced(
+            player_id, lambda: super(Rcon, self).switch_player_on_death(player_id), on_death=True
+        )
 
     def kick(self, player_id: str, reason, by, player_name: str | None = None) -> bool:
         from rcon.leadership_vote.storage import before_manual_action
