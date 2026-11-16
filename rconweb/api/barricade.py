@@ -21,6 +21,7 @@ from rcon.blacklist import (
     get_player_blacklist_records,
     remove_record_from_blacklist,
 )
+from rcon.vip_rewards.locking import lock
 
 logger = getLogger("rconweb")
 
@@ -29,29 +30,34 @@ logger = getLogger("rconweb")
 def assert_blacklist_exists(blacklist_id: int):
     stmt = exists().where(models.Blacklist.id == blacklist_id)
     with models.enter_session() as sess:
-        if not sess.query(stmt):
+        if not sess.query(stmt).scalar():
             raise BarricadeRequestError("Blacklist does not exist")
 
 
 @database_sync_to_async
 def ban_player(player_id: str, blacklist_id: int, reason: str) -> int | None:
     try:
-        with models.enter_session() as sess:
-            current_records = get_player_blacklist_records(
-                sess=sess,
-                player_id=player_id,
-                include_expired=True,
-                include_other_servers=True,
-            )
-            if current_records:
-                return current_records[0].id
+        # Concurrent requests/retries for the same player and list must not
+        # both create a record after observing an empty result.
+        with lock(f"barricade-ban:{blacklist_id}:{player_id}"):
+            with models.enter_session() as sess:
+                current_records = get_player_blacklist_records(
+                    sess=sess,
+                    player_id=player_id,
+                    include_expired=False,
+                    include_other_servers=True,
+                )
+                matching = next((record for record in current_records
+                                 if record.blacklist_id == blacklist_id), None)
+                if matching is not None:
+                    return matching.id
 
-        record = add_record_to_blacklist(
-            player_id=player_id,
-            blacklist_id=blacklist_id,
-            reason=reason,
-            admin_name="Barricade",
-        )
+            record = add_record_to_blacklist(
+                player_id=player_id,
+                blacklist_id=blacklist_id,
+                reason=reason,
+                admin_name="Barricade",
+            )
     except:
         logger.exception("Failed to blacklist player %s", player_id)
         return None
@@ -285,10 +291,7 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
 
         await assert_blacklist_exists(blacklist_id)
 
-        record_ids = [
-            # The client expects strings, not ints
-            str(ban_id)
-            for ban_id in await asyncio.gather(*[
+        ids = await asyncio.gather(*[
                 ban_player(
                     player_id=player_id,
                     blacklist_id=blacklist_id,
@@ -296,9 +299,14 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
                 )
                 for player_id, reason in payload.player_ids.items()
             ])
-        ]
-
-        return {"ban_ids": dict(zip(payload.player_ids.keys(), record_ids))}
+        # The client expects strings for confirmed records. A missing ID is
+        # an uncertain/failed write, not the literal successful ID "None".
+        ban_ids = {player_id: str(ban_id)
+                   for player_id, ban_id in zip(payload.player_ids, ids)
+                   if ban_id is not None}
+        if len(ban_ids) != len(payload.player_ids):
+            raise BarricadeRequestError("Could not blacklist all players", ban_ids=ban_ids)
+        return {"ban_ids": ban_ids}
 
     async def unban_players(self, payload: UnbanPlayersRequestPayload):
         record_ids: list[int] = []
