@@ -868,7 +868,7 @@ def blacklist_or_ban(
             raise
 
     if expires_at:
-        rcon.temp_ban(
+        return rcon.temp_ban(
             player_id=player_id,
             reason=reason,
             duration_hours=round_timedelta_to_hours(
@@ -877,7 +877,7 @@ def blacklist_or_ban(
             by=admin_name,
         )
     else:
-        rcon.perma_ban(player_id=player_id, reason=reason, by=admin_name)
+        return rcon.perma_ban(player_id=player_id, reason=reason, by=admin_name)
 
 
 def expire_all_player_blacklists(player_id: str):

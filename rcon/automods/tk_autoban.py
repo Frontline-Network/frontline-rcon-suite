@@ -28,13 +28,13 @@ def auto_ban_if_tks_right_after_connection(
         rcon: Rcon,
         log: StructuredLogLineWithMetaData,
         config: BanTeamKillOnConnectUserConfig | None = None,
-) -> None | BlacklistRecordWithBlacklistType:
+) -> None | bool | BlacklistRecordWithBlacklistType:
     if config is None:
         config = BanTeamKillOnConnectUserConfig.load_from_db()
     if not config or not config.enabled:
         return
 
-    result: None | BlacklistRecordWithBlacklistType = None
+    result: None | bool | BlacklistRecordWithBlacklistType = None
 
     player_name = log["player_name_1"]
     player_id = log["player_id_1"]
@@ -135,8 +135,16 @@ def auto_ban_if_tks_right_after_connection(
                     admin_name=author,
                     expires_at=expires_at,
                 )
+                if result is not True and not (isinstance(result, dict) and result):
+                    logger.warning("Teamkill ban for %s was not confirmed", player_id)
+                    return result
+                if isinstance(result, dict):
+                    logger.info("Blacklist entry recorded for %s; game-server enforcement is pending", player_id)
+                    audit_message = f"Blacklist entry created for {player_name}; game-server enforcement pending."
+                else:
+                    audit_message = discord_msg.format(player=player_name)
                 logger.info(
-                    "Banned player %s for TEAMKILL after connect %s", player_name, log
+                    "Teamkill action recorded for player %s after connect %s", player_name, log
                 )
 
                 webhookurls: list[HttpUrl | None] | None
@@ -145,7 +153,7 @@ def auto_ban_if_tks_right_after_connection(
                 else:
                     webhookurls = [webhook]
                 send_to_discord_audit(
-                    message=discord_msg.format(player=player_name),
+                    message=audit_message,
                     command_name="blacklist",
                     by=author,
                     webhookurls=webhookurls,
