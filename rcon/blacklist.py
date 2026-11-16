@@ -778,10 +778,14 @@ def edit_record_from_blacklist(
         return new_record
 
 
-def remove_record_from_blacklist(record_id: int):
+def remove_record_from_blacklist(record_id: int, *, expected_blacklist_id: int | None = None):
     with blacklist_change_session() as sess:
-        record = get_record(sess, record_id)
-        if not record:
+        # Lock while checking the requested list and deleting so a concurrent
+        # move to another list cannot turn an authorized removal into a
+        # deletion from that other list.
+        record = sess.get(BlacklistRecord, record_id, with_for_update=True)
+        if not record or (expected_blacklist_id is not None
+                          and record.blacklist_id != expected_blacklist_id):
             return False
 
         res = record.to_dict()

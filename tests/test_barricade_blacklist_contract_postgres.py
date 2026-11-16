@@ -59,3 +59,30 @@ def test_concurrent_requests_create_one_record_and_one_delivery(database, existi
         records = session.scalars(select(BlacklistRecord).where(BlacklistRecord.blacklist_id == second)).all()
         assert len(records) == 1
         assert len(session.scalars(select(journal.BlacklistSyncDelivery)).all()) == 1
+
+
+def test_unban_cannot_remove_record_from_another_list(database, existing_blacklist):
+    record_id, first, second = existing_blacklist
+    assert barricade.unban_player.func(record_id, second) is False
+    with database() as session:
+        assert session.get(BlacklistRecord, record_id).blacklist_id == first
+        assert session.scalars(select(journal.BlacklistSyncDelivery)).all() == []
+    assert barricade.unban_player.func(record_id, first) is True
+    with database() as session:
+        assert session.get(BlacklistRecord, record_id) is None
+        deliveries = session.scalars(select(journal.BlacklistSyncDelivery)).all()
+        assert len(deliveries) == 1 and deliveries[0].server_number == 1
+    assert barricade.unban_player.func(record_id, first) is False
+
+
+def test_concurrent_list_move_cannot_delete_record_from_new_list(database, existing_blacklist):
+    record_id, first, second = existing_blacklist
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        with database() as session, session.begin():
+            record = session.get(BlacklistRecord, record_id, with_for_update=True)
+            record.blacklist_id = second
+            unban = executor.submit(barricade.unban_player.func, record_id, first)
+        assert unban.result(timeout=15) is False
+    with database() as session:
+        assert session.get(BlacklistRecord, record_id).blacklist_id == second
+        assert session.scalars(select(journal.BlacklistSyncDelivery)).all() == []

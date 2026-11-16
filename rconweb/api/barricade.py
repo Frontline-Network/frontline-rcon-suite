@@ -66,10 +66,11 @@ def ban_player(player_id: str, blacklist_id: int, reason: str) -> int | None:
 
 
 @database_sync_to_async
-def unban_player(record_id: int):
+def unban_player(record_id: int, blacklist_id: int):
     try:
-        remove_record_from_blacklist(record_id=record_id)
-        return True
+        return remove_record_from_blacklist(
+            record_id=record_id, expected_blacklist_id=blacklist_id
+        ) is True
     except:
         logger.exception("Failed to remove blacklist record #%s", record_id)
         return False
@@ -309,6 +310,12 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         return {"ban_ids": ban_ids}
 
     async def unban_players(self, payload: UnbanPlayersRequestPayload):
+        try:
+            blacklist_id = int(payload.config.banlist_id)
+        except ValueError:
+            raise BarricadeRequestError("Invalid banlist ID")
+        await assert_blacklist_exists(blacklist_id)
+
         record_ids: list[int] = []
         for record_id in payload.record_ids:
             try:
@@ -318,7 +325,7 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
             record_ids.append(record_id)
 
         successes = await asyncio.gather(
-            *[unban_player(record_id) for record_id in record_ids]
+            *[unban_player(record_id, blacklist_id) for record_id in record_ids]
         )
 
         successful_record_ids = [
