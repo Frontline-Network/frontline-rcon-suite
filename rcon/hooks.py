@@ -90,6 +90,7 @@ ARG_RE = re.compile(r"\$(\d+)")
 STEAM_ENRICHMENT_MAX_EVENT_AGE: Final = timedelta(minutes=5)
 STEAM_ENRICHMENT_DEDUPE_SECONDS: Final = 15 * 60
 VAC_ACTION_GUARD_RULE: Final = "VacHistory"
+WINDOWS_STORE_GUARD_RULE: Final = "WindowsStore"
 STEAM_ENRICHMENT_DEDUPE_PREFIX: Final = "steam_connect_enrichment"
 
 
@@ -728,6 +729,22 @@ def windows_store_player_check(rcon: Rcon, _, name: str, player_id: str):
 
     action = config.action
     action_value = action.value if action else None
+    if action == WindowsStoreIdActionType.kick:
+        guard_action = "kick"
+    elif action in (WindowsStoreIdActionType.temp_ban, WindowsStoreIdActionType.perma_ban):
+        guard_action = "ban"
+    else:
+        return
+
+    try:
+        guard_server = int(get_server_number())
+        guard_token = action_guard.reserve(guard_server, player_id, [WINDOWS_STORE_GUARD_RULE], guard_action)
+    except Exception:
+        logger.exception("Skipping Windows Store action: durable reservation unavailable")
+        return
+    if guard_token is None:
+        logger.warning("Skipping Windows Store action: previous result awaits review")
+        return
 
     logger.info(
         "Windows store player '%s' (%s) connected, action=%s",
@@ -757,17 +774,21 @@ def windows_store_player_check(rcon: Rcon, _, name: str, player_id: str):
                 reason=config.player_message,
                 by=config.audit_message_author,
             )
-        else:
-            return
     except Exception as e:
         logger.error(
-            "Could not %s whitespace name player %s/%s: %s",
+            "Windows Store action %s was not confirmed for player %s/%s: %s",
             action_value,
             name,
             player_id,
             e,
         )
         return
+    if accepted is True or accepted is False:
+        try:
+            action_guard.finish(guard_server, player_id, guard_token,
+                                "confirmed" if accepted is True else "rejected", expected=1)
+        except Exception:
+            logger.exception("Could not finalize Windows Store action; reservation retained")
     if accepted is not True:
         logger.warning("Windows Store action was rejected or not confirmed; no success audit sent")
         return

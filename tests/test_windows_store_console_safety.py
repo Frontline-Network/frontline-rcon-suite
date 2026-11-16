@@ -7,6 +7,27 @@ from rcon import hooks
 from rcon.types import GameEnum, WindowsStoreIdActionType
 
 
+@pytest.fixture(autouse=True)
+def isolated_windows_store_guard(monkeypatch):
+    pending = {}
+
+    def reserve(server, player, rules, action):
+        if player in pending or '*' in pending:
+            return None
+        pending[player] = 'test-token'
+        return 'test-token'
+
+    def finish(server, player, token, result, *, expected):
+        assert pending[player] == token and result in {'confirmed', 'rejected'}
+        del pending[player]
+        return 1
+
+    monkeypatch.setattr(hooks, 'get_server_number', lambda: 3)
+    monkeypatch.setattr(hooks.action_guard, 'reserve', reserve)
+    monkeypatch.setattr(hooks.action_guard, 'finish', finish)
+    return pending
+
+
 @pytest.mark.parametrize("action", list(WindowsStoreIdActionType))
 @pytest.mark.parametrize("player_id", ["0" * 32, "f" * 32])
 def test_hllv_eos_ids_do_not_trigger_windows_store_actions(monkeypatch, action, player_id):
@@ -152,3 +173,52 @@ def test_unconfirmed_action_does_not_claim_success(monkeypatch, accepted):
     hooks.windows_store_player_check.__wrapped__(rcon, {}, 'player', 'fake-eos-id')
     rcon.kick.assert_called_once()
     audit.assert_not_called()
+
+
+@pytest.mark.parametrize('action,method', [(WindowsStoreIdActionType.kick, 'kick'),
+    (WindowsStoreIdActionType.temp_ban, 'temp_ban'), (WindowsStoreIdActionType.perma_ban, 'perma_ban')])
+@pytest.mark.parametrize('result', [None, TimeoutError('synthetic lost response')])
+def test_uncertain_action_blocks_next_connection(monkeypatch, isolated_windows_store_guard, action, method, result):
+    config = SimpleNamespace(enabled=True, action=action, player_message='reason',
+                             audit_message='{name}', audit_message_author='admin', temp_ban_length_hours=1)
+    monkeypatch.setattr(hooks.RconServerSettingsUserConfig, 'load_from_db',
+                        lambda: SimpleNamespace(windows_store_players=config))
+    api = Mock()
+    api._get_adapted_player_info.return_value = {'iD': 'fake-pc-id', 'platform': 'PC_WinGDK'}
+    operation = getattr(api, method)
+    if isinstance(result, Exception):
+        operation.side_effect = result
+    else:
+        operation.return_value = result
+    hooks.windows_store_player_check.__wrapped__(api, {}, 'player', 'fake-pc-id')
+    hooks.windows_store_player_check.__wrapped__(api, {}, 'player', 'fake-pc-id')
+    operation.assert_called_once()
+    assert isolated_windows_store_guard == {'fake-pc-id': 'test-token'}
+
+
+def test_reservation_failure_does_not_send_windows_store_action(monkeypatch):
+    config = SimpleNamespace(enabled=True, action=WindowsStoreIdActionType.kick,
+                             player_message='reason', audit_message='{name}', audit_message_author='admin',
+                             temp_ban_length_hours=1)
+    monkeypatch.setattr(hooks.RconServerSettingsUserConfig, 'load_from_db',
+                        lambda: SimpleNamespace(windows_store_players=config))
+    monkeypatch.setattr(hooks.action_guard, 'reserve', Mock(side_effect=RuntimeError('unavailable')))
+    api = Mock()
+    api._get_adapted_player_info.return_value = {'iD': 'fake-pc-id', 'platform': 'PC_WinGDK'}
+    hooks.windows_store_player_check.__wrapped__(api, {}, 'player', 'fake-pc-id')
+    api.kick.assert_not_called()
+
+
+def test_explicitly_rejected_windows_store_action_can_be_retried(monkeypatch, isolated_windows_store_guard):
+    config = SimpleNamespace(enabled=True, action=WindowsStoreIdActionType.kick,
+                             player_message='reason', audit_message='{name}', audit_message_author='admin',
+                             temp_ban_length_hours=1)
+    monkeypatch.setattr(hooks.RconServerSettingsUserConfig, 'load_from_db',
+                        lambda: SimpleNamespace(windows_store_players=config))
+    api = Mock()
+    api._get_adapted_player_info.return_value = {'iD': 'fake-pc-id', 'platform': 'PC_WinGDK'}
+    api.kick.return_value = False
+    hooks.windows_store_player_check.__wrapped__(api, {}, 'player', 'fake-pc-id')
+    hooks.windows_store_player_check.__wrapped__(api, {}, 'player', 'fake-pc-id')
+    assert api.kick.call_count == 2
+    assert isolated_windows_store_guard == {}
