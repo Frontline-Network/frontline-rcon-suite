@@ -4043,7 +4043,7 @@ const de = {
           },
           windowsStore: {
             title: "Windows-Store-Spieler",
-            description: "Erkennung und Reaktion für Windows-Store-IDs",
+            description: "Maßnahmen erfordern die bestätigte Plattform PC WinGDK; unbekannte Plattformen werden übersprungen.",
           },
           messages: {
             title: "Nachrichtenrahmen",
@@ -4085,7 +4085,7 @@ const de = {
           },
           windows_store_players: {
             label: "Regel für Windows-Store-Spieler",
-            help: "Legt Erkennung, Maßnahme und Meldungen für Spieler mit Windows-Store-ID fest.",
+            help: "Maßnahmen erfordern die bestätigte Plattform PC WinGDK. Unbekannte oder mehrdeutige Plattformen werden übersprungen; manche Server liefern diese Unterscheidung nicht.",
           },
           message_enhancements: {
             label: "Nachrichtenrahmen",
