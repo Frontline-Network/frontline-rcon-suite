@@ -683,7 +683,10 @@ class TimeWindowStats(BaseStats):
                     if boundary in seen_boundaries:
                         continue
                     seen_boundaries.add(boundary)
-                self._set_start_end_times(player_key, players_times, log, from_)
+                self._set_start_end_times(
+                    player_key, players_times, log, from_,
+                    offset_warmup_time_seconds=offset_warmup_time_seconds,
+                )
 
         # Keep the latest observed name for each ID independent of hash order.
         players = [
