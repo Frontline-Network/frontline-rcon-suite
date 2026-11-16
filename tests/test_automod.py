@@ -60,7 +60,7 @@ def test_failed_warning_rolls_back_only_originating_rule(result):
     player = PunishPlayer(player_id="id", name="Player", squad="Able", team="allies",
                           details=PunishDetails(author="AutoMod_NoLeaderWatch", message="warning"))
     red = Mock()
-    red.get.return_value = pickle.dumps(WatchStatus(warned={"Player": [PENDING_WARNING]}))
+    red.get.return_value = pickle.dumps(WatchStatus(warned={"id": [PENDING_WARNING]}))
     origin = NoLeaderAutomod(Mock(), red)
     other = Mock()
     other.action_author = "AutoMod_SeedingRules"
@@ -72,7 +72,7 @@ def test_failed_warning_rolls_back_only_originating_rule(result):
     _do_punitions(server, ActionMethod.MESSAGE, [player], [origin, other])
     if result is False:
         saved = pickle.loads(red.setex.call_args.args[2])
-        assert saved.warned["Player"] == []
+        assert saved.warned["id"] == []
     else:
         red.setex.assert_not_called()
     other.player_warning_failed.assert_not_called()
@@ -107,7 +107,7 @@ def test_warning_progress_requires_confirmation(monkeypatch, result):
     player = PunishPlayer(player_id="fake-id", name="Player", squad="Able", team="allies", lvl=100,
                           details=PunishDetails(author=mod.action_author, message="warning"))
     assert mod.should_warn_player(state, "Able", player) == PunishStepState.APPLY
-    assert state.warned[player.name] == [PENDING_WARNING]
+    assert state.warned[player.player_id] == [PENDING_WARNING]
     server = Mock()
     if isinstance(result, Exception):
         server.message_player.side_effect = result
@@ -120,7 +120,7 @@ def test_warning_progress_requires_confirmation(monkeypatch, result):
     elif result is False:
         assert mod.should_warn_player(state, "Able", player) == PunishStepState.APPLY
     else:
-        assert state.warned[player.name] == [PENDING_WARNING]
+        assert state.warned[player.player_id] == [PENDING_WARNING]
         assert mod.should_warn_player(state, "Able", player) == PunishStepState.WAIT
     server.message_player.assert_called_once()
 
@@ -134,7 +134,7 @@ def test_action_outcome_controls_repeat_and_escalation(monkeypatch, method, resu
     from rcon.automods.no_leader import NoLeaderAutomod
 
     initial = datetime.now()
-    state = WatchStatus(punished={"Player": [initial]})
+    state = WatchStatus(punished={"fake-id": [initial]})
     mod = NoLeaderAutomod(Mock(), Mock())
     @contextmanager
     def watch_state(_team, _squad):
@@ -151,13 +151,13 @@ def test_action_outcome_controls_repeat_and_escalation(monkeypatch, method, resu
     monkeypatch.setattr(automod, "audit", Mock())
     _do_punitions(server, method, [player], [mod])
     if result is False:
-        assert state.punished["Player"] == ([] if method == ActionMethod.PUNISH else [initial])
+        assert state.punished["fake-id"] == ([] if method == ActionMethod.PUNISH else [initial])
     elif result is True and method == ActionMethod.PUNISH:
-        assert len(state.punished["Player"]) == 1
-        assert state.punished["Player"][-1] != PENDING_WARNING
+        assert len(state.punished["fake-id"]) == 1
+        assert state.punished["fake-id"][-1] != PENDING_WARNING
     else:
-        assert state.punished["Player"][-1] == PENDING_WARNING
-        assert not is_time(state.punished["Player"], 0)
+        assert state.punished["fake-id"][-1] == PENDING_WARNING
+        assert not is_time(state.punished["fake-id"], 0)
     target.assert_called_once()
 
 
@@ -200,7 +200,7 @@ def test_interrupted_action_keeps_pending_reservation(monkeypatch, method):
     from rcon.automods.models import PENDING_WARNING, WatchStatus
     from rcon.automods.no_leader import NoLeaderAutomod
 
-    state = WatchStatus(punished={"Player": [datetime.now()]})
+    state = WatchStatus(punished={"fake-id": [datetime.now()]})
     mod = NoLeaderAutomod(Mock(), Mock())
     @contextmanager
     def watch_state(_team, _squad):
@@ -214,7 +214,7 @@ def test_interrupted_action_keeps_pending_reservation(monkeypatch, method):
     monkeypatch.setattr(automod, "audit", Mock())
     with pytest.raises(KeyboardInterrupt):
         _do_punitions(server, method, [player], [mod])
-    assert state.punished["Player"][-1] == PENDING_WARNING
+    assert state.punished["fake-id"][-1] == PENDING_WARNING
 
 
 @pytest.mark.parametrize("method", ["punish", "kick"])

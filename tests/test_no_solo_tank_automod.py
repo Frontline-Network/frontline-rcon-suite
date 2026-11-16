@@ -459,7 +459,7 @@ def test_should_warn_twice(team_view):
     assert PunishStepState.WAIT == mod.should_warn_player(
         watch_status, "baker", aplayer
     )
-    watch_status.warned[aplayer.name][-1] = datetime.now()  # confirmed send
+    watch_status.warned[aplayer.player_id][-1] = datetime.now()  # confirmed send
     time.sleep(config.warning_interval_seconds)
     assert PunishStepState.APPLY == mod.should_warn_player(
         watch_status, "baker", aplayer
@@ -467,7 +467,7 @@ def test_should_warn_twice(team_view):
     assert PunishStepState.WAIT == mod.should_warn_player(
         watch_status, "baker", aplayer
     )
-    watch_status.warned[aplayer.name][-1] = datetime.now()  # confirmed send
+    watch_status.warned[aplayer.player_id][-1] = datetime.now()  # confirmed send
     time.sleep(config.warning_interval_seconds)
     assert PunishStepState.GO_TO_NEXT_STEP == mod.should_warn_player(
         watch_status, "baker", aplayer
@@ -488,7 +488,7 @@ def test_should_warn_infinite(team_view):
         assert PunishStepState.APPLY == mod.should_warn_player(
             watch_status, "able", aplayer
         )
-        watch_status.warned[aplayer.name][-1] = datetime.now()  # confirmed send
+        watch_status.warned[aplayer.player_id][-1] = datetime.now()  # confirmed send
 
 
 def test_should_punish(team_view):
@@ -650,7 +650,7 @@ def test_shouldnt_kick_without_punish(team_view):
         team_view["allies"]["squads"]["baker"],
         aplayer,
     )
-    watch_status.punished.setdefault(player["name"], []).append(datetime.now())
+    watch_status.punished.setdefault(player["player_id"], []).append(datetime.now())
     assert PunishStepState.APPLY == mod.should_kick_player(
         watch_status,
         team_view,
@@ -671,7 +671,7 @@ def test_shouldnt_kick_disabled(team_view):
     watch_status = WatchStatus()
     player = team_view["allies"]["squads"]["baker"]["players"][0]
     aplayer = construct_aplayer(player)
-    watch_status.punished.setdefault(player["name"], []).append(datetime.now())
+    watch_status.punished.setdefault(player["player_id"], []).append(datetime.now())
 
     assert PunishStepState.DISABLED == mod.should_kick_player(
         watch_status,
@@ -693,7 +693,7 @@ def test_should_wait_kick(team_view):
     # baker squad is a solo tank squad, w/ SL
     player = team_view["allies"]["squads"]["baker"]["players"][0]
     aplayer = construct_aplayer(player)
-    watch_status.punished.setdefault(player["name"], []).append(datetime.now())
+    watch_status.punished.setdefault(player["player_id"], []).append(datetime.now())
 
     assert PunishStepState.WAIT == mod.should_kick_player(
         watch_status,

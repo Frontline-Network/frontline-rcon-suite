@@ -82,7 +82,7 @@ def test_dry_run_confirms_only_simulated_warning(monkeypatch):
     (NoSoloTankAutomod, AutoModNoSoloTankUserConfig, "no_solo_tankalliesable"),
     (LevelThresholdsAutomod, AutoModLevelUserConfig, "level_thresholds_automodalliesable"),
 ])
-def test_legacy_warning_is_never_assumed_confirmed(mod_type, config_type, key):
+def test_legacy_name_warning_is_not_attributed_to_any_id(mod_type, config_type, key):
     redis = fakeredis.FakeStrictRedis()
     legacy = WatchStatus(warned={"Player": [datetime.now() - timedelta(seconds=60)]})
     del legacy.__dict__["warning_confirmation_version"]
@@ -90,7 +90,28 @@ def test_legacy_warning_is_never_assumed_confirmed(mod_type, config_type, key):
     mod = mod_type(config_type(number_of_warnings=1, warning_interval_seconds=1), redis)
     player = PunishPlayer(player_id="fake-id", name="Player", squad="Able", team="allies", lvl=100)
     with mod.watch_state("allies", "Able") as state:
-        assert state.warned["Player"][-1] == PENDING_WARNING
-        assert mod.should_warn_player(state, "Able", player) == PunishStepState.WAIT
+        assert "Player" not in state.warned
+        assert mod.should_warn_player(state, "Able", player) == PunishStepState.APPLY
     with mod.watch_state("allies", "Able") as state:
-        assert state.warned["Player"][-1] == PENDING_WARNING
+        assert state.warned[player.player_id][-1] == PENDING_WARNING
+    assert redis.exists(key)
+
+
+@pytest.mark.parametrize("mod_type,config_type", [
+    (NoLeaderAutomod, AutoModNoLeaderUserConfig),
+    (NoSoloTankAutomod, AutoModNoSoloTankUserConfig),
+    (LevelThresholdsAutomod, AutoModLevelUserConfig),
+    (SeedingRulesAutomod, AutoModSeedingUserConfig),
+])
+def test_duplicate_names_do_not_share_warnings_and_rename_keeps_identity(mod_type, config_type):
+    redis = fakeredis.FakeStrictRedis()
+    mod = mod_type(config_type(number_of_warnings=1, warning_interval_seconds=1), redis)
+    first = PunishPlayer(player_id="eos-first", name="Same", squad="Able", team="allies", lvl=100)
+    second = PunishPlayer(player_id="eos-second", name="Same", squad="Able", team="allies", lvl=100)
+    with mod.watch_state("allies", "Able") as state:
+        assert mod.should_warn_player(state, "Able", first) == PunishStepState.APPLY
+        state.warned[first.player_id][-1] = datetime.now() - timedelta(seconds=5)
+        assert mod.should_warn_player(state, "Able", second) == PunishStepState.APPLY
+        first.name = "Renamed"
+        assert mod.should_warn_player(state, "Able", first) == PunishStepState.GO_TO_NEXT_STEP
+        assert state.warned[second.player_id] == [PENDING_WARNING]

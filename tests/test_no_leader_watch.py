@@ -625,7 +625,7 @@ def test_hll_and_hllv_squad_leaders_share_officer_immunity(team_view):
         player = dict(team_view["allies"]["squads"]["able"]["players"][0])
         player["role"] = live_role
         aplayer = construct_aplayer(player)
-        watch_status.punished.setdefault(aplayer.name, []).append(datetime.now())
+        watch_status.punished.setdefault(aplayer.player_id, []).append(datetime.now())
 
         assert (
             mod.should_note_player(watch_status, "able", aplayer)
@@ -715,13 +715,13 @@ def test_should_warn_twice(team_view):
         watch_status, "able", aplayer
     )
     assert PunishStepState.WAIT == mod.should_warn_player(watch_status, "able", aplayer)
-    watch_status.warned[aplayer.name][-1] = datetime.now()  # confirmed send
+    watch_status.warned[aplayer.player_id][-1] = datetime.now()  # confirmed send
     time.sleep(config.warning_interval_seconds)
     assert PunishStepState.APPLY == mod.should_warn_player(
         watch_status, "able", aplayer
     )
     assert PunishStepState.WAIT == mod.should_warn_player(watch_status, "able", aplayer)
-    watch_status.warned[aplayer.name][-1] = datetime.now()  # confirmed send
+    watch_status.warned[aplayer.player_id][-1] = datetime.now()  # confirmed send
     time.sleep(config.warning_interval_seconds)
     assert PunishStepState.GO_TO_NEXT_STEP == mod.should_warn_player(
         watch_status, "able", aplayer
@@ -741,7 +741,7 @@ def test_should_warn_infinite(team_view):
         assert PunishStepState.APPLY == mod.should_warn_player(
             watch_status, "able", aplayer
         )
-        watch_status.warned[aplayer.name][-1] = datetime.now()  # confirmed send
+        watch_status.warned[aplayer.player_id][-1] = datetime.now()  # confirmed send
 
 
 def test_should_punish(team_view):
@@ -1029,7 +1029,7 @@ def test_shouldnt_kick_without_punish(team_view):
         team_view["allies"]["squads"]["able"],
         aplayer,
     )
-    watch_status.punished.setdefault(player["name"], []).append(datetime.now())
+    watch_status.punished.setdefault(player["player_id"], []).append(datetime.now())
     assert PunishStepState.APPLY == mod.should_kick_player(
         watch_status,
         team_view,
@@ -1052,7 +1052,7 @@ def test_shouldnt_kick_immuned(team_view):
     watch_status = WatchStatus()
     player = team_view["allies"]["squads"]["able"]["players"][0]
     aplayer = construct_aplayer(player)
-    watch_status.punished.setdefault(player["name"], []).append(datetime.now())
+    watch_status.punished.setdefault(player["player_id"], []).append(datetime.now())
 
     assert PunishStepState.IMMUNED == mod.should_kick_player(
         watch_status,
@@ -1076,7 +1076,7 @@ def test_shouldnt_kick_immuned_lvl(team_view):
     watch_status = WatchStatus()
     player = team_view["allies"]["squads"]["able"]["players"][0]
     aplayer = construct_aplayer(player)
-    watch_status.punished.setdefault(player["name"], []).append(datetime.now())
+    watch_status.punished.setdefault(player["player_id"], []).append(datetime.now())
 
     assert PunishStepState.IMMUNED == mod.should_kick_player(
         watch_status,
@@ -1100,7 +1100,7 @@ def test_shouldnt_kick_small_squad(team_view):
     watch_status = WatchStatus()
     player = team_view["axis"]["squads"]["baker"]["players"][0]
     aplayer = construct_aplayer(player)
-    watch_status.punished.setdefault(player["name"], []).append(datetime.now())
+    watch_status.punished.setdefault(player["player_id"], []).append(datetime.now())
 
     assert PunishStepState.WAIT == mod.should_kick_player(
         watch_status,
@@ -1124,7 +1124,7 @@ def test_shouldnt_kick_small_game(team_view):
     watch_status = WatchStatus()
     player = team_view["allies"]["squads"]["able"]["players"][0]
     aplayer = construct_aplayer(player)
-    watch_status.punished.setdefault(player["name"], []).append(datetime.now())
+    watch_status.punished.setdefault(player["player_id"], []).append(datetime.now())
 
     assert PunishStepState.WAIT == mod.should_kick_player(
         watch_status,
@@ -1148,7 +1148,7 @@ def test_shouldnt_kick_disabled(team_view):
     watch_status = WatchStatus()
     player = team_view["allies"]["squads"]["able"]["players"][0]
     aplayer = construct_aplayer(player)
-    watch_status.punished.setdefault(player["name"], []).append(datetime.now())
+    watch_status.punished.setdefault(player["player_id"], []).append(datetime.now())
 
     assert PunishStepState.DISABLED == mod.should_kick_player(
         watch_status,
@@ -1172,7 +1172,7 @@ def test_should_wait_kick(team_view):
     watch_status = WatchStatus()
     player = team_view["allies"]["squads"]["able"]["players"][0]
     aplayer = construct_aplayer(player)
-    watch_status.punished.setdefault(player["name"], []).append(datetime.now())
+    watch_status.punished.setdefault(player["player_id"], []).append(datetime.now())
 
     assert PunishStepState.WAIT == mod.should_kick_player(
         watch_status,
