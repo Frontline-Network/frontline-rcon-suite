@@ -85,6 +85,67 @@ def test_confirmed_pc_wingdk_can_trigger_rule(monkeypatch, game, platform):
     rcon.kick.assert_called_once_with(player_id='fake-eos-id', player_name='player', reason='reason', by='admin')
 
 
+@pytest.mark.parametrize('platform', ['EPlatformFamily::WinGDK', 'WinGDK', 'wingdk'])
+@pytest.mark.parametrize(('action', 'method'), [
+    (WindowsStoreIdActionType.kick, 'kick'),
+    (WindowsStoreIdActionType.temp_ban, 'temp_ban'),
+    (WindowsStoreIdActionType.perma_ban, 'perma_ban'),
+])
+def test_observed_hllv_wingdk_can_trigger_rule(monkeypatch, platform, action, method):
+    config = SimpleNamespace(enabled=True, action=action,
+                             player_message='reason', audit_message='{name}', audit_message_author='admin',
+                             temp_ban_length_hours=1)
+    monkeypatch.setattr(hooks.RconServerSettingsUserConfig, 'load_from_db',
+                        lambda: SimpleNamespace(windows_store_players=config))
+    monkeypatch.setattr(hooks, 'send_to_discord_audit', Mock())
+    rcon = Mock()
+    rcon.config.game = GameEnum.HLL_VIETNAM
+    rcon._get_adapted_player_info.return_value = {'iD': 'fake-eos-id', 'platform': platform}
+    getattr(rcon, method).return_value = True
+    hooks.windows_store_player_check.__wrapped__(rcon, {}, 'player', 'fake-eos-id')
+    expected = {'player_id': 'fake-eos-id', 'reason': 'reason', 'by': 'admin'}
+    if method == 'kick':
+        expected['player_name'] = 'player'
+    elif method == 'temp_ban':
+        expected['duration_hours'] = 1
+    getattr(rcon, method).assert_called_once_with(**expected)
+
+
+def test_observed_hllv_wingdk_with_mismatched_id_is_not_sanctioned(monkeypatch):
+    config = SimpleNamespace(enabled=True, action=WindowsStoreIdActionType.kick,
+                             player_message='reason', audit_message='{name}', audit_message_author='admin',
+                             temp_ban_length_hours=1)
+    monkeypatch.setattr(hooks.RconServerSettingsUserConfig, 'load_from_db',
+                        lambda: SimpleNamespace(windows_store_players=config))
+    rcon = Mock()
+    rcon.config.game = GameEnum.HLL_VIETNAM
+    rcon._get_adapted_player_info.return_value = {'iD': 'another-player', 'platform': 'EPlatformFamily::WinGDK'}
+    hooks.windows_store_player_check.__wrapped__(rcon, {}, 'player', 'fake-eos-id')
+    rcon.kick.assert_not_called()
+
+
+@pytest.mark.parametrize(('game', 'platform'), [
+    (GameEnum.HLL_VIETNAM, 'EPlatformFamily::XboxSeries'),
+    (GameEnum.HLL_VIETNAM, 'EPlatformFamily::PS5'),
+    (GameEnum.HLL_VIETNAM, 'xbl'),
+    (GameEnum.HLL_WW2, 'EPlatformFamily::WinGDK'),
+    (GameEnum.HLL_WW2, 'xbl'),
+])
+def test_observed_console_and_ambiguous_other_game_platforms_are_not_sanctioned(monkeypatch, game, platform):
+    config = SimpleNamespace(enabled=True, action=WindowsStoreIdActionType.kick,
+                             player_message='reason', audit_message='{name}', audit_message_author='admin',
+                             temp_ban_length_hours=1)
+    monkeypatch.setattr(hooks.RconServerSettingsUserConfig, 'load_from_db',
+                        lambda: SimpleNamespace(windows_store_players=config))
+    rcon = Mock()
+    rcon.config.game = game
+    rcon._get_adapted_player_info.return_value = {'iD': 'fake-eos-id', 'platform': platform}
+    hooks.windows_store_player_check.__wrapped__(rcon, {}, 'player', 'fake-eos-id')
+    rcon.kick.assert_not_called()
+    rcon.temp_ban.assert_not_called()
+    rcon.perma_ban.assert_not_called()
+
+
 @pytest.mark.parametrize('action,method', [(WindowsStoreIdActionType.temp_ban, 'temp_ban'),
                                            (WindowsStoreIdActionType.perma_ban, 'perma_ban')])
 def test_confirmed_pc_ban_uses_player_id_and_audits_success(monkeypatch, action, method):
