@@ -11,6 +11,7 @@ from discord_webhook import DiscordEmbed
 import rcon.steam_utils as steam_utils
 from discord.utils import escape_markdown
 from rcon.arguments import max_arg_index, replace_params
+from rcon.automods import action_guard
 from rcon.blacklist import (
     apply_blacklist_punishment,
     blacklist_or_ban,
@@ -88,6 +89,7 @@ logger = logging.getLogger(__name__)
 ARG_RE = re.compile(r"\$(\d+)")
 STEAM_ENRICHMENT_MAX_EVENT_AGE: Final = timedelta(minutes=5)
 STEAM_ENRICHMENT_DEDUPE_SECONDS: Final = 15 * 60
+VAC_ACTION_GUARD_RULE: Final = "VacHistory"
 STEAM_ENRICHMENT_DEDUPE_PREFIX: Final = "steam_connect_enrichment"
 
 
@@ -513,17 +515,39 @@ def ban_if_has_vac_bans(rcon: Rcon, player_id: str, name: str):
                 )
             else:
                 expires_at = None
-            result = blacklist_or_ban(
-                rcon=rcon,
-                blacklist_id=config.blacklist_id,
-                player_id=player_id,
-                reason=reason,
-                expires_at=expires_at,
-                admin_name="VAC BOT",
+            server_number = int(get_server_number())
+            try:
+                token = action_guard.reserve(server_number, player_id, [VAC_ACTION_GUARD_RULE], "ban")
+            except Exception:
+                logger.exception("Skipping VAC action: durable reservation unavailable")
+                return
+            if token is None:
+                logger.warning("Skipping VAC action: previous result awaits review")
+                return
+            try:
+                result = blacklist_or_ban(
+                    rcon=rcon,
+                    blacklist_id=config.blacklist_id,
+                    player_id=player_id,
+                    reason=reason,
+                    expires_at=expires_at,
+                    admin_name="VAC BOT",
+                )
+            except Exception:
+                logger.exception("VAC action result uncertain; reservation retained")
+                return
+            confirmed = (config.blacklist_id is not None and isinstance(result, dict) and bool(result.get("id"))) or (
+                config.blacklist_id is None and result is True
             )
-            if config.blacklist_id is not None and isinstance(result, dict) and result.get("id"):
+            if confirmed or result is False:
+                try:
+                    action_guard.finish(server_number, player_id, token,
+                                        "confirmed" if confirmed else "rejected", expected=1)
+                except Exception:
+                    logger.exception("Could not finalize VAC action; reservation retained")
+            if config.blacklist_id is not None and confirmed:
                 logger.info("VAC blacklist record created for player %s; game-server synchronization pending", player_id)
-            elif config.blacklist_id is None and result is True:
+            elif config.blacklist_id is None and confirmed:
                 logger.info("VAC ban confirmed by game server for player %s", player_id)
             else:
                 logger.warning("VAC action was not confirmed for player %s", player_id)

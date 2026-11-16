@@ -28,7 +28,7 @@ action_guard = Table(
     Column("reviewed_by", String(150), nullable=True),
     Column("review_reason", Text, nullable=True),
     CheckConstraint("server_number BETWEEN 1 AND 32", name="ck_automod_guard_server"),
-    CheckConstraint("action IN ('message', 'punish', 'kick', 'switch')", name="ck_automod_guard_action"),
+    CheckConstraint("action IN ('message', 'punish', 'kick', 'switch', 'ban')", name="ck_automod_guard_action"),
     CheckConstraint("state IN ('pending', 'confirmed', 'rejected', 'reviewed')", name="ck_automod_guard_state"),
 )
 action_guard_history = Table(
@@ -83,7 +83,7 @@ def reserve(server_number: int, player_id: str, rules: list[str], action: str,
     if (not 1 <= server_number <= 32 or not player_id or len(player_id) > 100
             or (player_id == "*") != legacy_global
             or not rules or any(not rule or len(rule) > 150 for rule in rules)
-            or action not in {"message", "punish", "kick", "switch"}):
+            or action not in {"message", "punish", "kick", "switch", "ban"}):
         raise ValueError("Invalid automated action reservation")
     if event is not None:
         event_ms, event_key = event
