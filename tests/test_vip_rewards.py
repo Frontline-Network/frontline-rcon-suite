@@ -1,7 +1,7 @@
 """Offline policy and durable delivery tests. No game server is contacted."""
 
 import copy
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from unittest.mock import Mock
 
@@ -321,7 +321,7 @@ def delivery(monkeypatch):
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.ext.compiler import compiles
     from sqlalchemy.dialects.postgresql import JSONB
-    from rcon.models import SeedVipGrant, VipRewardGrant, VipRewardState, VipRewardEvent
+    from rcon.models import SeedVipGrant, VipRewardGrant, VipRewardNotice, VipRewardState, VipRewardEvent
     from rcon.vip_rewards import service
 
     @compiles(JSONB, "sqlite")
@@ -331,6 +331,7 @@ def delivery(monkeypatch):
     db = create_engine("sqlite://")
     for table in (
         VipRewardGrant.__table__,
+        VipRewardNotice.__table__,
         SeedVipGrant.__table__,
         VipRewardState.__table__,
         VipRewardEvent.__table__,
@@ -350,6 +351,7 @@ def delivery(monkeypatch):
     cfg = config(dry_run=False, melee={"enabled": True, "limit": 3})
     e = engine(cfg)
     monkeypatch.setattr(service, "enter_session", session)
+    monkeypatch.setattr(service, "get_session_maker", lambda: factory)
     monkeypatch.setattr(service, "vip_lock", no_lock)
     monkeypatch.setattr(service, "lock", no_lock)
     monkeypatch.setattr(service, "server", lambda: 1)
@@ -363,6 +365,8 @@ def delivery(monkeypatch):
     remote = {"vip": None}
     monkeypatch.setattr(service, "current_vip", lambda rcon, pid: remote["vip"])
     rcon = Mock()
+    rcon.without_retries.return_value = nullcontext()
+    rcon.message_player.return_value = True
 
     def write(**kwargs):
         remote["vip"] = dict(
@@ -506,8 +510,150 @@ def test_message_failure_does_not_repeat_vip(delivery):
     rcon.message_player.side_effect = TimeoutError()
     id_ = add()
     service.deliver(rcon, id_)
+    service.deliver_reward_notice(rcon, id_)
     service.deliver(rcon, id_)
     assert rcon.add_vip.call_count == 1 and read(id_)["status"] == "awarded"
+
+
+def test_reconciled_reward_creates_notice_without_repeating_grant(delivery):
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    write = rcon.add_vip.side_effect
+    def timeout_after_write(**kwargs):
+        write(**kwargs)
+        raise TimeoutError()
+    rcon.add_vip.side_effect = timeout_after_write
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    service.deliver(rcon, grant_id)
+    with service.enter_session() as session:
+        notice = session.get(VipRewardNotice, grant_id)
+        assert notice.status == "queued"
+    service.deliver_reward_notice(rcon, grant_id)
+    with service.enter_session() as session:
+        assert session.get(VipRewardNotice, grant_id).status == "sent"
+    assert rcon.add_vip.call_count == 1 and rcon.message_player.call_count == 1
+
+
+@pytest.mark.parametrize("result,expected", [(False, "queued"), (None, "review"), (TimeoutError(), "review")])
+def test_notice_retry_requires_confirmed_rejection(delivery, result, expected):
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    if isinstance(result, Exception):
+        rcon.message_player.side_effect = result
+    else:
+        rcon.message_player.return_value = result
+    service.deliver_reward_notice(rcon, grant_id)
+    service.deliver_reward_notice(rcon, grant_id)
+    with service.enter_session() as session:
+        notice = session.get(VipRewardNotice, grant_id)
+        assert notice.status == expected and notice.attempts == 1
+    assert rcon.message_player.call_count == 1 and rcon.add_vip.call_count == 1
+
+
+def test_rejected_notice_retries_after_delay_without_regrant(delivery, monkeypatch):
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    rcon.message_player.side_effect = [False, True]
+    service.deliver_reward_notice(rcon, grant_id)
+    monkeypatch.setattr(service.time, "time", lambda: NOW + service.NOTICE_RETRY_SECONDS + 1)
+    service.deliver_reward_notice(rcon, grant_id)
+    with service.enter_session() as session:
+        notice = session.get(VipRewardNotice, grant_id)
+        assert notice.status == "sent" and notice.attempts == 2
+    assert rcon.add_vip.call_count == 1 and rcon.message_player.call_count == 2
+
+
+def test_interrupted_notice_is_reviewed_and_never_replayed(delivery):
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    with service.enter_session() as session:
+        session.get(VipRewardNotice, grant_id).status = "sending"
+    service.recover_interrupted_reward_notices()
+    service.deliver_reward_notice(rcon, grant_id)
+    with service.enter_session() as session:
+        assert session.get(VipRewardNotice, grant_id).status == "review"
+    assert rcon.message_player.call_count == 0
+
+
+def test_repeated_notice_rejections_stop_after_three_attempts(delivery, monkeypatch):
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    rcon.message_player.return_value = False
+    for attempt in range(4):
+        monkeypatch.setattr(service.time, "time", lambda attempt=attempt: NOW + attempt * 31)
+        service.deliver_reward_notice(rcon, grant_id)
+    with service.enter_session() as session:
+        notice = session.get(VipRewardNotice, grant_id)
+        assert notice.status == "failed" and notice.attempts == 3
+    assert rcon.message_player.call_count == 3 and rcon.add_vip.call_count == 1
+
+
+def test_expired_notice_is_not_sent(delivery, monkeypatch):
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    monkeypatch.setattr(service.time, "time", lambda: NOW + service.NOTICE_LIFETIME_SECONDS + 1)
+    service.deliver_reward_notice(rcon, grant_id)
+    with service.enter_session() as session:
+        assert session.get(VipRewardNotice, grant_id).status == "expired"
+    rcon.message_player.assert_not_called()
+
+
+def test_reward_journal_shows_notice_outcome_without_message_body(delivery):
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    rcon.message_player.return_value = None
+    service.deliver_reward_notice(rcon, grant_id)
+    row = service.journal(preview="false")["results"][0]
+    assert row["notice"] == {"status": "review", "attempts": 1}
+    assert "message" not in row["notice"]
+
+
+def test_notice_is_not_sent_when_reservation_commit_fails(delivery):
+    from sqlalchemy import event as sqlalchemy_event
+    from rcon.models import VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    service.deliver(rcon, grant_id)
+    factory = service.get_session_maker()
+    def fail_commit(_session):
+        raise RuntimeError("synthetic commit failure")
+    sqlalchemy_event.listen(factory.class_, "before_commit", fail_commit)
+    try:
+        with pytest.raises(RuntimeError, match="synthetic commit failure"):
+            service.deliver_reward_notice(rcon, grant_id)
+    finally:
+        sqlalchemy_event.remove(factory.class_, "before_commit", fail_commit)
+    with service.enter_session() as session:
+        assert session.get(VipRewardNotice, grant_id).status == "queued"
+    rcon.message_player.assert_not_called()
+
+
+def test_reward_and_notice_queue_are_rolled_back_together(delivery):
+    from rcon.models import VipRewardGrant, VipRewardNotice
+    service, cfg, rcon, remote, add, read = delivery
+    grant_id = add()
+    with pytest.raises(RuntimeError, match="synthetic rollback"):
+        with service.enter_session() as session:
+            grant = session.get(VipRewardGrant, grant_id)
+            grant.status = "awarded"
+            grant.credited_seconds = 3600
+            service.queue_reward_notice(session, grant, cfg, NOW)
+            raise RuntimeError("synthetic rollback")
+    with service.enter_session() as session:
+        assert session.get(VipRewardGrant, grant_id).status == "queued"
+        assert session.get(VipRewardNotice, grant_id) is None
 
 
 @pytest.mark.parametrize("language,expected", [
@@ -521,6 +667,7 @@ def test_automatic_reward_notification_uses_configured_language(delivery, langua
     service.read_gate_state(False)["config"] = cfg.policy_signature()
     grant_id = add()
     service.deliver(rcon, grant_id)
+    service.deliver_reward_notice(rcon, grant_id)
     assert read(grant_id)["status"] == "awarded"
     assert rcon.message_player.call_args.kwargs == {"player_id": "a", "message": expected}
 

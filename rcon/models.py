@@ -210,6 +210,28 @@ class VipRewardGrant(Base):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
+class VipRewardNotice(Base):
+    """A separate durable delivery record for one confirmed reward message."""
+
+    __tablename__ = "vip_reward_notice"
+    grant_id: Mapped[int] = mapped_column(
+        ForeignKey("vip_reward_grant.id", ondelete="CASCADE"), primary_key=True
+    )
+    server_number: Mapped[int] = mapped_column(index=True, nullable=False)
+    player_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    attempts: Mapped[int] = mapped_column(nullable=False, default=0)
+    created_at: Mapped[float] = mapped_column(nullable=False)
+    due_at: Mapped[float] = mapped_column(nullable=False)
+    expires_at: Mapped[float] = mapped_column(nullable=False)
+    updated_at: Mapped[float] = mapped_column(nullable=False)
+    __table_args__ = (
+        CheckConstraint("status IN ('queued', 'sending', 'sent', 'review', 'failed', 'expired')", name="ck_vip_reward_notice_status"),
+        CheckConstraint("attempts >= 0", name="ck_vip_reward_notice_attempts"),
+    )
+
+
 class SeedVipCycle(Base):
     """Persistent observation state for one server and execution mode."""
 

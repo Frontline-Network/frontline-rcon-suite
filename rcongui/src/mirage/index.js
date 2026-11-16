@@ -978,7 +978,14 @@ export function makeServer({ environment = "development" } = {}) {
         return ok(true);
       });
       this.get("/get_vip_rewards_status", () => ok({ status: vipRewards.enabled ? "seeding" : "disabled", preview: vipRewards.dry_run, counts: { allies: 14, axis: 18 }, thresholds: { allies: 20, axis: 20 } }));
-      this.get("/get_vip_rewards_journal", () => ok({ total: 0, offset: 0, results: [] }));
+      this.get("/get_vip_rewards_journal", () => {
+        const showNotice = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo_vip_notice") === "1";
+        return ok({ total: showNotice ? 1 : 0, offset: 0, results: showNotice ? [{
+          id: 1, player_id: "synthetic-player", rule: "melee", occurred: 1700000000,
+          credited_seconds: 3600, requested_seconds: 3600, status: "awarded", reason: "",
+          notice: { status: "review", attempts: 1 },
+        }] : [] });
+      });
       this.get("/get_vip_rewards_progress", () => ok({ total: 0, round: 0, days: {} }));
       this.get("/get_chat_commands_config", () => ok(autoMod(true, true)));
       this.get("/get_rcon_chat_commands_config", () => ok(autoMod(true)));

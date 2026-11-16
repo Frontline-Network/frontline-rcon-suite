@@ -26,6 +26,18 @@ const persistedConfig = (page) => page.evaluate(async (endpoint) => {
   return body.result;
 }, configEndpoint);
 
+for (const [language, tab, status] of [
+  ["de", "Vergabejournal", "Nachrichtenergebnis unklar"],
+  ["en", "Award journal", "Message outcome uncertain"],
+  ["fr", "Journal des attributions", "Résultat du message incertain"],
+]) {
+  test(`uncertain reward notification is visible in ${language}`, async ({ page }) => {
+    await openDemoPage(page, path, { language, query: { demo_vip_notice: "1" } });
+    await page.getByRole("tab", { name: tab, exact: true }).click();
+    await expect(page.getByText(status, { exact: true })).toBeVisible();
+  });
+}
+
 for (const [language, tab, label, option, save, saved] of [
   ["de", "Grundeinstellungen", "Sprache der Spielernachrichten", "Französisch", "Einstellungen speichern", "Einstellungen gespeichert"],
   ["en", "General settings", "Player message language", "French", "Save settings", "Settings saved"],

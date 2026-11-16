@@ -82,6 +82,14 @@ function getCopy() {
     review: tr("Prüfung erforderlich"),
     reviewed: tr("Manuell geprüft"),
   };
+  const noticeResults = {
+    queued: tr("Nachricht vorgemerkt"),
+    sending: tr("Nachricht wird gesendet"),
+    sent: tr("Nachricht vom Server angenommen"),
+    review: tr("Nachrichtenergebnis unklar"),
+    failed: tr("Nachricht wiederholt abgelehnt"),
+    expired: tr("Nachricht abgelaufen"),
+  };
   const reasons = {
     daily_budget: tr("24-Stunden-Budget erreicht"),
     rule_limit: tr("Regellimit erreicht"),
@@ -105,7 +113,7 @@ function getCopy() {
     events: tr("Events"),
     challenges: tr("Waffen-Challenges"),
   };
-  return { labels, notes, results, reasons, awardPeriods, ruleLabels };
+  return { labels, notes, results, noticeResults, reasons, awardPeriods, ruleLabels };
 }
 const isRuleEnabled = (config, key) =>
   Array.isArray(config[key])
@@ -397,7 +405,7 @@ function localTime(value) {
 
 export default function VipRewards() {
   useTranslation("vipRewards");
-  const { labels, notes, results, reasons, ruleLabels } = getCopy();
+  const { labels, notes, results, noticeResults, reasons, ruleLabels } = getCopy();
   const { permissions } = useAuth();
   const has = (key) =>
     permissions?.is_superuser ||
@@ -1700,6 +1708,9 @@ export default function VipRewards() {
                         >
                           {reasons[r.reason] || r.reason}
                         </Typography>
+                        {r.notice && <Typography variant="caption" display="block" color="text.secondary">
+                          {noticeResults[r.notice.status] || r.notice.status}
+                        </Typography>}
                         {r.status === "review" && (
                           <Typography variant="caption" display="block">
                             {tr("Zielablauf:")}

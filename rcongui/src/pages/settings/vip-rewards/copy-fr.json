@@ -1,4 +1,10 @@
 {
+  "Nachricht vorgemerkt": "Message en attente",
+  "Nachricht wird gesendet": "Envoi du message",
+  "Nachricht vom Server angenommen": "Message accepté par le serveur",
+  "Nachrichtenergebnis unklar": "Résultat du message incertain",
+  "Nachricht wiederholt abgelehnt": "Message refusé à plusieurs reprises",
+  "Nachricht abgelaufen": "Message expiré",
   "Sprache der Spielernachrichten": "Langue des messages aux joueurs",
   "Gilt für automatische VIP-Benachrichtigungen und die private Statusantwort.": "S’applique aux notifications VIP automatiques et aux réponses privées sur la progression.",
   "Deutsch": "Allemand",
