@@ -1782,7 +1782,7 @@
           },
           "weapons": {
             "title": "Limiter les armes",
-            "description": "Punit directement l’utilisation des armes sélectionnées sans passer à l’expulsion.",
+            "description": "Punit directement les armes sélectionnées. Après la première infraction observée pendant la transition de sécurité, les sanctions liées aux armes sont suspendues pendant au moins une minute ; les actions non confirmées ne sont pas répétées.",
             "empty": "Aucune arme n'est encore bloquée. Choisissez une dans le catalogue ou entrez un identificateur de jeu qui n'est pas encore connu."
           },
           "cap": {

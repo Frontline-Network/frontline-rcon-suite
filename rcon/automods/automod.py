@@ -6,7 +6,7 @@ from pydantic import HttpUrl
 from redis.client import Redis
 
 import rcon.game_logs
-from rcon.automods import action_guard
+from rcon.automods import action_guard, event_guard
 from rcon.automods.level_thresholds import LevelThresholdsAutomod
 from rcon.automods.models import ActionMethod, PunishPlayer, PunitionsToApply
 from rcon.automods.no_leader import NoLeaderAutomod
@@ -20,7 +20,7 @@ from rcon.hooks import inject_player_ids
 from rcon.logs.loop import on_connected, on_kill
 from rcon.rcon import Rcon, get_rcon
 from rcon.service_runtime import stopping, wait
-from rcon.types import GetDetailedPlayer, StructuredLogLineType
+from rcon.types import GetDetailedPlayer, StructuredLogLineType, StructuredLogLineWithMetaData
 from rcon.user_config.auto_mod_level import AutoModLevelUserConfig
 from rcon.user_config.auto_mod_no_leader import AutoModNoLeaderUserConfig
 from rcon.user_config.auto_mod_seeding import AutoModSeedingUserConfig
@@ -97,6 +97,7 @@ def _do_punitions(
     method: ActionMethod,
     players: List[PunishPlayer],
     mods,
+    event: tuple[int, str] | None = None,
 ):
     for aplayer in players:
         action_confirmed = False
@@ -106,19 +107,26 @@ def _do_punitions(
         if not aplayer.details.dry_run and method in {ActionMethod.MESSAGE, ActionMethod.PUNISH, ActionMethod.KICK}:
             try:
                 guard_server = int(get_server_number())
-                guard_token = action_guard.reserve(guard_server, aplayer.player_id, guard_rules, method.name.lower())
+                if event is None:
+                    guard_token = action_guard.reserve(guard_server, aplayer.player_id, guard_rules, method.name.lower())
+                else:
+                    guard_token = action_guard.reserve(guard_server, aplayer.player_id, guard_rules, method.name.lower(), event=event)
             except Exception:
                 logger.exception("Automod action not sent: durable reservation unavailable")
                 continue
             if guard_token is None:
-                logger.warning("Automod action not sent: an earlier action awaits review")
+                logger.warning("Automod action held by transition, event deduplication, or an earlier unconfirmed action")
                 continue
 
         def settle_guard(result):
             if guard_token is None:
                 return True
             try:
-                action_guard.finish(guard_server, aplayer.player_id, guard_token, result, expected=len(guard_rules))
+                if event is None:
+                    action_guard.finish(guard_server, aplayer.player_id, guard_token, result, expected=len(guard_rules))
+                else:
+                    action_guard.finish(guard_server, aplayer.player_id, guard_token, result,
+                                        expected=len(guard_rules), event_expected=len(guard_rules))
                 return True
             except Exception:
                 logger.exception("Automod action outcome could not be saved; reservation retained")
@@ -229,6 +237,7 @@ def do_punitions(
     rcon: Rcon,
     punitions_to_apply: PunitionsToApply,
     mods: list | None = None,
+    event: tuple[int, str] | None = None,
 ):
     if punitions_to_apply:
         logger.debug(
@@ -240,11 +249,15 @@ def do_punitions(
 
     mods = enabled_moderators() if mods is None else mods
 
-    _do_punitions(rcon, ActionMethod.MESSAGE, punitions_to_apply.warning, mods)
+    if event is None:
+        _do_punitions(rcon, ActionMethod.MESSAGE, punitions_to_apply.warning, mods)
+        _do_punitions(rcon, ActionMethod.PUNISH, punitions_to_apply.punish, mods)
+        _do_punitions(rcon, ActionMethod.KICK, punitions_to_apply.kick, mods)
+        return
 
-    _do_punitions(rcon, ActionMethod.PUNISH, punitions_to_apply.punish, mods)
-
-    _do_punitions(rcon, ActionMethod.KICK, punitions_to_apply.kick, mods)
+    _do_punitions(rcon, ActionMethod.MESSAGE, punitions_to_apply.warning, mods, event=event)
+    _do_punitions(rcon, ActionMethod.PUNISH, punitions_to_apply.punish, mods, event=event)
+    _do_punitions(rcon, ActionMethod.KICK, punitions_to_apply.kick, mods, event=event)
 
 
 def enabled_moderators():
@@ -302,7 +315,7 @@ def audit(
 
 
 @on_kill
-def on_kill(rcon: Rcon, log: StructuredLogLineType):
+def on_kill(rcon: Rcon, log: StructuredLogLineWithMetaData):
     red = get_redis_client()
     if not is_first_run_done(red):
         logger.debug(
@@ -315,13 +328,19 @@ def on_kill(rcon: Rcon, log: StructuredLogLineType):
         logger.debug("No automod is enabled")
         return
 
+    try:
+        event = event_guard.identity(log)
+    except ValueError:
+        logger.warning("Automod kill action skipped: event identity is unavailable")
+        return
+
     punitions_to_apply = PunitionsToApply()
     for mod in mods:
         on_kill_hook = getattr(mod, "on_kill", None)
         if callable(on_kill_hook):
             punitions_to_apply.merge(mod.on_kill(log))
 
-    do_punitions(rcon, punitions_to_apply, mods)
+    do_punitions(rcon, punitions_to_apply, mods, event=event)
 
 
 pendingTimers: dict[str, Timer] = {}
