@@ -38,6 +38,12 @@ The deployed commit tag is stored as `CRCON_IMAGE_TAG` in the ignored `.env`.
 Backups and deployment metadata are written below `.deploy-backups/` and
 `.deploy-state/` with owner-only permissions.
 
+The Frontline override enables the HTTP and WebSocket readiness probe for managed
+backends 1–4, including when an older generated Compose file disabled its health
+check. Additional backend instances must have the same probe configured in their
+generated Compose file. The check reflects readiness; it does not prevent a brief
+interruption while a backend container is replaced.
+
 ## Preserve password recovery on every rollout
 
 SMTP credentials belong only in the installation's ignored `.env` (owner-only

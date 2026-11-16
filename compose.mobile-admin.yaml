@@ -10,6 +10,16 @@ x-frontline-backend: &frontline-backend
     args:
       CRCON_VERSION: ${CRCON_VERSION:-development}
 
+# Generated compose.yaml files can retain the old echo-based healthcheck.
+# Override it for the managed backend services, not for supervisor workers.
+x-frontline-backend-healthcheck: &frontline-backend-healthcheck
+  disable: false
+  test: ["CMD", "python", "/code/scripts/backend_healthcheck.py"]
+  interval: 15s
+  timeout: 30s
+  start_period: 30s
+  retries: 5
+
 x-mobile-environment: &mobile-environment
   CRCON_VERSION: ${CRCON_VERSION:-development}
   # The shared runtime is the update-safe default. Set
@@ -227,6 +237,7 @@ services:
 
   backend_1:
     <<: *frontline-backend
+    healthcheck: *frontline-backend-healthcheck
     restart: on-failure:5
     deploy: *backend-deploy
     environment: *mobile-environment-server-1
@@ -239,6 +250,7 @@ services:
 
   backend_2:
     <<: *frontline-backend
+    healthcheck: *frontline-backend-healthcheck
     restart: on-failure:5
     deploy: *backend-deploy
     environment: *mobile-environment-server-2
@@ -251,6 +263,7 @@ services:
 
   backend_3:
     <<: *frontline-backend
+    healthcheck: *frontline-backend-healthcheck
     restart: on-failure:5
     deploy: *backend-deploy
     environment: *mobile-environment-server-3
@@ -263,6 +276,7 @@ services:
 
   backend_4:
     <<: *frontline-backend
+    healthcheck: *frontline-backend-healthcheck
     restart: on-failure:5
     deploy: *backend-deploy
     environment: *mobile-environment-server-4
