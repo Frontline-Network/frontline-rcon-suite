@@ -1070,7 +1070,7 @@ class BlacklistCommandHandler:
         while not stop_event.is_set():
             try:
                 from rcon.blacklist_sync_journal import process_one
-                process_one(SERVER_NUMBER, self.dispatch)
+                process_one(SERVER_NUMBER, self.dispatch, is_ready=self._game_server_ready)
             except Exception:
                 logger.exception("Unable to process durable blacklist delivery")
             message = self.pubsub.get_message(timeout=1.0)
@@ -1083,6 +1083,15 @@ class BlacklistCommandHandler:
             except Exception:
                 logger.exception("Failed to process legacy blacklist notification")
         self.pubsub.close()
+
+    def _game_server_ready(self):
+        """Only an actual game-server response permits queued side effects."""
+        try:
+            state = self.rcon.get_gamestate()
+            return isinstance(state, dict) and bool(state)
+        except Exception:
+            logger.debug("Blacklist synchronization deferred: game server unavailable")
+            return False
 
     def dispatch(self, data: bytes):
         """Execute one decoded delivery, propagating failures to its journal."""

@@ -59,12 +59,34 @@ def enqueue(session, command: bytes, server_mask: int) -> int:
     return len(targets)
 
 
-def process_one(server_number: int, handler) -> str:
+def process_one(server_number: int, handler, *, is_ready=None) -> str:
     """Process the oldest server delivery, failing closed on ambiguous work."""
     if not 1 <= server_number <= 32:
         raise ValueError("Server number must be between 1 and 32")
     with lock(f"blacklist-sync:{server_number}"):
         maker = get_session_maker()
+        if is_ready is not None:
+            # Do not convert a known-offline target into an ambiguous delivery.
+            # Check outside a database transaction: the RCON read can block.
+            # The per-server advisory lock keeps another worker from taking
+            # the same item while we probe. In-flight/review rows are still
+            # processed below so a prior uncertain action is never retried.
+            with maker() as session:
+                first = session.execute(
+                    select(BlacklistSyncDelivery.status)
+                    .where(BlacklistSyncDelivery.server_number == server_number,
+                           BlacklistSyncDelivery.status.in_(("queued", "sending", "review")))
+                    .order_by(BlacklistSyncDelivery.id).limit(1)
+                ).scalar_one_or_none()
+            if first is None:
+                return "empty"
+            if first == "queued":
+                try:
+                    ready = is_ready() is True
+                except Exception:
+                    ready = False
+                if not ready:
+                    return "deferred"
         with maker() as session, session.begin():
             row = session.scalar(
                 select(BlacklistSyncDelivery)
