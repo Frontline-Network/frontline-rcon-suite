@@ -4,7 +4,6 @@ import time
 from contextlib import contextmanager, nullcontext
 from contextvars import ContextVar
 from datetime import timedelta
-from functools import wraps
 from typing import Any, Generator, List, Literal, Sequence
 
 from rcon.connection import (
@@ -62,34 +61,6 @@ def players_by_name(pairs: list[tuple[str, str]]) -> dict[str, str]:
             raise ValueError("Duplicate player names cannot be represented as a name-keyed mapping")
         result[name] = player_id
     return result
-
-
-def escape_string(s):
-    """Logic taken from the official rcon client.
-    There's probably plenty of nicer and more bulletproof ones
-    """
-    if not isinstance(s, str):
-        return s
-    st = ""
-    for index in range(len(s)):
-        st = (
-            (st + s[index] if s[index] != "\\" else st + "\\\\")
-            if s[index] != '"'
-            else st + '\\"'
-        )
-    return st
-
-
-def _escape_params(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        return func(
-            args[0],
-            *[escape_string(a) for a in args[1:]],
-            **{k: escape_string(v) for k, v in kwargs.items()},
-        )
-
-    return wrapper
 
 
 class HLLCommandFailedError(Exception):
@@ -724,7 +695,6 @@ class ServerCtl:
         self.exchange("SetVipSlotCount", 2, {"VipSlotCount": value})
         return True
 
-    @_escape_params
     def set_broadcast(self, message: str):
         self.exchange("ServerBroadcast", 2, {"Message": message})
 
@@ -807,19 +777,16 @@ class ServerCtl:
             {"CurrentIndex": current_index, "NewIndex": new_index},
         )
 
-    @_escape_params
     def punish(self, player_id: str, reason: str) -> bool:
         return self.exchange_success(
             "PunishPlayer", 2, {"PlayerId": player_id, "Reason": reason}
         )
 
-    @_escape_params
     def kick(self, player_id: str, reason: str) -> bool:
         return self.exchange_success(
             "KickPlayer", 2, {"PlayerId": player_id, "Reason": reason}
         )
 
-    @_escape_params
     def temp_ban(
         self,
         player_id: str,
@@ -838,7 +805,6 @@ class ServerCtl:
             },
         )
 
-    @_escape_params
     def perma_ban(
         self,
         player_id: str,
@@ -857,7 +823,6 @@ class ServerCtl:
     def remove_perma_ban(self, player_id: str) -> bool:
         return self.exchange_success("RemovePermanentBan", 2, {"PlayerId": player_id})
 
-    @_escape_params
     def add_admin(self, player_id, role, description) -> bool:
         return self.exchange_success(
             "AddAdmin",
@@ -868,7 +833,6 @@ class ServerCtl:
     def remove_admin(self, player_id) -> bool:
         return self.exchange_success("RemoveAdmin", 2, {"PlayerId": player_id})
 
-    @_escape_params
     def add_vip(self, player_id: str, description: str) -> bool:
         return self.exchange_success(
             "AddVip", 2, {"PlayerId": player_id, "Comment": description}
@@ -877,17 +841,14 @@ class ServerCtl:
     def remove_vip(self, player_id) -> bool:
         return self.exchange_success("RemoveVip", 2, {"PlayerId": player_id})
 
-    @_escape_params
     def message_player(self, player_id: str, message: str) -> bool:
         return self.exchange_success(
             "MessagePlayer", 2, {"Message": message, "PlayerId": player_id}
         )
 
-    @_escape_params
     def message_all_players(self, message: str) -> bool:
         return self.exchange_success("MessageAllPlayers", 2, {"Message": message})
 
-    @_escape_params
     def bulk_message_players(self, player_ids: list[str], messages: list[str]) -> bool:
         if len(player_ids) != len(messages):
             raise HLLCommandFailedError(
