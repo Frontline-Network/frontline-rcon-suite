@@ -41,6 +41,7 @@ from rcon.player_history import (
 from rcon.rcon import Rcon, StructuredLogLineWithMetaData, do_run_commands
 from rcon.recent_actions import get_recent_actions
 from rcon.types import (
+    GameEnum,
     MessageVariableContext,
     MostRecentEvents,
     PlayerFlagType,
@@ -660,6 +661,12 @@ def windows_store_player_check(rcon: Rcon, _, name: str, player_id: str):
     config = RconServerSettingsUserConfig.load_from_db().windows_store_players
 
     if not config.enabled or steam_utils.is_steam_id_64(player_id):
+        return
+
+    # HLL Vietnam supplies EOS IDs for multiple platforms. A non-Steam ID
+    # therefore cannot establish that a player uses the Windows Store.
+    if rcon.config.game == GameEnum.HLL_VIETNAM:
+        logger.warning("Skipping Windows Store rule: HLL Vietnam IDs do not identify the platform")
         return
 
     action = config.action
