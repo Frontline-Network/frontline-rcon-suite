@@ -55,9 +55,11 @@ def recipient_is_eligible(campaign: AutoBroadcastMessage, is_vip: bool | None) -
 
 def session_is_eligible(
     campaign: AutoBroadcastMessage,
-    session_start: datetime,
+    session_start: datetime | None,
     now: datetime,
 ) -> bool:
+    if session_start is None:
+        return False
     return now >= session_start + timedelta(minutes=campaign.min_session_minutes)
 
 
@@ -170,7 +172,10 @@ def _active_sessions(
                             player_session.start_event_us / 1_000_000, timezone.utc
                         ).replace(tzinfo=None)
                         if player_session.start_event_us is not None
-                        else player_session.start or player_session.created
+                        # Legacy starts are local wall time with no recorded
+                        # timezone. Creation is UTC and conservatively delays
+                        # delivery if an old connect was processed late.
+                        else player_session.created
                     ),
                 },
             )

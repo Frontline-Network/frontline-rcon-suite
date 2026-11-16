@@ -51,10 +51,11 @@ def test_active_session_uses_absolute_start_across_dst(monkeypatch, module, star
 
 
 @pytest.mark.parametrize("module", [campaign_delivery, vip_lifecycle])
-def test_active_session_preserves_legacy_start_when_absolute_time_unknown(monkeypatch, module):
+def test_legacy_session_uses_utc_creation_as_conservative_start(monkeypatch, module):
     player = SimpleNamespace(id=7, player_id="player-1")
     legacy_start = datetime(2024, 10, 27, 2, 30)
-    session = SimpleNamespace(id=11, start=legacy_start, start_event_us=None, created=legacy_start)
+    created_utc = datetime(2024, 10, 27, 1, 31)
+    session = SimpleNamespace(id=11, start=legacy_start, start_event_us=None, created=created_utc)
 
     class Query:
         def join(self, *args): return self
@@ -67,4 +68,14 @@ def test_active_session_preserves_legacy_start_when_absolute_time_unknown(monkey
         yield SimpleNamespace(query=lambda *args: Query())
 
     monkeypatch.setattr(module, "enter_session", fake_session)
-    assert module._active_sessions({"player-1"}, 1)["player-1"]["start"] == legacy_start
+    start = module._active_sessions({"player-1"}, 1)["player-1"]["start"]
+    assert start == created_utc
+    if module is campaign_delivery:
+        item = AutoBroadcastMessage(id="legacy", message="hello", time_sec=60, min_session_minutes=5)
+        eligible = module.session_is_eligible
+    else:
+        item = VipLifecycleCampaign(message="hello", min_session_minutes=5)
+        eligible = module._session_is_eligible
+    assert not eligible(item, start, created_utc + timedelta(minutes=4, seconds=59))
+    assert eligible(item, start, created_utc + timedelta(minutes=5))
+    assert not eligible(item, None, created_utc + timedelta(days=1))
