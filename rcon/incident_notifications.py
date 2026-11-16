@@ -16,7 +16,7 @@ def notify_incident_reporter(
     message: str,
     by: str | None = None,
     save_message: bool | None = None,
-) -> bool:
+) -> bool | None:
     """Send incident status only to the player who submitted the report.
 
     Keeping this routing in one helper prevents report subjects from ever being
@@ -36,8 +36,13 @@ def notify_incident_reporter(
         kwargs["by"] = by
     if save_message is not None:
         kwargs["save_message"] = save_message
-    rcon_api.message_player(**kwargs)
-    return True
+    result = rcon_api.message_player(**kwargs)
+    if result is True:
+        return True
+    if result is False:
+        return False
+    # An unconfirmed result must not be represented as delivery or retried.
+    return None
 
 
 def received_reporter_template() -> str | None:
