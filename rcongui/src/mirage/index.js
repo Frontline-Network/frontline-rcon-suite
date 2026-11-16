@@ -921,10 +921,12 @@ export function makeServer({ environment = "development" } = {}) {
         return ok(true);
       });
       this.get("/get_blacklist_sync_reviews", () => {
-        const showFixture = typeof window !== "undefined" &&
-          new URLSearchParams(window.location.search).get("demo_blacklist_review") === "1" &&
+        const fixture = typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("demo_blacklist_review");
+        const showFixture = ["1", "ownership", "identity"].includes(fixture) &&
           !blacklistSyncReviewResolved;
-        const results = showFixture ? [{ id: 1, command: "EXPIRE_ALL", payload: { player_id: "fake-console-id" }, updated_at: "2026-01-02T12:00:00Z" }] : [];
+        const reviewKind = fixture === "ownership" ? "hllv_ownership" : fixture === "identity" ? "hllv_identity" : null;
+        const results = showFixture ? [{ id: 1, command: "EXPIRE_ALL", review_kind: reviewKind, payload: { player_id: "fake-console-id" }, updated_at: "2026-01-02T12:00:00Z" }] : [];
         return ok({ total: results.length, results });
       });
       this.post("/acknowledge_blacklist_sync_review", (_schema, request) => {

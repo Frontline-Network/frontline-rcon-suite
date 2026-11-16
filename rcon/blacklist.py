@@ -61,6 +61,10 @@ class HLLVSteamBanOwnershipUnverified(RuntimeError):
     """An existing EOS game ban cannot safely be attributed to this record."""
 
 
+class HLLVSteamIdentityUnverified(RuntimeError):
+    """An action was not attempted because its Steam/EOS link is unverified."""
+
+
 def _is_hllv_steam_id(rcon, player_id):
     return (getattr(getattr(rcon, 'game_profile', None), 'game', None) == GameEnum.HLL_VIETNAM
             and isinstance(player_id, str) and is_steam_id_64(player_id))
@@ -1216,11 +1220,11 @@ class BlacklistCommandHandler:
 
     def _apply_hllv_steam_record(self, sess, steam_id, top_record, prepared):
         if not isinstance(prepared, dict) or prepared.get('steam_id') != steam_id:
-            raise RuntimeError('HLLV Steam identity was not prepared')
+            raise HLLVSteamIdentityUnverified('HLLV Steam identity was not prepared')
         eos_id = prepared.get('eos_id')
         if eos_id is None:
             if top_record.blacklist.sync == BlacklistSyncMethod.BAN_IMMEDIATELY:
-                raise RuntimeError('No verified online EOS identity for immediate ban')
+                raise HLLVSteamIdentityUnverified('No verified online EOS identity for immediate ban')
             logger.info('Steam restriction retained for the next verified HLLV connection')
             return
         eos_record = is_player_blacklisted(sess, player_id=eos_id)
@@ -1230,7 +1234,7 @@ class BlacklistCommandHandler:
         with self.rcon.without_retries():
             details = self.rcon.get_detailed_player_info(player_id=eos_id)
         if verified_steam_id(self.rcon, eos_id, details) != steam_id:
-            raise RuntimeError('HLLV Steam-to-EOS association changed before action')
+            raise HLLVSteamIdentityUnverified('HLLV Steam-to-EOS association changed before action')
         result = apply_blacklist_punishment(self.rcon, top_record, player_id=eos_id,
                                             player_name=details.get('name'))
         if result is not True and result is not _BLACKLIST_ACTION_EXPIRED:
