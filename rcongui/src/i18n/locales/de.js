@@ -5268,7 +5268,7 @@ const de = {
     lastChecked: "Zuletzt geprüft",
     latestRelease: "Neueste Version",
   },
-  language: { label: "Sprache", de: "Deutsch", en: "English", fr: "Français", loadFailed: "Die Sprache konnte nicht geladen werden. Bitte versuche es erneut." },
+  language: { label: "Sprache", de: "Deutsch", en: "English", fr: "Français", loadFailed: "Die Sprache konnte nicht geladen werden. Bitte versuche es erneut.", storageUnavailable: "Browserspeicher ist nicht verfügbar. Lokale Einstellungen gelten nur für diesen Besuch." },
 };
 
 Object.assign(de.maps.votemapSettings, {

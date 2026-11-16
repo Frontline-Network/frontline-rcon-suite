@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import siteConfig from "@/config/siteConfig";
+import { safeBrowserStorage } from "./safe-browser-storage";
 
 const prefix = siteConfig.appName + ".";
 const withPrefix = (key) => prefix + key;
@@ -51,6 +52,7 @@ export const useLogsTableStore = create(
     }),
     {
       name: withPrefix("logs-table"),
+      storage: safeBrowserStorage,
     }
   )
 );
@@ -73,6 +75,7 @@ export const useLogsSearchStore = create(
     }),
     {
       name: withPrefix("logs-search"),
+      storage: safeBrowserStorage,
     }
   )
 );
@@ -97,6 +100,7 @@ export const useGameListTableStore = create(
     }),
     {
       name: withPrefix("game-list-table"),
+      storage: safeBrowserStorage,
     }
   )
 );
@@ -121,6 +125,7 @@ export const useGameDetailsTableStore = create(
     }),
     {
       name: withPrefix("game-details-table"),
+      storage: safeBrowserStorage,
     }
   )
 );
@@ -145,6 +150,7 @@ export const useLiveSessionsTableStore = create(
     }),
     {
       name: withPrefix("live-sessions-table"),
+      storage: safeBrowserStorage,
     }
   )
 );

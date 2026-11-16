@@ -23,7 +23,7 @@ const fr = {
   maps: mapsFr,
   actions: actionsFr,
   incidents: incidentsFr,
-  language: { label: "Langue", de: "Deutsch", en: "English", fr: "Français", loadFailed: "La langue n’a pas pu être chargée. Veuillez réessayer." },
+  language: { label: "Langue", de: "Deutsch", en: "English", fr: "Français", loadFailed: "La langue n’a pas pu être chargée. Veuillez réessayer.", storageUnavailable: "Le stockage du navigateur est indisponible. Les préférences locales ne durent que pendant cette visite." },
   settings: {
     ...draft.settings,
     ...remainingSettingsFr,

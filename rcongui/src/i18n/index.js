@@ -8,6 +8,7 @@ import "dayjs/locale/de";
 import "dayjs/locale/fr";
 import { dateLocale } from "./date-locale";
 import LocalizedFormat from "dayjs/plugin/localizedFormat";
+import { browserStorage } from "@/utils/browser-storage";
 
 export const supportedLanguages = ["de", "en", "fr"];
 
@@ -15,7 +16,7 @@ dayjs.extend(LocalizedFormat);
 
 let savedLanguage = null;
 try {
-  if (typeof window !== "undefined") savedLanguage = window.localStorage.getItem("crcon.language");
+  if (typeof window !== "undefined") savedLanguage = browserStorage.getItem("crcon.language");
 } catch {
   // Storage may be disabled; language selection still works for this session.
 }
@@ -100,7 +101,7 @@ export async function selectAppLanguage(language) {
   await i18n.changeLanguage(language);
   if (selection !== languageSelection) return false;
   try {
-    if (typeof window !== "undefined") window.localStorage.setItem("crcon.language", language);
+    if (typeof window !== "undefined") browserStorage.setItem("crcon.language", language);
   } catch {
     // The language remains usable until the session ends.
   }

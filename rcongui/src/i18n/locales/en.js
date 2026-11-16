@@ -5222,7 +5222,7 @@ const en = {
     lastChecked: "Last checked",
     latestRelease: "Latest release",
   },
-  language: { label: "Language", de: "Deutsch", en: "English", fr: "Français", loadFailed: "The language could not be loaded. Please try again." },
+  language: { label: "Language", de: "Deutsch", en: "English", fr: "Français", loadFailed: "The language could not be loaded. Please try again.", storageUnavailable: "Browser storage is unavailable. Local settings last only for this visit." },
 };
 
 Object.assign(en.maps.votemapSettings, {

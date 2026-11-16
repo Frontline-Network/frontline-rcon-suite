@@ -1,6 +1,7 @@
 import siteConfig from '@/config/siteConfig';
 import {useEffect, useState} from "react";
 import deepmerge from 'lodash/merge';
+import { browserStorage } from '@/utils/browser-storage';
 
 const STORAGE_VERSION = '1.0'; // Define current version
 const prefix = siteConfig.appName + '.';
@@ -8,7 +9,7 @@ const withPrefix = (key) => prefix + key;
 
 const getItem = (key) => {
   try {
-    const storedValue = localStorage.getItem(withPrefix(key));
+    const storedValue = browserStorage.getItem(withPrefix(key));
     if (!storedValue) return null;
     
     const parsed = JSON.parse(storedValue);
@@ -16,7 +17,7 @@ const getItem = (key) => {
     // Check if stored data has version information
     if (!parsed._version) {
       // No version - treat as legacy data
-      localStorage.removeItem(withPrefix(key));
+      browserStorage.removeItem(withPrefix(key));
       return null;
     }
 
@@ -27,18 +28,20 @@ const getItem = (key) => {
         Stored: ${parsed._version}, Current: ${STORAGE_VERSION}\n
         Migrating data...
       `);
-      localStorage.removeItem(withPrefix(key));
+      browserStorage.removeItem(withPrefix(key));
       return null;
     }
 
     return parsed.data;
   } catch (error) {
-    console.error(`
-      Storage read error for ${key}.\n
-      Error: ${error.message}\n
-      Storage has been reset.
-    `);
-    localStorage.removeItem(withPrefix(key));
+    // Storage itself may be unavailable; a second access here would throw
+    // again and prevent the page from mounting.
+    console.warn(`Storage read failed for ${key}: ${error.message}`);
+    try {
+      browserStorage.removeItem(withPrefix(key));
+    } catch {
+      // The page can still use its default value without persistent storage.
+    }
     return null;
   }
 };
@@ -48,7 +51,12 @@ const setItem = (key, value) => {
     _version: STORAGE_VERSION,
     data: value
   };
-  localStorage.setItem(withPrefix(key), JSON.stringify(storageData));
+  try {
+    browserStorage.setItem(withPrefix(key), JSON.stringify(storageData));
+  } catch (error) {
+    // React retains this preference for the current visit only.
+    console.warn(`Storage write failed for ${key}: ${error.message}`);
+  }
 };
 
 export const useStorageState = (key, initialState) => {

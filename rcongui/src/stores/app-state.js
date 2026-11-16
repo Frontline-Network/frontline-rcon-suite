@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import siteConfig from "@/config/siteConfig";
 import { DEFAULT_APPEARANCE, normalizeAppearance } from "@/themes/appearance";
+import { safeBrowserStorage } from "./safe-browser-storage";
 
 const prefix = siteConfig.appName + ".";
 const withPrefix = (key) => prefix + key;
@@ -85,6 +86,7 @@ export const useAppStore = create(
     }),
     {
       name: withPrefix("app"),
+      storage: safeBrowserStorage,
       version: 2,
       migrate: (persistedState, version) => {
         if (version < 2) {
