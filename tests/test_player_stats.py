@@ -1,11 +1,12 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import time
 
 import pytest
 
 os.environ["HLL_MAINTENANCE_CONTAINER"] = "1"
 from rcon.models import Maps, PlayerID, PlayerSoldier, PlayerStats, calc_weapon_type_usage
-from rcon.player_stats import BaseStats, Streaks
+from rcon.player_stats import BaseStats, LiveStats, Streaks
 from rcon.types import AllLogTypes, PlayerTeamAssociation, PlayerTeamConfidence
 from rcon.utils import get_default_player_stats
 from rcon.maps import Team
@@ -37,6 +38,70 @@ def test_shortest_life_records_first_positive_duration_and_tracks_minimum():
     calc._process_death_time(stats["last_spawn"] + timedelta(seconds=60), stats)
     assert stats["shortest_life_secs"] == 60
     assert stats["longest_life_secs"] == 180
+
+
+@pytest.mark.skipif(not hasattr(time, "tzset"), reason="requires POSIX timezone support")
+@pytest.mark.parametrize("zone", ["UTC", "Europe/Berlin", "America/New_York"])
+@pytest.mark.parametrize("start", [
+    datetime(2026, 1, 15, 12, tzinfo=timezone.utc),
+    datetime(2026, 10, 25, 0, 59, tzinfo=timezone.utc),
+])
+def test_lifetime_uses_actual_event_instants_across_timezones(monkeypatch, zone, start):
+    original_tz = os.environ.get("TZ")
+    try:
+        monkeypatch.setenv("TZ", zone)
+        time.tzset()
+        calc = BaseStats.__new__(BaseStats)
+        stats = get_default_player_stats()
+        stats["last_spawn"] = start.astimezone(timezone(timedelta(hours=2)))
+        player = {"name": "Player", "player_id": "p"}
+        log = {"action": AllLogTypes.kill,
+               "timestamp_ms": int((start + timedelta(seconds=120)).timestamp() * 1000),
+               "player_id_1": "enemy", "player_id_2": "p"}
+        calc._calc_streaks(stats, player, log, Streaks())
+        assert stats["longest_life_secs"] == 120
+        assert stats["shortest_life_secs"] == 120
+    finally:
+        if original_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = original_tz
+        time.tzset()
+
+
+def test_missing_event_timestamp_does_not_break_streak_or_change_life():
+    calc = BaseStats.__new__(BaseStats)
+    stats = get_default_player_stats()
+    stats["last_spawn"] = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    streaks = Streaks()
+    calc._calc_streaks(stats, {"name": "Player", "player_id": "p"},
+        {"action": AllLogTypes.kill, "player_id_1": "enemy", "player_id_2": "p"}, streaks)
+    assert streaks.death == 1
+    assert stats["last_spawn"] is None
+    assert stats["longest_life_secs"] == 0
+
+
+def test_live_first_appearance_preserves_aware_session_instant():
+    start = datetime(2026, 1, 1, 13, tzinfo=timezone(timedelta(hours=1)))
+    calc = LiveStats.__new__(LiveStats)
+    assert calc._get_player_first_appearance({"profile": {"sessions": [{"start": start}]}}) == datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
+
+
+@pytest.mark.skipif(not hasattr(time, "tzset"), reason="requires POSIX timezone support")
+def test_live_first_appearance_converts_legacy_local_wall_time(monkeypatch):
+    original_tz = os.environ.get("TZ")
+    try:
+        monkeypatch.setenv("TZ", "Europe/Berlin")
+        time.tzset()
+        calc = LiveStats.__new__(LiveStats)
+        player = {"profile": {"sessions": [{"start": datetime(2026, 1, 1, 13)}]}}
+        assert calc._get_player_first_appearance(player) == datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
+    finally:
+        if original_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = original_tz
+        time.tzset()
 
 
 def test_canadian_weapon_identifies_allied_team():

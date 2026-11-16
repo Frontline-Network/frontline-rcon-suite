@@ -200,7 +200,11 @@ class BaseStats:
     ) -> None:
         action = log["action"]
 
-        log_time = datetime.datetime.fromtimestamp(log["timestamp_ms"] / 1000)
+        timestamp_ms = log.get("timestamp_ms")
+        log_time = (
+            datetime.datetime.fromtimestamp(timestamp_ms / 1000, datetime.UTC)
+            if timestamp_ms is not None else None
+        )
         if action == AllLogTypes.kill:
             if self._is_player_kill(player, log):
                 streaks.kill += 1
@@ -210,18 +214,26 @@ class BaseStats:
                 streaks.kill = 0
                 streaks.deaths_by_tk = 0
                 streaks.death += 1
-                self._process_death_time(log_time, stats)
+                if log_time is not None:
+                    self._process_death_time(log_time, stats)
+                else:
+                    stats["last_spawn"] = None
         if action == AllLogTypes.team_kill:
             if self._is_player_kill(player, log):
                 streaks.teamkills += 1
             if self._is_player_death(player, log):
                 streaks.kill = 0
                 streaks.deaths_by_tk += 1
-                self._process_death_time(log_time, stats)
+                if log_time is not None:
+                    self._process_death_time(log_time, stats)
+                else:
+                    stats["last_spawn"] = None
         if action == AllLogTypes.connected:
             stats["last_spawn"] = log_time
         if action == AllLogTypes.disconnected:
-            self._process_death_time(log_time, stats, save_spawn=False)
+            if log_time is not None:
+                self._process_death_time(log_time, stats, save_spawn=False)
+            stats["last_spawn"] = None
 
         stats["kills_streak"] = max(streaks.kill, stats["kills_streak"])
         stats["deaths_without_kill_streak"] = max(
@@ -306,12 +318,12 @@ class BaseStats:
             stats["last_spawn"] = log_time
             return
 
-        time_since_last_spawn = int(
-            (
-                log_time.replace(tzinfo=datetime.UTC)
-                - stats["last_spawn"].replace(tzinfo=datetime.UTC)
-            ).total_seconds()
-        )
+        spawn_time = stats["last_spawn"]
+        if log_time.tzinfo is None:
+            log_time = log_time.replace(tzinfo=datetime.UTC)
+        if spawn_time.tzinfo is None:
+            spawn_time = spawn_time.replace(tzinfo=datetime.UTC)
+        time_since_last_spawn = int((log_time - spawn_time).total_seconds())
         stats["longest_life_secs"] = max(
             time_since_last_spawn,
             stats["longest_life_secs"],
@@ -381,7 +393,9 @@ class LiveStats(BaseStats):
         if not session_start:
             return None
 
-        return session_start.replace(tzinfo=datetime.UTC)
+        # Historical sessions without timezone information were stored as local
+        # wall time; newer sessions have an authoritative UTC-aware timestamp.
+        return session_start.astimezone(datetime.UTC)
 
     def _is_log_from_current_session(
         self, now, player, log: StructuredLogLineWithMetaData
