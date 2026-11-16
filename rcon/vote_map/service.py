@@ -1236,10 +1236,10 @@ class VoteMapCommandHandler:
         message = (log.get("sub_content") or "").strip()
 
         try:
-            if match := self.VOTE_CMD_PATTERN.match(message):
+            if match := self.VOTE_CMD_PATTERN.fullmatch(message):
                 entry = int(match.group(2))
                 self.handle_vote(player_id, log, entry)
-            elif self.HELP_CMD_PATTERN.match(message):
+            elif self.HELP_CMD_PATTERN.fullmatch(message):
                 self.handle_help(player_id, log)
             elif self.SHOW_CMD_PATTERN.match(message):
                 self.handle_show_selection(player_id)
@@ -1260,6 +1260,7 @@ class VoteMapCommandHandler:
                     self.config.help_text or "Type '!votemap help' in the chat."
                 )
                 self.rcon.message_player(player_id=player_id, message=message)
+                return False
         except VoteMapException as e:
             self.rcon.message_player(player_id=player_id, message=str(e))
             return False
