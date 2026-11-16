@@ -1,6 +1,59 @@
 import { expect, test } from "@playwright/test";
 import { VIEWPORTS, expectNoHorizontalPageOverflow } from "./helpers.mjs";
 
+const frenchAsset = /\/(?:src\/i18n\/locales\/fr\.js|assets\/fr-[\w-]+\.js)(?:\?.*)?$/;
+
+test("failed language download keeps the current language and allows retry", async ({ page }) => {
+  let failures = 0;
+  await page.route(frenchAsset, async (route) => {
+    if (failures++ === 0) await route.abort();
+    else await route.continue();
+  });
+  await page.addInitScript(() => localStorage.setItem("crcon.language", "de"));
+  await page.goto("/records/game-logs", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Sprache", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Français", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Die Sprache konnte nicht geladen werden" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "de");
+  expect(await page.evaluate(() => localStorage.getItem("crcon.language"))).toBe("de");
+  await page.getByRole("menuitem", { name: "Français", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+  expect(await page.evaluate(() => localStorage.getItem("crcon.language"))).toBe("fr");
+});
+
+test("failed saved French catalog preserves preference and shows a startup error", async ({ page }) => {
+  await page.route(frenchAsset, (route) => route.abort());
+  await page.addInitScript(() => localStorage.setItem("crcon.language", "fr"));
+  await page.goto("/records/game-logs", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("alert").filter({ hasText: "The language could not be loaded" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  expect(await page.evaluate(() => localStorage.getItem("crcon.language"))).toBe("fr");
+  await page.unroute(frenchAsset);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+});
+
+test("release dialog reports a failed language download and supports retry", async ({ page }) => {
+  let failures = 0;
+  await page.route(frenchAsset, async (route) => {
+    if (failures++ === 0) await route.abort();
+    else await route.continue();
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem("crcon.language", "de");
+    localStorage.removeItem("crcon.preview.highlights:v0.8.8:preview-user");
+  });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible({ timeout: 20000 });
+  await dialog.getByRole("button", { name: "Français", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Die Sprache konnte nicht geladen werden");
+  await expect(page.locator("html")).toHaveAttribute("lang", "de");
+  await dialog.getByRole("button", { name: "Français", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
+});
+
 test("the last language selection wins when French loads slowly", async ({ page }) => {
   let releaseFrench;
   const frenchBlocked = new Promise((resolve) => { releaseFrench = resolve; });

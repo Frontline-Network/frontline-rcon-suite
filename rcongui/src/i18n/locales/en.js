@@ -5221,7 +5221,7 @@ const en = {
     lastChecked: "Last checked",
     latestRelease: "Latest release",
   },
-  language: { label: "Language", de: "Deutsch", en: "English", fr: "Français" },
+  language: { label: "Language", de: "Deutsch", en: "English", fr: "Français", loadFailed: "The language could not be loaded. Please try again." },
 };
 
 Object.assign(en.maps.votemapSettings, {

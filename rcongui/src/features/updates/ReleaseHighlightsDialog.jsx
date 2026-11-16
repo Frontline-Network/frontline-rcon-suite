@@ -45,6 +45,7 @@ export default function ReleaseHighlightsDialog({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
+  const [languageError, setLanguageError] = useState(false);
   const selectedLanguage = (i18n.resolvedLanguage || "en").split("-")[0];
   const lang = ["de", "en", "fr"].includes(selectedLanguage) ? selectedLanguage : "en";
   // Older release data may have only DE/EN; future highlights can include FR.
@@ -52,7 +53,12 @@ export default function ReleaseHighlightsDialog({
   const content = release.highlights;
   const changeLanguage = async (_, language) => {
     if (!language) return;
-    await selectAppLanguage(language);
+    setLanguageError(false);
+    try {
+      await selectAppLanguage(language);
+    } catch {
+      setLanguageError(true);
+    }
   };
   const openAction = () => {
     onClose();
@@ -289,6 +295,7 @@ export default function ReleaseHighlightsDialog({
             );
           })}
         </Box>
+        {languageError && <Alert severity="error" role="alert" sx={{ mb: 2 }}>{t("language.loadFailed")}</Alert>}
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {t("releaseHighlights.saveFailed")}

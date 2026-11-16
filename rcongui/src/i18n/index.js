@@ -13,10 +13,12 @@ export const supportedLanguages = ["de", "en", "fr"];
 
 dayjs.extend(LocalizedFormat);
 
-const savedLanguage =
-  typeof window !== "undefined"
-    ? window.localStorage.getItem("crcon.language")
-    : null;
+let savedLanguage = null;
+try {
+  if (typeof window !== "undefined") savedLanguage = window.localStorage.getItem("crcon.language");
+} catch {
+  // Storage may be disabled; language selection still works for this session.
+}
 const initialLanguage = supportedLanguages.includes(savedLanguage)
   ? savedLanguage
   : "de";
@@ -38,7 +40,8 @@ i18n
     interpolation: { escapeValue: false },
     detection: {
       order: ["localStorage", "navigator"],
-      caches: ["localStorage"],
+      // Do not overwrite a saved French choice while its lazy catalog loads.
+      caches: [],
       lookupLocalStorage: "crcon.language",
     },
   });
@@ -67,10 +70,21 @@ export function ensureLanguageLoaded(language) {
 let languageSelection = 0;
 export async function selectAppLanguage(language) {
   const selection = ++languageSelection;
-  await ensureLanguageLoaded(language);
+  try {
+    await ensureLanguageLoaded(language);
+  } catch (error) {
+    if (selection !== languageSelection) return false;
+    throw error;
+  }
   if (selection !== languageSelection) return false;
   await i18n.changeLanguage(language);
-  return selection === languageSelection;
+  if (selection !== languageSelection) return false;
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem("crcon.language", language);
+  } catch {
+    // The language remains usable until the session ends.
+  }
+  return true;
 }
 
 // Wait before mounting when French was saved, avoiding an English flash and
