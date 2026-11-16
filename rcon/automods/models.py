@@ -18,22 +18,25 @@ PENDING_WARNING = datetime.max
 class WarningConfirmationMixin:
     """Keep a planned warning pending until the game server confirms it."""
 
+    def progress_key(self, aplayer):
+        return aplayer.name
+
     def player_warning_succeeded(self, aplayer):
         with self.watch_state(aplayer.team, aplayer.squad) as status:
-            warnings = status.warned.get(aplayer.name)
+            warnings = status.warned.get(self.progress_key(aplayer))
             if warnings and warnings[-1] == PENDING_WARNING:
                 warnings[-1] = datetime.now()
 
     def player_warning_failed(self, aplayer):
         with self.watch_state(aplayer.team, aplayer.squad) as status:
-            warnings = status.warned.get(aplayer.name)
+            warnings = status.warned.get(self.progress_key(aplayer))
             if warnings and warnings[-1] == PENDING_WARNING:
                 warnings.pop()
 
     def player_punish_started(self, aplayer):
         """Reserve a punishment before sending it to the game server."""
         with self.watch_state(aplayer.team, aplayer.squad) as status:
-            punishes = status.punished.setdefault(aplayer.name, [])
+            punishes = status.punished.setdefault(self.progress_key(aplayer), [])
             if punishes:
                 punishes[-1] = PENDING_WARNING
             else:
@@ -41,20 +44,20 @@ class WarningConfirmationMixin:
 
     def player_punish_succeeded(self, aplayer):
         with self.watch_state(aplayer.team, aplayer.squad) as status:
-            punishes = status.punished.get(aplayer.name)
+            punishes = status.punished.get(self.progress_key(aplayer))
             if punishes and punishes[-1] == PENDING_WARNING:
                 punishes[-1] = datetime.now()
 
     def player_kick_attempted(self, aplayer):
         """Reserve the kick before sending, so a crash cannot trigger a replay."""
         with self.watch_state(aplayer.team, aplayer.squad) as status:
-            punishes = status.punished.setdefault(aplayer.name, [])
+            punishes = status.punished.setdefault(self.progress_key(aplayer), [])
             if not punishes or punishes[-1] != PENDING_WARNING:
                 punishes.append(PENDING_WARNING)
 
     def player_kick_rejected(self, aplayer):
         with self.watch_state(aplayer.team, aplayer.squad) as status:
-            punishes = status.punished.get(aplayer.name)
+            punishes = status.punished.get(self.progress_key(aplayer))
             if punishes and punishes[-1] == PENDING_WARNING:
                 punishes.pop()
 

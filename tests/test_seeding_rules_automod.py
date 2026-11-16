@@ -776,20 +776,20 @@ def test_position_boundary_applies_to_both_teams_regardless_of_score(
     waiting = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
     assert not waiting.warning and not waiting.punish
     watch_status = state[team + squad_name]
-    assert len(watch_status.warned.get(player["name"], [])) == 1
-    watch_status.warned[player["name"]][-1] -= timedelta(seconds=61)
+    assert len(watch_status.warned.get(player["player_id"], [])) == 1
+    watch_status.warned[player["player_id"]][-1] -= timedelta(seconds=61)
     second = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
     assert [player["player_id"]] == [p.player_id for p in second.warning]
     assert not second.punish
     mod.player_warning_succeeded(second.warning[0])
-    watch_status.warned[player["name"]][-1] -= timedelta(seconds=61)
+    watch_status.warned[player["player_id"]][-1] -= timedelta(seconds=61)
     punished = mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
     assert [player["player_id"]] == [p.player_id for p in punished.punish]
 
     player["world_position"]["x"] = 0
     assert not mod.punitions_to_apply(team_view, squad_name, team, squad, snapshot)
-    assert player["name"] not in watch_status.warned
-    assert player["name"] not in watch_status.punished
+    assert player["player_id"] not in watch_status.warned
+    assert player["player_id"] not in watch_status.punished
 
 
 @pytest.mark.parametrize("team,squad_name", [("allies", "able"), ("axis", "able")])
@@ -901,9 +901,9 @@ def test_conquest_never_enforces_geofence_or_offense_fallback(
     }
     # Simulate progress left over from Warfare when the next round starts.
     previous = state.setdefault(team + "able", WatchStatus())
-    previous.offensive_points[player["name"]] = 0
-    previous.warned[player["name"]] = [datetime.now() - timedelta(minutes=5)]
-    previous.punished[player["name"]] = [datetime.now() - timedelta(minutes=5)]
+    previous.offensive_points[player["player_id"]] = 0
+    previous.warned[player["player_id"]] = [datetime.now() - timedelta(minutes=5)]
+    previous.punished[player["player_id"]] = [datetime.now() - timedelta(minutes=5)]
     previous.combat_area_outside_player_ids.add(player["player_id"])
 
     for offset in (0, 10, 20):
@@ -919,8 +919,8 @@ def test_conquest_never_enforces_geofence_or_offense_fallback(
 
     mod._position_cap_violation.assert_not_called()
     assert not previous.offensive_points
-    assert player["name"] not in previous.warned
-    assert player["name"] not in previous.punished
+    assert player["player_id"] not in previous.warned
+    assert player["player_id"] not in previous.punished
     assert player["player_id"] not in previous.combat_area_outside_player_ids
 
 
@@ -1055,10 +1055,10 @@ def test_reconnect_clears_only_target_players_old_progress(team_view, legacy_pic
         initial_world_positions={pid: None, "other": None},
         combat_area_outside_player_ids={pid, "other"},
         position_tracking_context={pid: (6, None)},
-        offensive_points={name: 500, "other": 500},
-        warned={name: [datetime.now()], "other": [datetime.now()]},
-        punished={name: [datetime.now()], "other": [datetime.now()]},
-        noted={name: [datetime.now()], "other": [datetime.now()]},
+        offensive_points={pid: 500, "other": 500},
+        warned={pid: [datetime.now()], "other": [datetime.now()]},
+        punished={pid: [datetime.now()], "other": [datetime.now()]},
+        noted={pid: [datetime.now()], "other": [datetime.now()]},
     )
     if legacy_pickle:
         del watch.position_tracking_context
@@ -1067,7 +1067,7 @@ def test_reconnect_clears_only_target_players_old_progress(team_view, legacy_pic
     assert watch.initial_world_positions[pid] == (94_000, 0, 1)
     assert watch.combat_area_outside_player_ids == {"other"}
     for entries in (watch.noted, watch.warned, watch.punished, watch.offensive_points):
-        assert name not in entries and "other" in entries
+        assert pid not in entries and "other" in entries
 
 
 def test_reconnect_without_position_does_not_use_old_offense_points(team_view):
@@ -1077,10 +1077,10 @@ def test_reconnect_without_position_does_not_use_old_offense_points(team_view):
     player["world_position"] = None
     watch = WatchStatus(
         position_tracking_context={player["player_id"]: (1, None)},
-        offensive_points={player["name"]: 100},
+        offensive_points={player["player_id"]: 100},
     )
     assert mod._position_cap_violation(watch, player, "allies", game_state) is False
-    assert player["name"] not in watch.offensive_points
+    assert player["player_id"] not in watch.offensive_points
 
 
 @fixture
@@ -1163,8 +1163,8 @@ def test_position_discontinuity_clears_escalation_and_requires_new_movement(
     pid, name = player["player_id"], player["name"]
     watch.combat_area_outside_player_ids = {pid, "other"}
     for entries in (watch.noted, watch.warned, watch.punished):
-        entries.update({name: [datetime.now()], "other": [datetime.now()]})
-    watch.offensive_points = {name: 500, "other": 500}
+        entries.update({pid: [datetime.now()], "other": [datetime.now()]})
+    watch.offensive_points = {pid: 500, "other": 500}
     if reset == "jump":
         player["world_position"]["x"] = 94_000
     elif reset == "gap":
@@ -1181,7 +1181,7 @@ def test_position_discontinuity_clears_escalation_and_requires_new_movement(
         player["world_position"]["x"] = float("nan")
     assert mod._position_cap_violation(watch, player, "allies", game_state) is False
     for entries in (watch.noted, watch.warned, watch.punished, watch.offensive_points):
-        assert name not in entries and "other" in entries
+        assert pid not in entries and "other" in entries
     assert watch.combat_area_outside_player_ids == {"other"}
     # A new outside baseline remains protected even after a long stationary wait.
     assert sample(94_000) is False
@@ -1378,8 +1378,8 @@ def test_position_skip_warning_state_stays_bounded_while_outside(team_view):
         mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
 
     watch_status = state["alliesable"]
-    assert len(watch_status.warned[player["name"]]) == 2
-    assert len(watch_status.punished[player["name"]]) == 1
+    assert len(watch_status.warned[player["player_id"]]) == 2
+    assert len(watch_status.punished[player["player_id"]]) == 1
 
 
 def test_position_progress_resets_after_returning_inside(team_view):
@@ -1399,8 +1399,8 @@ def test_position_progress_resets_after_returning_inside(team_view):
         team_view, "able", "allies", squad, game_state
     )
     watch_status = state["alliesable"]
-    assert player["name"] not in watch_status.warned
-    assert player["name"] not in watch_status.punished
+    assert player["player_id"] not in watch_status.warned
+    assert player["player_id"] not in watch_status.punished
     assert player["player_id"] not in watch_status.combat_area_outside_player_ids
 
     player["world_position"] = {"x": 20_160, "y": 0, "z": 1}
@@ -1421,14 +1421,14 @@ def test_position_repeats_punishment_when_kick_is_disabled(team_view):
     assert [player["player_id"]] == [target.player_id for target in first.punish]
 
     watch_status = state["alliesable"]
-    watch_status.punished[player["name"]][-1] -= timedelta(seconds=61)
+    watch_status.punished[player["player_id"]][-1] -= timedelta(seconds=61)
     second = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
     assert [player["player_id"]] == [target.player_id for target in second.punish]
 
-    watch_status.punished[player["name"]][-1] -= timedelta(seconds=61)
+    watch_status.punished[player["player_id"]][-1] -= timedelta(seconds=61)
     repeated = mod.punitions_to_apply(team_view, "able", "allies", squad, game_state)
     assert [player["player_id"]] == [target.player_id for target in repeated.punish]
-    assert len(watch_status.punished[player["name"]]) == 2
+    assert len(watch_status.punished[player["player_id"]]) == 2
 
 
 def test_punishes_commander_cap_fight(team_view):

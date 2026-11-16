@@ -94,6 +94,9 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
     config: AutoModSeedingUserConfig
     action_author = AUTOMOD_USERNAME
 
+    def progress_key(self, aplayer):
+        return aplayer.player_id
+
     def __init__(
         self, config: AutoModSeedingUserConfig, red: redis.StrictRedis or None
     ):
@@ -116,6 +119,8 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
         """
         Sends a one-time seeding rules reminder message to players on connect
         """
+        if not isinstance(player_id, str) or not player_id.strip():
+            return PunitionsToApply()
         # Independent of announcements: an old squad watch can survive a short
         # disconnect. Invalidate its spawn proof even while profiles are cached.
         self.red.setex(connection_key(player_id), SEEDING_RULES_RESET_SECS, uuid4().hex)
@@ -189,6 +194,9 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
         """
         p: PunitionsToApply = PunitionsToApply()
 
+        if not isinstance(log.get("player_id_1"), str) or not log["player_id_1"].strip():
+            return p
+
         if log[
             "weapon"
         ] in self.config.disallowed_weapons.weapons and not self._is_seeding_rule_disabled(
@@ -233,7 +241,10 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
         """
         Observe and actualize the current moderation step
         """
-        redis_key = f"seeding_rules_automod{team.lower()}{str(squad_name).lower()}"
+        # Name-keyed legacy histories cannot safely be attributed to an ID.
+        # A separate expiring namespace starts fresh without escalating from an
+        # ambiguous warning or affecting the legacy state during rollback.
+        redis_key = f"seeding_rules_automod_id_v2{team.lower()}{str(squad_name).lower()}"
         watch_status = self.red.get(redis_key)
         if watch_status:
             watch_status = upgrade_legacy_warning_state(pickle.loads(watch_status))
@@ -268,12 +279,12 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
         }
 
         if method == ActionMethod.MESSAGE:
-            data["received_warnings"] = len(watch_status.warned.get(aplayer.name))
+            data["received_warnings"] = len(watch_status.warned.get(self.progress_key(aplayer)))
             data["max_warnings"] = self.config.number_of_warnings
             data["next_check_seconds"] = self.config.warning_interval_seconds
 
         if method == ActionMethod.PUNISH:
-            data["received_punishes"] = len(watch_status.punished.get(aplayer.name))
+            data["received_punishes"] = len(watch_status.punished.get(self.progress_key(aplayer)))
             data["max_punishes"] = self.config.number_of_punishments
             data["next_check_seconds"] = self.config.punish_interval_seconds
 
@@ -326,7 +337,7 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
         """
         with self.watch_state(aplayer.team, aplayer.squad) as watch_status:
             try:
-                if punishes := watch_status.punished.get(aplayer.name):
+                if punishes := watch_status.punished.get(self.progress_key(aplayer)):
                     del punishes[-1]
             except Exception:
                 self.logger.exception("tried to cleanup punished time but failed")
@@ -371,9 +382,8 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
             getattr(watch_status, "combat_area_outside_player_ids", set()).discard(
                 player_id
             )
-            name = player.get("name", player_id)
-            self._clear_player_progress(watch_status, name)
-            watch_status.offensive_points.pop(name, None)
+            self._clear_player_progress(watch_status, player_id)
+            watch_status.offensive_points.pop(player_id, None)
             self.logger.info(
                 "Re-armed seeding spawn protection for %s after connection context changed",
                 player_id,
@@ -504,16 +514,15 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
         was_outside = player_id in outside_ids
         watch_status.initial_world_positions[player_id] = position
         outside_ids.discard(player_id)
-        name = player.get("name", player["player_id"])
         if had_proof or was_outside:
-            self._clear_player_progress(watch_status, name)
-        watch_status.offensive_points.pop(name, None)
+            self._clear_player_progress(watch_status, player_id)
+        watch_status.offensive_points.pop(player_id, None)
 
     @staticmethod
-    def _clear_player_progress(watch_status: WatchStatus, player_name: str) -> None:
+    def _clear_player_progress(watch_status: WatchStatus, player_id: str) -> None:
         """Start warnings and punishments fresh for a new boundary excursion."""
         for states in (watch_status.noted, watch_status.warned, watch_status.punished):
-            states.pop(player_name, None)
+            states.pop(player_id, None)
 
     def _update_combat_area_excursion(
         self,
@@ -535,13 +544,13 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
         was_outside = player_id in outside_player_ids
         if outside:
             if not was_outside:
-                self._clear_player_progress(watch_status, player_name)
+                self._clear_player_progress(watch_status, player_id)
                 outside_player_ids.add(player_id)
             return
 
         if was_outside:
             outside_player_ids.discard(player_id)
-            self._clear_player_progress(watch_status, player_name)
+            self._clear_player_progress(watch_status, player_id)
 
     def punitions_to_apply(
         self,
@@ -586,6 +595,9 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
             author = AUTOMOD_USERNAME + ("-DryRun" if self.config.dry_run else "")
 
             for player in squad["players"]:
+                if not isinstance(player.get("player_id"), str) or not player["player_id"].strip():
+                    self.logger.warning("Skipping seeding check for player without a stable ID")
+                    continue
                 profile = player.get("profile", {})
                 aplayer = PunishPlayer(
                     player_id=player["player_id"],
@@ -681,7 +693,7 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
                         team_reached_cap_limit,
                     )
                     op = player["offense"]
-                    oop = watch_status.offensive_points.setdefault(aplayer.name, -1)
+                    oop = watch_status.offensive_points.setdefault(aplayer.player_id, -1)
 
                     self.logger.debug(
                         "Player had %s offensive points last and now %s",
@@ -706,7 +718,7 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
                         )
 
                         if ecf.skip_warning and self.config.number_of_warnings > 0:
-                            warnings = watch_status.warned.setdefault(aplayer.name, [])
+                            warnings = watch_status.warned.setdefault(aplayer.player_id, [])
                             missing_warnings = max(
                                 0, self.config.number_of_warnings - len(warnings)
                             )
@@ -717,7 +729,7 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
                                         seconds=self.config.warning_interval_seconds + 1
                                     )
                                 )
-                    watch_status.offensive_points[aplayer.name] = op
+                    watch_status.offensive_points[aplayer.player_id] = op
                 else:
                     watch_status.offensive_points.clear()
                     self._update_combat_area_excursion(
@@ -830,7 +842,7 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
             self.logger.debug("%s is immune to warnings", aplayer.short_repr())
             return PunishStepState.IMMUNED
 
-        warnings = watch_status.warned.setdefault(aplayer.name, [])
+        warnings = watch_status.warned.setdefault(aplayer.player_id, [])
 
         # warning_interval_seconds
         if not is_time(warnings, self.config.warning_interval_seconds):
@@ -910,7 +922,7 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
             self.logger.debug("Server below min player count for punish")
             return PunishStepState.WAIT
 
-        punishes = watch_status.punished.setdefault(aplayer.name, [])
+        punishes = watch_status.punished.setdefault(aplayer.player_id, [])
 
         # punish_interval_seconds
         if not is_time(punishes, self.config.punish_interval_seconds):
@@ -1003,7 +1015,7 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
             return PunishStepState.WAIT
 
         try:
-            last_time = watch_status.punished.get(aplayer.name, [])[-1]
+            last_time = watch_status.punished.get(aplayer.player_id, [])[-1]
         except IndexError:
             self.logger.error("Trying to kick player without prior punishes")
             return PunishStepState.DISABLED
