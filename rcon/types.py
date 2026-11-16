@@ -176,7 +176,7 @@ class GameEnum(enum.StrEnum):
 
     @classmethod
     def from_int(cls, value: int) -> "GameEnum":
-        return cls(GameIntEnum(value).name)
+        return cls[GameIntEnum(value).name]
 
 
 class GameIntEnum(enum.IntEnum):
