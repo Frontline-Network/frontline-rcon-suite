@@ -411,14 +411,16 @@ def record_map_end(rcon: Rcon, struct_log: StructuredLogLineWithMetaData):
 
 
 def ban_if_blacklisted(rcon: Rcon, player_id: str, name: str):
+    """Return whether a restriction exists and whether its action was confirmed."""
     with enter_session() as sess:
         blacklist = is_player_blacklisted(sess, player_id)
         if not blacklist:
-            return False
+            return False, False
 
-        return apply_blacklist_punishment(
+        confirmed = apply_blacklist_punishment(
             rcon, blacklist, player_id=player_id, player_name=name
         )
+        return True, confirmed is True
 
 
 def should_ban(
@@ -600,14 +602,15 @@ def handle_on_connect(
     if player_info:
         PlayerSoldier.update(player_info)
 
-    blacklisted = ban_if_blacklisted(rcon, player_id, struct_log["player_name_1"])
-    if blacklisted:
+    blacklisted, blacklist_action_confirmed = ban_if_blacklisted(rcon, player_id, struct_log["player_name_1"])
+    if blacklist_action_confirmed:
         # We don't need the player potentially blacklisted a second
         # time because of VAC bans. So we return here.
         return
 
     save_start_player_session(player_id, timestamp=timestamp)
-    ban_if_has_vac_bans(rcon, player_id, struct_log["player_name_1"])
+    if not blacklisted:
+        ban_if_has_vac_bans(rcon, player_id, struct_log["player_name_1"])
 
 
 @on_disconnected
