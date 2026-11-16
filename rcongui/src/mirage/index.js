@@ -39,6 +39,14 @@ import {
 export function makeServer({ environment = "development" } = {}) {
   let gameState = createGameState();
   let vipRewards = structuredClone(vipRewardDefaults);
+  let endMatchStats = {
+    enabled: false, language: "en", title: "", kills: true, defense: true,
+    support: true, combat: false, offense: false, vehicles_destroyed: false,
+    teamplay: false, offdef: false, kd: false, kpm: false,
+    include_players: true, include_squads: true,
+    unit_types: ["commander", "infantry", "armor", "artillery", "recon"],
+    top_count: 1, message_gap_seconds: 15, support_multiplier: 1.5, defense_multiplier: 1.5,
+  };
   let seedVipReviewResolved = false;
   let blacklistSyncReviewResolved = false;
   let sessionEventReviewResolved = false;
@@ -958,6 +966,12 @@ export function makeServer({ environment = "development" } = {}) {
         return ok(true);
       });
       this.get("/get_vip_rewards_config", () => ok(vipRewards));
+      this.get("/get_end_match_stats_config", () => ok(endMatchStats));
+      this.post("/validate_end_match_stats_config", () => ok(true));
+      this.post("/set_end_match_stats_config", (_schema, request) => {
+        endMatchStats = JSON.parse(request.requestBody).config;
+        return ok(true);
+      });
       this.post("/validate_vip_rewards_config", () => ok(true));
       this.post("/set_vip_rewards_config", (schema, request) => {
         vipRewards = JSON.parse(request.requestBody).config;

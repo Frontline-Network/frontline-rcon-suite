@@ -1,6 +1,9 @@
 // Interface copy only. The separately configured in-game message language and
 // customer-provided titles are intentionally unaffected by this dictionary.
 export const french = {
+  "Mörser": "Mortier", "Hubschrauber": "Hélicoptère",
+  "Für bestehende Einstellungen Vietnam-Trupparten bei Bedarf auswählen.": "Pour les paramètres existants, sélectionnez si besoin les types d’escouade Vietnam.",
+  "Wähle mindestens eine Squad-Truppart für die Rangliste.": "Sélectionnez un type d’escouade pour générer un classement.",
   "Ohne Infanterie, Panzer, Artillerie oder Aufklärung gibt es keine Squad-Rangliste.": "Le classement des escouades nécessite au moins un type d’unité : infanterie, blindés, artillerie ou reconnaissance.",
   "Bitte wähle mindestens eine Statistik für die Vorschau.": "Sélectionnez au moins une statistique pour l’aperçu.",
   "Gilt nur, wenn beide Ranglisten aktiviert sind; 5 bis 30 Sekunden.": "S’applique uniquement si les deux classements sont activés ; de 5 à 30 secondes.",

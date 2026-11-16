@@ -99,6 +99,26 @@ def test_empty_or_zero_values_are_omitted():
     assert stats.format_stats([{"name": "Alice", "kills": 0}]) is None
 
 
+def test_vietnam_squad_types_and_members_are_included_when_selected():
+    config = stats.EndMatchStatsUserConfig(include_players=True, include_squads=True)
+    assert {"mortar", "helicopter"}.issubset(config.unit_types)
+    teams = {"allies": {"squads": {
+        "Mortar": {"type": "mortar", "kills": 5, "players": [{"name": "Mortar player", "kills": 5}]},
+        "Air": {"type": "helicopter", "kills": 8, "players": [{"name": "Pilot", "kills": 8}]},
+    }}}
+    players, squads = stats.extract_team_view(teams, config, game=GameEnum.HLL_VIETNAM)
+    assert {p["name"] for p in players} == {"Mortar player", "Pilot"}
+    assert {s["name"] for s in squads} == {"Mortar (allies)", "Air (allies)"}
+    player_message, squad_message = stats.format_sections(players, config, squads)
+    assert "Pilot (8)" in player_message and "Air (allies) (8)" in squad_message
+
+
+def test_existing_explicit_unit_selection_remains_unchanged():
+    old = ["commander", "infantry", "armor", "artillery", "recon"]
+    assert stats.EndMatchStatsUserConfig.model_validate({"unit_types": old}).unit_types == old
+    assert stats.EndMatchStatsUserConfig(unit_types=["mortar", "helicopter"]).unit_types == ["mortar", "helicopter"]
+
+
 def test_squadless_players_count_individually_without_creating_a_squad():
     config = stats.EndMatchStatsUserConfig(include_players=True, include_squads=True)
     player = {"player_id": "p1", "name": "Solo", "kills": 25}
