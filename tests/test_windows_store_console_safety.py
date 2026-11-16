@@ -39,7 +39,7 @@ def test_ambiguous_or_non_windows_platform_never_triggers_actions(monkeypatch, g
     monkeypatch.setattr(hooks, 'send_to_discord_audit', audit)
     rcon = Mock()
     rcon.config.game = game
-    rcon.get_detailed_player_info.return_value = {'player_id': 'fake-eos-id', 'platform': platform}
+    rcon._get_adapted_player_info.return_value = {'iD': 'fake-eos-id', 'platform': platform}
     hooks.windows_store_player_check.__wrapped__(rcon, {}, 'player', 'fake-eos-id')
     rcon.kick.assert_not_called()
     rcon.temp_ban.assert_not_called()
@@ -58,7 +58,7 @@ def test_confirmed_pc_wingdk_can_trigger_rule(monkeypatch, game, platform):
     monkeypatch.setattr(hooks, 'send_to_discord_audit', Mock())
     rcon = Mock()
     rcon.config.game = game
-    rcon.get_detailed_player_info.return_value = {'player_id': 'fake-eos-id', 'platform': platform}
+    rcon._get_adapted_player_info.return_value = {'iD': 'fake-eos-id', 'platform': platform}
     rcon.kick.return_value = True
     hooks.windows_store_player_check.__wrapped__(rcon, {}, 'player', 'fake-eos-id')
     rcon.kick.assert_called_once_with(player_id='fake-eos-id', player_name='player', reason='reason', by='admin')
@@ -74,7 +74,7 @@ def test_confirmed_pc_ban_uses_player_id_and_audits_success(monkeypatch, action,
     audit = Mock()
     monkeypatch.setattr(hooks, 'send_to_discord_audit', audit)
     rcon = Mock()
-    rcon.get_detailed_player_info.return_value = {'player_id': 'fake-eos-id', 'platform': 'PC_WinGDK'}
+    rcon._get_adapted_player_info.return_value = {'iD': 'fake-eos-id', 'platform': 'PC_WinGDK'}
     getattr(rcon, method).return_value = True
     hooks.windows_store_player_check.__wrapped__(rcon, {}, 'player', 'fake-eos-id')
     kwargs = {'player_id': 'fake-eos-id', 'reason': 'reason', 'by': 'admin'}
@@ -84,7 +84,7 @@ def test_confirmed_pc_ban_uses_player_id_and_audits_success(monkeypatch, action,
     audit.assert_called_once()
 
 
-@pytest.mark.parametrize('response', [None, {}, {'player_id': 'other', 'platform': 'PC_WinGDK'}])
+@pytest.mark.parametrize('response', [None, {}, {'iD': 'other', 'platform': 'PC_WinGDK'}])
 def test_missing_or_wrong_player_details_never_trigger_rule(monkeypatch, response):
     config = SimpleNamespace(enabled=True, action=WindowsStoreIdActionType.perma_ban,
                              player_message='reason', audit_message='{name}', audit_message_author='admin',
@@ -93,7 +93,7 @@ def test_missing_or_wrong_player_details_never_trigger_rule(monkeypatch, respons
                         lambda: SimpleNamespace(windows_store_players=config))
     monkeypatch.setattr(hooks, 'send_to_discord_audit', Mock())
     rcon = Mock()
-    rcon.get_detailed_player_info.return_value = response
+    rcon._get_adapted_player_info.return_value = response
     hooks.windows_store_player_check.__wrapped__(rcon, {}, 'player', 'fake-eos-id')
     rcon.perma_ban.assert_not_called()
 
@@ -105,12 +105,26 @@ def test_platform_lookup_failure_never_triggers_rule(monkeypatch):
     audit = Mock()
     monkeypatch.setattr(hooks, 'send_to_discord_audit', audit)
     rcon = Mock()
-    rcon.get_detailed_player_info.side_effect = TimeoutError('offline')
+    rcon._get_adapted_player_info.side_effect = TimeoutError('offline')
     hooks.windows_store_player_check.__wrapped__(rcon, {}, 'player', 'fake-eos-id')
     rcon.kick.assert_not_called()
     rcon.temp_ban.assert_not_called()
     rcon.perma_ban.assert_not_called()
     audit.assert_not_called()
+
+
+def test_fresh_console_platform_wins_over_stale_cached_pc_data(monkeypatch):
+    monkeypatch.setattr(hooks.RconServerSettingsUserConfig, 'load_from_db',
+                        lambda: SimpleNamespace(windows_store_players=SimpleNamespace(enabled=True)))
+    rcon = Mock()
+    rcon.get_detailed_player_info.return_value = {'player_id': 'fake-eos-id', 'platform': 'PC_WinGDK'}
+    rcon._get_adapted_player_info.return_value = {'iD': 'fake-eos-id', 'platform': 'EPlatform::PS5'}
+    hooks.windows_store_player_check.__wrapped__(rcon, {}, 'player', 'fake-eos-id')
+    rcon._get_adapted_player_info.assert_called_once_with('fake-eos-id')
+    rcon.get_detailed_player_info.assert_not_called()
+    rcon.kick.assert_not_called()
+    rcon.temp_ban.assert_not_called()
+    rcon.perma_ban.assert_not_called()
 
 
 @pytest.mark.parametrize('player_id', [None, '', ' '])
@@ -119,7 +133,7 @@ def test_missing_identity_never_triggers_a_lookup_or_action(monkeypatch, player_
                         lambda: SimpleNamespace(windows_store_players=SimpleNamespace(enabled=True)))
     rcon = Mock()
     hooks.windows_store_player_check.__wrapped__(rcon, {}, 'player', player_id)
-    rcon.get_detailed_player_info.assert_not_called()
+    rcon._get_adapted_player_info.assert_not_called()
     rcon.kick.assert_not_called()
 
 
@@ -133,7 +147,7 @@ def test_unconfirmed_action_does_not_claim_success(monkeypatch, accepted):
     audit = Mock()
     monkeypatch.setattr(hooks, 'send_to_discord_audit', audit)
     rcon = Mock()
-    rcon.get_detailed_player_info.return_value = {'player_id': 'fake-eos-id', 'platform': 'PC_WinGDK'}
+    rcon._get_adapted_player_info.return_value = {'iD': 'fake-eos-id', 'platform': 'PC_WinGDK'}
     rcon.kick.return_value = accepted
     hooks.windows_store_player_check.__wrapped__(rcon, {}, 'player', 'fake-eos-id')
     rcon.kick.assert_called_once()

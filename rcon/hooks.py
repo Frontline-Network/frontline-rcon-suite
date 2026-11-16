@@ -669,8 +669,10 @@ def windows_store_player_check(rcon: Rcon, _, name: str, player_id: str):
     # Windows-GDK platform can justify this rule. Unknown formats, mismatched
     # identities and unavailable player information must never be punished.
     try:
-        details = rcon.get_detailed_player_info(player_id=player_id)
-        if (not isinstance(details, dict) or str(details.get("player_id") or "") != str(player_id)
+        # The detailed-player helper is cached; a rapid reconnect on another
+        # platform must not inherit a previous session's PC classification.
+        details = rcon._get_adapted_player_info(player_id)
+        if (not isinstance(details, dict) or str(details.get("iD") or "") != str(player_id)
                 or not isinstance(details.get("platform"), str)
                 or details["platform"].strip().lower().rsplit("::", 1)[-1] != "pc_wingdk"):
             logger.warning("Skipping Windows Store rule: player platform is not confirmed as PC WinGDK")
