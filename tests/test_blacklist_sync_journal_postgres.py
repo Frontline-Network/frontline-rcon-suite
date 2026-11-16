@@ -415,6 +415,27 @@ def test_expired_queued_create_is_not_banned_after_reconnect(database, existing_
     server.temp_ban.assert_not_called()
 
 
+def test_offline_fourth_server_keeps_active_kick_only_record_until_ready(database, existing_blacklist, monkeypatch):
+    record_id, first, _second = existing_blacklist
+    with database() as session, session.begin():
+        session.delete(session.get(BlacklistRecord, record_id))
+        target = session.get(Blacklist, first)
+        target.servers = 1 << 3
+        target.sync = BlacklistSyncMethod.KICK_ONLY
+    monkeypatch.setattr(blacklist, "SERVER_NUMBER", 4)
+    monkeypatch.setattr(blacklist, "_get_set_player", lambda session, player_id: session.scalar(
+        select(PlayerID).where(PlayerID.player_id == player_id)))
+    blacklist.add_record_to_blacklist("synthetic-player", first, "reason", admin_name="tester")
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = mock.Mock()
+    assert journal.process_one(4, receiver.dispatch, is_ready=lambda: False) == "deferred"
+    receiver.rcon.kick.assert_not_called()
+    with database() as session:
+        row = session.scalar(select(journal.BlacklistSyncDelivery))
+        assert row.server_number == 4 and row.status == "queued"
+        assert session.scalar(select(BlacklistRecord)).is_expired() is None
+
+
 def test_rejected_game_server_action_is_not_acknowledged(database, existing_blacklist, monkeypatch):
     from unittest.mock import Mock
 
