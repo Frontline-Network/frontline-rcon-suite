@@ -50,6 +50,8 @@ def migrate(connection, method):
 def test_migration_preserves_old_rows_and_supports_server_32_and_wire(database):
     with database.begin() as connection:
         migrate(connection, "upgrade")
+        # A staged pilot may have widened the column before Alembic reaches it.
+        migrate(connection, "upgrade")
     with Session(database) as session, session.begin():
         old = session.get(Blacklist, 1)
         assert old.get_server_numbers() == {1, 31}
