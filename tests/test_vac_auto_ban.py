@@ -51,6 +51,35 @@ def test_missing_flags_fail_closed_only_when_exemptions_are_configured():
     assert should_ban(bans, float('inf'), 40, None, []) is True
 
 
+@pytest.mark.parametrize('blacklist_id', [None, 1])
+@pytest.mark.parametrize('days_since', [40, '40'])
+def test_expired_vac_action_does_not_create_a_ban_or_blacklist_record(blacklist_id, days_since):
+    player = SimpleNamespace(flags=[], steaminfo=SimpleNamespace(bans={
+        'VACBanned': True, 'DaysSinceLastBan': days_since, 'NumberOfGameBans': 0,
+    }))
+    config = SimpleNamespace(vac_history_days=40, game_ban_threshhold=0, whitelist_flags=[],
+        ban_on_vac_history_reason='VAC {DAYS_SINCE_LAST_BAN}', auto_expire=True, blacklist_id=blacklist_id)
+    with patch('rcon.hooks.VacGameBansUserConfig.load_from_db', return_value=config), \
+         patch('rcon.hooks.enter_session'), patch('rcon.hooks.get_player', return_value=player), \
+         patch('rcon.hooks.blacklist_or_ban') as ban:
+        ban_if_has_vac_bans(Mock(), 'synthetic-player', 'synthetic-name')
+    ban.assert_not_called()
+
+
+def test_vac_auto_expiry_accepts_numeric_string_when_time_remains():
+    player = SimpleNamespace(flags=[], steaminfo=SimpleNamespace(bans={
+        'VACBanned': True, 'DaysSinceLastBan': '39', 'NumberOfGameBans': 0,
+    }))
+    config = SimpleNamespace(vac_history_days=40, game_ban_threshhold=0, whitelist_flags=[],
+        ban_on_vac_history_reason='VAC {DAYS_SINCE_LAST_BAN}', auto_expire=True, blacklist_id=None)
+    with patch('rcon.hooks.VacGameBansUserConfig.load_from_db', return_value=config), \
+         patch('rcon.hooks.enter_session'), patch('rcon.hooks.get_player', return_value=player), \
+         patch('rcon.hooks.blacklist_or_ban', return_value=True) as ban:
+        ban_if_has_vac_bans(Mock(), 'synthetic-player', 'synthetic-name')
+    ban.assert_called_once()
+    assert ban.call_args.kwargs['expires_at'] is not None
+
+
 @pytest.mark.parametrize(
     "bans, max_game_bans, max_days_since_ban, player_flags, whitelist_flags, expected",
     [

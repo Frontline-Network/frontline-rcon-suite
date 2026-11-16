@@ -498,13 +498,16 @@ def ban_if_has_vac_bans(rcon: Rcon, player_id: str, name: str):
             player_flags=player.flags,
             whitelist_flags=whitelist_flags,
         ):
-            days_since_last_ban = bans["DaysSinceLastBan"]
+            days_since_last_ban = int(bans["DaysSinceLastBan"])
             reason = config.ban_on_vac_history_reason.format(
                 DAYS_SINCE_LAST_BAN=days_since_last_ban,
                 MAX_DAYS_SINCE_BAN=str(max_days_since_ban),
             )
             if config.auto_expire:
                 days_until_expire = max_days_since_ban - days_since_last_ban
+                if days_until_expire <= 0:
+                    logger.info("Skipping VAC action: calculated expiry has already been reached")
+                    return
                 expires_at = datetime.now(tz=timezone.utc) + timedelta(
                     days=days_until_expire
                 )
