@@ -20,6 +20,7 @@ from rcon.barricade import (
     send_to_barricade,
 )
 from rcon.cache_utils import get_redis_client
+from rcon.automods import action_guard
 from rcon.commands import HLLCommandFailedError
 from rcon.discord import dict_to_discord, send_to_discord_audit
 from rcon.models import (
@@ -44,11 +45,13 @@ from rcon.types import (
     PlayerActionState,
 )
 from rcon.utils import MISSING, get_server_number
+from rcon.vip_rewards.locking import lock
 
 logger = logging.getLogger(__name__)
 red = get_redis_client()
 
 SERVER_NUMBER = int(get_server_number())
+BLACKLIST_ACTION_GUARD_RULE = "BlacklistEnforcement"
 
 
 @contextmanager
@@ -392,7 +395,21 @@ def get_ban_state_from_record(record: BlacklistRecord | BlacklistRecordType | No
         return BanState.TEMP
 
 
+def _require_blacklist_action_review_clear(player_id: str):
+    pending = action_guard.pending_players(SERVER_NUMBER, BLACKLIST_ACTION_GUARD_RULE)
+    if '*' in pending or player_id in pending:
+        raise RuntimeError("Previous blacklist action awaits review")
+
+
 def synchronize_ban(
+    rcon: Rcon, player_id: str, new_record: BlacklistRecord | None, old_state: BanState
+):
+    with lock(f"blacklist-sync:{SERVER_NUMBER}"):
+        _require_blacklist_action_review_clear(player_id)
+        return _synchronize_ban(rcon, player_id, new_record, old_state)
+
+
+def _synchronize_ban(
     rcon: Rcon, player_id: str, new_record: BlacklistRecord | None, old_state: BanState
 ):
     """Update a ban associated with a blacklist record.
@@ -464,6 +481,39 @@ def apply_blacklist_punishment(
     player_id: str = None,
     player_name: str = None,
 ):
+    if player_id is None:
+        player_id = record.player.player_id
+    with lock(f"blacklist-sync:{SERVER_NUMBER}"):
+        try:
+            state = get_ban_state_from_record(record)
+            guard_action = "kick" if state == BanState.NONE else "ban"
+            token = action_guard.reserve(SERVER_NUMBER, player_id, [BLACKLIST_ACTION_GUARD_RULE], guard_action)
+        except Exception:
+            logger.exception("Blacklist action not sent: durable reservation unavailable")
+            return False
+        if token is None:
+            logger.warning("Blacklist action not sent: previous result awaits review")
+            return False
+        try:
+            result = _apply_blacklist_punishment(rcon, record, player_id=player_id, player_name=player_name)
+        except Exception:
+            logger.exception("Blacklist action result uncertain; reservation retained")
+            return False
+        if result is True or result is False:
+            try:
+                action_guard.finish(SERVER_NUMBER, player_id, token,
+                                    "confirmed" if result is True else "rejected", expected=1)
+            except Exception:
+                logger.exception("Could not finalize blacklist action; reservation retained")
+        return result is True
+
+
+def _apply_blacklist_punishment(
+    rcon: Rcon,
+    record: BlacklistRecord,
+    player_id: str = None,
+    player_name: str = None,
+):
     logger.info("Applying punishment to %s", player_id)
     try:
         state = get_ban_state_from_record(record)
@@ -519,8 +569,16 @@ def apply_blacklist_punishment(
                     by=f"BLACKLIST: {record.admin_name}",
                 )
 
-        if not accepted:
-            raise RuntimeError("Game server rejected blacklist action")
+        if accepted is not True:
+            logger.warning("Blacklist action was not confirmed")
+            try:
+                send_to_discord_audit(
+                    message="Failed to confirm blacklist action; please check the logs",
+                    command_name="blacklist", by="ERROR",
+                )
+            except Exception:
+                logger.exception("Unable to send blacklist error to audit log")
+            return False if accepted is False else None
 
     except Exception:
         logger.exception("Failed to apply blacklist")
@@ -532,7 +590,7 @@ def apply_blacklist_punishment(
             )
         except:
             logger.error("Unable to send blacklist error to audit log")
-        return False
+        return None
 
     else:
         try:
@@ -1028,6 +1086,10 @@ class BlacklistCommandHandler:
 
     def dispatch(self, data: bytes):
         """Execute one decoded delivery, propagating failures to its journal."""
+        with lock(f"blacklist-sync:{SERVER_NUMBER}"):
+            return self._dispatch(data)
+
+    def _dispatch(self, data: bytes):
         cmd = BlacklistCommand.decode(data)
         if not (cmd.server_mask & get_server_number_mask()):
             raise ValueError("Blacklist delivery targets another server")
@@ -1254,6 +1316,11 @@ class BlacklistCommandHandler:
             raise RuntimeError(f"Could not confirm {failures} blacklist synchronization(s)")
 
     def handle_expire_all(self, payload: BlacklistExpireAllCommand):
+        with lock(f"blacklist-sync:{SERVER_NUMBER}"):
+            _require_blacklist_action_review_clear(payload.player_id)
+            self._handle_expire_all(payload)
+
+    def _handle_expire_all(self, payload: BlacklistExpireAllCommand):
         """Handle all of a player's active blacklist records being expired,
         effectively granting them access to the server whilst keeping all
         previous blacklists logged.

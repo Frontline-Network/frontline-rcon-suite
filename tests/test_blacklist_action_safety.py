@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
+from contextlib import nullcontext
 
 import pytest
 from rcon import blacklist
@@ -9,6 +10,28 @@ from rcon.models import Blacklist, BlacklistRecord, PlayerID, PlayerName
 from rcon.types import BlacklistSyncMethod
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+
+
+@pytest.fixture(autouse=True)
+def fake_blacklist_guard(monkeypatch):
+    pending = {}
+
+    def reserve(server, player, rules, action):
+        if player in pending or '*' in pending:
+            return None
+        pending[player] = 'synthetic-token'
+        return 'synthetic-token'
+
+    def finish(server, player, token, result, *, expected):
+        assert pending[player] == token
+        del pending[player]
+        return 1
+
+    monkeypatch.setattr(blacklist, 'lock', lambda _key: nullcontext())
+    monkeypatch.setattr(blacklist.action_guard, 'reserve', reserve)
+    monkeypatch.setattr(blacklist.action_guard, 'finish', finish)
+    monkeypatch.setattr(blacklist.action_guard, 'pending_players', lambda *_args: set(pending))
+    return pending
 
 
 @pytest.mark.parametrize("state,method", [
@@ -41,6 +64,92 @@ def test_offline_ban_without_saved_name_uses_player_id(monkeypatch):
     monkeypatch.setattr(blacklist, "send_to_discord_audit", Mock())
     assert blacklist.apply_blacklist_punishment(server, record) is True
     assert server.perma_ban.call_args.kwargs["player_id"] == "id"
+
+
+@pytest.mark.parametrize('result', [None, TimeoutError('synthetic lost response')])
+def test_uncertain_blacklist_action_blocks_later_attempts(monkeypatch, fake_blacklist_guard, result):
+    record = SimpleNamespace(admin_name='tester', expires_at=None, get_formatted_reason=lambda: 'reason')
+    server = Mock()
+    if isinstance(result, Exception):
+        server.perma_ban.side_effect = result
+    else:
+        server.perma_ban.return_value = result
+    monkeypatch.setattr(blacklist, 'get_ban_state_from_record', lambda _: blacklist.BanState.PERMA)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', Mock())
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='synthetic', player_name='name') is False
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='synthetic', player_name='name') is False
+    server.perma_ban.assert_called_once()
+    assert fake_blacklist_guard == {'synthetic': 'synthetic-token'}
+
+
+def test_rejected_blacklist_action_can_be_retried(monkeypatch, fake_blacklist_guard):
+    record = SimpleNamespace(admin_name='tester', expires_at=None, get_formatted_reason=lambda: 'reason')
+    server = Mock()
+    server.perma_ban.return_value = False
+    monkeypatch.setattr(blacklist, 'get_ban_state_from_record', lambda _: blacklist.BanState.PERMA)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', Mock())
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='synthetic', player_name='name') is False
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='synthetic', player_name='name') is False
+    assert server.perma_ban.call_count == 2 and fake_blacklist_guard == {}
+
+
+def test_pending_blacklist_action_blocks_synchronization_removal(fake_blacklist_guard):
+    fake_blacklist_guard['synthetic'] = 'synthetic-token'
+    server = Mock()
+    with pytest.raises(RuntimeError, match='awaits review'):
+        blacklist.synchronize_ban(server, 'synthetic', None, blacklist.BanState.PERMA)
+    server.remove_perma_ban.assert_not_called()
+
+
+@pytest.mark.parametrize('pending_player', ['synthetic', '*'])
+def test_expire_all_does_not_remove_bans_while_review_is_pending(fake_blacklist_guard, pending_player):
+    fake_blacklist_guard[pending_player] = 'synthetic-token'
+    server = Mock()
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = server
+    with pytest.raises(RuntimeError, match='awaits review'):
+        handler.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+    server.get_temp_bans.assert_not_called()
+    server.get_perma_bans.assert_not_called()
+    server.remove_temp_ban.assert_not_called()
+    server.remove_perma_ban.assert_not_called()
+
+
+def test_expire_all_fails_closed_if_guard_database_is_unavailable(monkeypatch):
+    monkeypatch.setattr(blacklist.action_guard, 'pending_players', Mock(side_effect=RuntimeError('database offline')))
+    server = Mock()
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = server
+    with pytest.raises(RuntimeError, match='database offline'):
+        handler.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+    server.assert_not_called()
+
+
+def test_expire_all_proceeds_for_an_unrelated_player(fake_blacklist_guard):
+    fake_blacklist_guard['other-player'] = 'synthetic-token'
+    server = Mock()
+    server.get_temp_bans.return_value = [{'player_id': 'synthetic'}]
+    server.get_perma_bans.return_value = [{'player_id': 'synthetic'}]
+    server.remove_temp_ban.return_value = True
+    server.remove_perma_ban.return_value = True
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = server
+    handler.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+    server.remove_temp_ban.assert_called_once_with('synthetic')
+    server.remove_perma_ban.assert_called_once_with('synthetic')
+
+
+def test_confirmed_action_with_failed_finalization_is_not_resent(monkeypatch, fake_blacklist_guard):
+    record = SimpleNamespace(admin_name='tester', expires_at=None, get_formatted_reason=lambda: 'reason')
+    server = Mock()
+    server.perma_ban.return_value = True
+    monkeypatch.setattr(blacklist, 'get_ban_state_from_record', lambda _: blacklist.BanState.PERMA)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', Mock())
+    monkeypatch.setattr(blacklist.action_guard, 'finish', Mock(side_effect=RuntimeError('database unavailable')))
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='synthetic', player_name='name') is True
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='synthetic', player_name='name') is False
+    server.perma_ban.assert_called_once()
+    assert fake_blacklist_guard == {'synthetic': 'synthetic-token'}
 
 
 @pytest.mark.parametrize("reason", ["Evidence {", "Evidence }", "{player_id.no_such_attribute}"])

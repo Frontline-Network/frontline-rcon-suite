@@ -132,3 +132,21 @@ def test_uncertain_vac_ban_requires_audited_review(guard_api):
             action_guard.action_guard_history.c.token == token)).mappings().all()
     assert any(row['event'] == 'reviewed' and row['actor'] == 'Operator' and
                row['reason'] == 'checked server logs' for row in events)
+
+
+def test_uncertain_blacklist_action_requires_audited_review(guard_api):
+    token = action_guard.reserve(3, 'synthetic', ['BlacklistEnforcement'], 'ban')
+    response = invoke('get_pending_automod_actions', 'GET', {'api.can_view_player_profile'})
+    rows = json.loads(response.content)['result']['results']
+    assert any(row['token'] == token and row['actions'][0] == {'rule': 'BlacklistEnforcement', 'action': 'ban'} for row in rows)
+    body = {'player_id': 'synthetic', 'token': token, 'reason': 'checked server logs'}
+    assert invoke('review_pending_automod_action', 'POST', {'api.can_view_player_profile'}, body).status_code == 403
+    response = invoke('review_pending_automod_action', 'POST',
+                      {'api.can_view_player_profile', 'api.can_run_raw_commands'}, body)
+    assert response.status_code == 200 and json.loads(response.content)['result'] is True
+    assert action_guard.pending_players(3, 'BlacklistEnforcement') == set()
+    with guard_api() as session:
+        events = session.execute(select(action_guard.action_guard_history).where(
+            action_guard.action_guard_history.c.token == token)).mappings().all()
+    assert any(row['event'] == 'reviewed' and row['actor'] == 'Operator' and
+               row['reason'] == 'checked server logs' for row in events)

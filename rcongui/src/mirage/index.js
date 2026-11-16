@@ -961,8 +961,9 @@ export function makeServer({ environment = "development" } = {}) {
         const nameKick = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("name_kick_hold") === "1";
         const vac = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("vac_hold") === "1";
         const windowsStore = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("windows_store_hold") === "1";
+        const blacklist = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("blacklist_action_hold") === "1";
         return ok({ results: showFixture ? [{ token: "synthetic-token", player_id: globalHold ? "*" : "fake-console-id",
-          updated_at: "2023-11-14T22:13:20+00:00", actions: [{ rule: windowsStore ? "WindowsStore" : vac ? "VacHistory" : nameKick ? "NameKick" : switching ? "AutobalancerSwitch" : teamkill ? "AutoMod_TeamKillAfterConnect" : "AutoMod_NoLeaderWatch", action: windowsStore || vac ? "ban" : nameKick ? "kick" : switching ? "switch" : teamkill ? "ban" : "message" }] }] : [], more: false });
+          updated_at: "2023-11-14T22:13:20+00:00", actions: [{ rule: blacklist ? "BlacklistEnforcement" : windowsStore ? "WindowsStore" : vac ? "VacHistory" : nameKick ? "NameKick" : switching ? "AutobalancerSwitch" : teamkill ? "AutoMod_TeamKillAfterConnect" : "AutoMod_NoLeaderWatch", action: blacklist || windowsStore || vac ? "ban" : nameKick ? "kick" : switching ? "switch" : teamkill ? "ban" : "message" }] }] : [], more: false });
       });
       this.post("/review_pending_automod_action", (_schema, request) => {
         const payload = JSON.parse(request.requestBody);

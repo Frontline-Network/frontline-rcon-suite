@@ -49,6 +49,7 @@ from rcon.types import (
     SteamBansType,
     WindowsStoreIdActionType,
 )
+from rcon.vip_rewards.locking import lock
 from rcon.user_config.camera_notification import CameraNotificationUserConfig
 from rcon.user_config.chat_commands import (
     MESSAGE_VAR_RE,
@@ -416,11 +417,21 @@ def ban_if_blacklisted(rcon: Rcon, player_id: str, name: str):
         blacklist = is_player_blacklisted(sess, player_id)
         if not blacklist:
             return False, False
-
-        confirmed = apply_blacklist_punishment(
-            rcon, blacklist, player_id=player_id, player_name=name
-        )
-        return True, confirmed is True
+    try:
+        with lock(f"blacklist-sync:{int(get_server_number())}"):
+            # Re-read under the same lock used by blacklist synchronization;
+            # the first lookup may have raced with a record change.
+            with enter_session() as sess:
+                blacklist = is_player_blacklisted(sess, player_id)
+                if not blacklist:
+                    return False, False
+                confirmed = apply_blacklist_punishment(
+                    rcon, blacklist, player_id=player_id, player_name=name
+                )
+                return True, confirmed is True
+    except Exception:
+        logger.exception("Unable to confirm blacklist action; no VAC fallback")
+        return True, False
 
 
 def should_ban(
