@@ -7,6 +7,7 @@ crash or ambiguous reply that marker must be reviewed, never replayed blindly.
 
 from datetime import datetime, timezone
 import hashlib
+from time import monotonic
 
 from sqlalchemy import TIMESTAMP, CheckConstraint, LargeBinary, String, Text, func, select, text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -63,30 +64,30 @@ def process_one(server_number: int, handler, *, is_ready=None) -> str:
     """Process the oldest server delivery, failing closed on ambiguous work."""
     if not 1 <= server_number <= 32:
         raise ValueError("Server number must be between 1 and 32")
+    maker = get_session_maker()
+    ready = is_ready is None
+    probed_at = None
+    if is_ready is not None:
+        # A probe can block for the full RCON timeout. Never hold the shared
+        # producer/worker lock while waiting for an offline server: that would
+        # also stall unrelated blacklist writes and their API responses.
+        with maker() as session:
+            first = session.execute(
+                select(BlacklistSyncDelivery.status)
+                .where(BlacklistSyncDelivery.server_number == server_number,
+                       BlacklistSyncDelivery.status.in_(("queued", "sending", "review")))
+                .order_by(BlacklistSyncDelivery.id).limit(1)
+            ).scalar_one_or_none()
+        if first is None:
+            return "empty"
+        if first == "queued":
+            try:
+                ready = is_ready() is True
+                probed_at = monotonic()
+            except Exception:
+                ready = False
+
     with lock(f"blacklist-sync:{server_number}"):
-        maker = get_session_maker()
-        if is_ready is not None:
-            # Do not convert a known-offline target into an ambiguous delivery.
-            # Check outside a database transaction: the RCON read can block.
-            # The per-server advisory lock keeps another worker from taking
-            # the same item while we probe. In-flight/review rows are still
-            # processed below so a prior uncertain action is never retried.
-            with maker() as session:
-                first = session.execute(
-                    select(BlacklistSyncDelivery.status)
-                    .where(BlacklistSyncDelivery.server_number == server_number,
-                           BlacklistSyncDelivery.status.in_(("queued", "sending", "review")))
-                    .order_by(BlacklistSyncDelivery.id).limit(1)
-                ).scalar_one_or_none()
-            if first is None:
-                return "empty"
-            if first == "queued":
-                try:
-                    ready = is_ready() is True
-                except Exception:
-                    ready = False
-                if not ready:
-                    return "deferred"
         with maker() as session, session.begin():
             row = session.scalar(
                 select(BlacklistSyncDelivery)
@@ -104,6 +105,10 @@ def process_one(server_number: int, handler, *, is_ready=None) -> str:
                 row.reason = "process ended before delivery was confirmed"
                 row.updated_at = datetime.now(timezone.utc)
                 return "review"
+            if not ready or (probed_at is not None and monotonic() - probed_at > 5):
+                # The oldest row may have changed during the unlocked probe.
+                # A queued action needs a successful probe before dispatch.
+                return "deferred"
             # The handlers read the current source state. Consecutive changes
             # to the same record therefore need one reconciliation, not one
             # RCON action per historical version.

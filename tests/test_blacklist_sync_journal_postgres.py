@@ -116,6 +116,39 @@ def test_offline_server_does_not_block_an_online_server(database):
     offline.assert_called_once_with(b"first")
 
 
+def test_slow_offline_probe_does_not_block_new_blacklist_mutation(database):
+    queue(database, b"existing", (1 << 2) | (1 << 3))
+    entered, release = Event(), Event()
+
+    def slow_offline_probe():
+        entered.set()
+        assert release.wait(10)
+        return False
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        worker = executor.submit(journal.process_one, 4, mock.Mock(), is_ready=slow_offline_probe)
+        assert entered.wait(10)
+        writer = executor.submit(queue, database, b"new", (1 << 2) | (1 << 3))
+        try:
+            assert writer.result(timeout=2) == 2
+        finally:
+            release.set()
+        assert worker.result(timeout=10) == "deferred"
+    with database() as session:
+        assert len(session.scalars(select(journal.BlacklistSyncDelivery)).all()) == 4
+
+
+def test_stale_successful_probe_does_not_dispatch(database, monkeypatch):
+    queue(database, b"existing", 1)
+    times = iter((10.0, 16.0))
+    monkeypatch.setattr(journal, 'monotonic', lambda: next(times))
+    dispatch = mock.Mock()
+    assert journal.process_one(1, dispatch, is_ready=lambda: True) == 'deferred'
+    dispatch.assert_not_called()
+    with database() as session:
+        assert session.scalar(select(journal.BlacklistSyncDelivery.status)) == 'queued'
+
+
 def test_empty_queue_does_not_probe_or_dispatch(database):
     probe = mock.Mock()
     dispatch = mock.Mock()
