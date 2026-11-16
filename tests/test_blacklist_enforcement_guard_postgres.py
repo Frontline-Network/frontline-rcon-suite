@@ -95,6 +95,12 @@ def test_transition_hold_blocks_actions_until_audited_review(configured):
     assert not blacklist.apply_blacklist_punishment(api, make_record(), 'synthetic', 'name')
     with pytest.raises(RuntimeError, match='awaits review'):
         blacklist.synchronize_ban(api, 'synthetic', None, blacklist.BanState.PERMA)
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api
+    with pytest.raises(RuntimeError, match='awaits review'):
+        handler.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+    api.get_temp_bans.assert_not_called()
+    api.remove_temp_ban.assert_not_called()
     api.perma_ban.assert_not_called()
     api.remove_perma_ban.assert_not_called()
     assert action_guard.review(3, '*', token, 'operator', 'legacy actions checked') == 1

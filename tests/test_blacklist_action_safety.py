@@ -101,6 +101,20 @@ def test_pending_blacklist_action_blocks_synchronization_removal(fake_blacklist_
     server.remove_perma_ban.assert_not_called()
 
 
+@pytest.mark.parametrize('pending_player', ['synthetic', '*'])
+def test_expire_all_does_not_remove_bans_while_review_is_pending(fake_blacklist_guard, pending_player):
+    fake_blacklist_guard[pending_player] = 'synthetic-token'
+    server = Mock()
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = server
+    with pytest.raises(RuntimeError, match='awaits review'):
+        handler.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+    server.get_temp_bans.assert_not_called()
+    server.get_perma_bans.assert_not_called()
+    server.remove_temp_ban.assert_not_called()
+    server.remove_perma_ban.assert_not_called()
+
+
 def test_confirmed_action_with_failed_finalization_is_not_resent(monkeypatch, fake_blacklist_guard):
     record = SimpleNamespace(admin_name='tester', expires_at=None, get_formatted_reason=lambda: 'reason')
     server = Mock()

@@ -395,13 +395,17 @@ def get_ban_state_from_record(record: BlacklistRecord | BlacklistRecordType | No
         return BanState.TEMP
 
 
+def _require_blacklist_action_review_clear(player_id: str):
+    pending = action_guard.pending_players(SERVER_NUMBER, BLACKLIST_ACTION_GUARD_RULE)
+    if '*' in pending or player_id in pending:
+        raise RuntimeError("Previous blacklist action awaits review")
+
+
 def synchronize_ban(
     rcon: Rcon, player_id: str, new_record: BlacklistRecord | None, old_state: BanState
 ):
     with lock(f"blacklist-sync:{SERVER_NUMBER}"):
-        pending = action_guard.pending_players(SERVER_NUMBER, BLACKLIST_ACTION_GUARD_RULE)
-        if '*' in pending or player_id in pending:
-            raise RuntimeError("Previous blacklist action awaits review")
+        _require_blacklist_action_review_clear(player_id)
         return _synchronize_ban(rcon, player_id, new_record, old_state)
 
 
@@ -1312,6 +1316,11 @@ class BlacklistCommandHandler:
             raise RuntimeError(f"Could not confirm {failures} blacklist synchronization(s)")
 
     def handle_expire_all(self, payload: BlacklistExpireAllCommand):
+        with lock(f"blacklist-sync:{SERVER_NUMBER}"):
+            _require_blacklist_action_review_clear(payload.player_id)
+            self._handle_expire_all(payload)
+
+    def _handle_expire_all(self, payload: BlacklistExpireAllCommand):
         """Handle all of a player's active blacklist records being expired,
         effectively granting them access to the server whilst keeping all
         previous blacklists logged.
