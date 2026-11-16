@@ -1,5 +1,6 @@
 """Blacklist enforcement serialization against disposable PostgreSQL only."""
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from threading import Event
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -45,6 +46,39 @@ def test_rejected_action_can_be_retried(configured):
     assert action_guard.pending_players(3, 'BlacklistEnforcement') == set()
     assert not blacklist.apply_blacklist_punishment(api, make_record(), 'synthetic', 'name')
     assert api.perma_ban.call_count == 2
+
+
+def test_expiry_during_reservation_resolves_without_a_server_action(configured, monkeypatch):
+    record = make_record()
+    record.expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    api = Mock()
+    reserve = action_guard.reserve
+
+    def expire_after_reserving(*args, **kwargs):
+        token = reserve(*args, **kwargs)
+        record.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        return token
+
+    monkeypatch.setattr(action_guard, 'reserve', expire_after_reserving)
+    assert blacklist.apply_blacklist_punishment(api, record, 'synthetic', 'name') is blacklist._BLACKLIST_ACTION_EXPIRED
+    api.kick.assert_not_called()
+    api.temp_ban.assert_not_called()
+    api.perma_ban.assert_not_called()
+    assert action_guard.pending_players(3, 'BlacklistEnforcement') == set()
+    with configured() as session:
+        state = session.execute(action_guard.action_guard.select()).one().state
+    assert state == 'rejected'
+
+
+def test_expired_connect_record_is_not_reported_as_a_confirmed_action(configured):
+    record = make_record()
+    record.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    api = Mock()
+    with patch('rcon.hooks.enter_session'), patch('rcon.hooks.is_player_blacklisted', return_value=record):
+        assert hooks.ban_if_blacklisted(api, 'synthetic', 'name') == (True, False)
+    api.kick.assert_not_called()
+    api.temp_ban.assert_not_called()
+    api.perma_ban.assert_not_called()
 
 
 def test_synchronization_waits_for_connect_action_and_does_not_remove_after_timeout(configured):

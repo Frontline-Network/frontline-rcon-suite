@@ -9,6 +9,7 @@ from typing import Final
 from discord_webhook import DiscordEmbed
 
 import rcon.steam_utils as steam_utils
+from rcon.barricade_hllv_identity import verified_steam_id as _verified_hllv_steam_id
 from discord.utils import escape_markdown
 from rcon.arguments import max_arg_index, replace_params
 from rcon.automods import action_guard
@@ -410,22 +411,6 @@ def record_map_end(rcon: Rcon, struct_log: StructuredLogLineWithMetaData):
         end_timestamp=end,
         start_timestamp=current["start"],
     )
-
-
-def _verified_hllv_steam_id(rcon, player_id: str, player_info: dict | None) -> str | None:
-    """Trust only a current, self-consistent HLLV Steam player response."""
-    if (getattr(getattr(rcon, 'game_profile', None), 'game', None) != GameEnum.HLL_VIETNAM
-            or not isinstance(player_info, dict)
-            or player_info.get('player_id') != player_id
-            or player_info.get('eos_id') != player_id
-            or str(player_info.get('platform') or '').strip().lower() != 'eplatformfamily::steam'):
-        return None
-    steam_id = player_info.get('steam_id')
-    if not isinstance(steam_id, str) or not steam_utils.is_steam_id_64(steam_id):
-        return None
-    if len(player_id) != 32 or not all(c in '0123456789abcdefABCDEF' for c in player_id):
-        return None
-    return steam_id
 
 
 def _connect_blacklist_record(sess, player_id: str, verified_steam_id: str | None):

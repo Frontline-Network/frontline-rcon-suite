@@ -19,6 +19,7 @@ from rcon.barricade import (
     ServerRequestType,
     send_to_barricade,
 )
+from rcon.barricade_hllv_identity import prepare_online_steam_identity, verified_steam_id
 from rcon.cache_utils import get_redis_client
 from rcon.automods import action_guard
 from rcon.commands import HLLCommandFailedError
@@ -38,10 +39,12 @@ from rcon.player_history import (
     unaccent,
 )
 from rcon.rcon import Rcon, get_rcon
+from rcon.steam_utils import is_steam_id_64
 from rcon.types import (
     BlacklistRecordType,
     BlacklistRecordWithBlacklistType,
     BlacklistType,
+    GameEnum,
     PlayerActionState,
 )
 from rcon.utils import MISSING, get_server_number
@@ -363,6 +366,14 @@ def round_timedelta_to_hours(td: timedelta | datetime):
     return max(round(td.total_seconds() / (60 * 60)), 1)
 
 
+def _blacklist_record_has_expired(record: BlacklistRecord) -> bool:
+    expires_at = normalize_blacklist_expiry(getattr(record, "expires_at", None))
+    return expires_at is not None and expires_at <= datetime.now(tz=timezone.utc)
+
+
+_BLACKLIST_ACTION_EXPIRED = object()
+
+
 class BanState(IntEnum):
     NONE = 0
     TEMP = 1
@@ -469,9 +480,10 @@ def _synchronize_ban(
         # we don't need to do anything as of now.
         return
 
-    if not apply_blacklist_punishment(
+    result = apply_blacklist_punishment(
         rcon, new_record, player_id=player_id, player_name=player_name
-    ):
+    )
+    if result is not True and result is not _BLACKLIST_ACTION_EXPIRED:
         raise RuntimeError("Could not confirm blacklist action")
 
 
@@ -484,6 +496,9 @@ def apply_blacklist_punishment(
     if player_id is None:
         player_id = record.player.player_id
     with lock(f"blacklist-sync:{SERVER_NUMBER}"):
+        if _blacklist_record_has_expired(record):
+            logger.info("Skipping blacklist action: record has expired")
+            return _BLACKLIST_ACTION_EXPIRED
         try:
             state = get_ban_state_from_record(record)
             guard_action = "kick" if state == BanState.NONE else "ban"
@@ -499,13 +514,13 @@ def apply_blacklist_punishment(
         except Exception:
             logger.exception("Blacklist action result uncertain; reservation retained")
             return False
-        if result is True or result is False:
+        if result is True or result is False or result is _BLACKLIST_ACTION_EXPIRED:
             try:
                 action_guard.finish(SERVER_NUMBER, player_id, token,
                                     "confirmed" if result is True else "rejected", expected=1)
             except Exception:
                 logger.exception("Could not finalize blacklist action; reservation retained")
-        return result is True
+        return result if result is _BLACKLIST_ACTION_EXPIRED else result is True
 
 
 def _apply_blacklist_punishment(
@@ -516,6 +531,12 @@ def _apply_blacklist_punishment(
 ):
     logger.info("Applying punishment to %s", player_id)
     try:
+        # A record can expire after it was selected or while the action guard
+        # was being reserved. Never turn that stale record into a new kick or
+        # the minimum one-hour server ban.
+        if _blacklist_record_has_expired(record):
+            logger.info("Skipping blacklist action: record has expired")
+            return _BLACKLIST_ACTION_EXPIRED
         state = get_ban_state_from_record(record)
         reason = record.get_formatted_reason()
 
@@ -524,6 +545,10 @@ def _apply_blacklist_punishment(
         if player_name is None:
             names = record.player.names
             player_name = names[0].name if names else player_id
+
+        if _blacklist_record_has_expired(record):
+            logger.info("Skipping blacklist action: record has expired")
+            return _BLACKLIST_ACTION_EXPIRED
 
         # Apply any bans/kicks
         match state:
@@ -1070,7 +1095,8 @@ class BlacklistCommandHandler:
         while not stop_event.is_set():
             try:
                 from rcon.blacklist_sync_journal import process_one
-                process_one(SERVER_NUMBER, self.dispatch, is_ready=self._game_server_ready)
+                process_one(SERVER_NUMBER, self.dispatch, is_ready=self._game_server_ready,
+                            prepare=self._prepare_delivery)
             except Exception:
                 logger.exception("Unable to process durable blacklist delivery")
             message = self.pubsub.get_message(timeout=1.0)
@@ -1079,7 +1105,7 @@ class BlacklistCommandHandler:
             try:
                 data = message["data"]
                 if BlacklistCommand.decode(data).server_mask & get_server_number_mask():
-                    self.dispatch(data)
+                    self.dispatch(data, self._prepare_delivery(data))
             except Exception:
                 logger.exception("Failed to process legacy blacklist notification")
         self.pubsub.close()
@@ -1093,12 +1119,27 @@ class BlacklistCommandHandler:
             logger.debug("Blacklist synchronization deferred: game server unavailable")
             return False
 
-    def dispatch(self, data: bytes):
+    def _prepare_delivery(self, data: bytes):
+        """Resolve online Steam identities before acquiring the shared lock."""
+        try:
+            cmd = BlacklistCommand.decode(data)
+        except Exception:
+            # Leave malformed entries to normal dispatch, which moves them to
+            # review instead of deferring them forever as a failed live read.
+            return None
+        if (cmd.command == BlacklistCommandType.CREATE_RECORD
+                and getattr(getattr(self.rcon, 'game_profile', None), 'game', None) == GameEnum.HLL_VIETNAM
+                and isinstance(cmd.payload.get('player_id'), str)
+                and is_steam_id_64(cmd.payload['player_id'])):
+            return prepare_online_steam_identity(self.rcon, cmd.payload['player_id'])
+        return None
+
+    def dispatch(self, data: bytes, prepared=None):
         """Execute one decoded delivery, propagating failures to its journal."""
         with lock(f"blacklist-sync:{SERVER_NUMBER}"):
-            return self._dispatch(data)
+            return self._dispatch(data, prepared)
 
-    def _dispatch(self, data: bytes):
+    def _dispatch(self, data: bytes, prepared=None):
         cmd = BlacklistCommand.decode(data)
         if not (cmd.server_mask & get_server_number_mask()):
             raise ValueError("Blacklist delivery targets another server")
@@ -1113,7 +1154,11 @@ class BlacklistCommandHandler:
         }
         schema, handler = handlers[cmd.command]
         logger.info("Handling %s command", cmd.command.name)
-        handler(schema.model_validate(cmd.payload))
+        payload = schema.model_validate(cmd.payload)
+        if cmd.command == BlacklistCommandType.CREATE_RECORD:
+            handler(payload, prepared=prepared)
+        else:
+            handler(payload)
 
     @staticmethod
     def send(cmd: BlacklistCommand):
@@ -1123,7 +1168,7 @@ class BlacklistCommandHandler:
 
         red.publish(BlacklistCommandHandler.CHANNEL, cmd.encode())
 
-    def handle_create_record(self, payload: BlacklistCreateRecordCommand):
+    def handle_create_record(self, payload: BlacklistCreateRecordCommand, prepared=None):
         """Handle a new record being created."""
         with blacklist_change_session() as sess:
             top_record = is_player_blacklisted(sess, player_id=payload.player_id)
@@ -1134,6 +1179,30 @@ class BlacklistCommandHandler:
                 logger.info(
                     "Newly created record does not take priority and will be ignored"
                 )
+                return
+
+            if (getattr(getattr(self.rcon, 'game_profile', None), 'game', None) == GameEnum.HLL_VIETNAM
+                    and is_steam_id_64(payload.player_id)):
+                if not isinstance(prepared, dict) or prepared.get('steam_id') != payload.player_id:
+                    raise RuntimeError('HLLV Steam identity was not prepared')
+                eos_id = prepared.get('eos_id')
+                if eos_id is None:
+                    if top_record.blacklist.sync == BlacklistSyncMethod.BAN_IMMEDIATELY:
+                        raise RuntimeError('No verified online EOS identity for immediate ban')
+                    logger.info('Steam restriction retained for the next verified HLLV connection')
+                    return
+                eos_record = is_player_blacklisted(sess, player_id=eos_id)
+                if eos_record is not None and get_highest_priority_record([top_record, eos_record]).id != top_record.id:
+                    logger.info('Existing EOS restriction has higher priority')
+                    return
+                with self.rcon.without_retries():
+                    details = self.rcon.get_detailed_player_info(player_id=eos_id)
+                if verified_steam_id(self.rcon, eos_id, details) != payload.player_id:
+                    raise RuntimeError('HLLV Steam-to-EOS association changed before action')
+                result = apply_blacklist_punishment(self.rcon, top_record, player_id=eos_id,
+                                                    player_name=details.get('name'))
+                if result is not True and result is not _BLACKLIST_ACTION_EXPIRED:
+                    raise RuntimeError('Could not confirm HLLV blacklist action')
                 return
 
             old_record = is_player_blacklisted(

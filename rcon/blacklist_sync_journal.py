@@ -7,6 +7,7 @@ crash or ambiguous reply that marker must be reviewed, never replayed blindly.
 
 from datetime import datetime, timezone
 import hashlib
+import logging
 from time import monotonic
 
 from sqlalchemy import TIMESTAMP, CheckConstraint, LargeBinary, String, Text, func, select, text
@@ -14,6 +15,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from rcon.models import Base, get_session_maker
 from rcon.vip_rewards.locking import lock
+
+logger = logging.getLogger(__name__)
 
 
 class BlacklistSyncDelivery(Base):
@@ -60,32 +63,45 @@ def enqueue(session, command: bytes, server_mask: int) -> int:
     return len(targets)
 
 
-def process_one(server_number: int, handler, *, is_ready=None) -> str:
+def process_one(server_number: int, handler, *, is_ready=None, prepare=None) -> str:
     """Process the oldest server delivery, failing closed on ambiguous work."""
     if not 1 <= server_number <= 32:
         raise ValueError("Server number must be between 1 and 32")
     maker = get_session_maker()
     ready = is_ready is None
     probed_at = None
-    if is_ready is not None:
+    prepared_at = prepared_id = prepared = None
+    if is_ready is not None or prepare is not None:
         # A probe can block for the full RCON timeout. Never hold the shared
         # producer/worker lock while waiting for an offline server: that would
         # also stall unrelated blacklist writes and their API responses.
         with maker() as session:
             first = session.execute(
-                select(BlacklistSyncDelivery.status)
+                select(BlacklistSyncDelivery.id, BlacklistSyncDelivery.status,
+                       BlacklistSyncDelivery.command)
                 .where(BlacklistSyncDelivery.server_number == server_number,
                        BlacklistSyncDelivery.status.in_(("queued", "sending", "review")))
                 .order_by(BlacklistSyncDelivery.id).limit(1)
-            ).scalar_one_or_none()
+            ).one_or_none()
         if first is None:
             return "empty"
-        if first == "queued":
-            try:
-                ready = is_ready() is True
-                probed_at = monotonic()
-            except Exception:
-                ready = False
+        if first.status == "queued":
+            if is_ready is not None:
+                try:
+                    ready = is_ready() is True
+                    probed_at = monotonic()
+                except Exception:
+                    ready = False
+            if ready and prepare is not None:
+                try:
+                    prepared = prepare(first.command)
+                    prepared_id = first.id
+                    prepared_at = monotonic()
+                except Exception as exc:
+                    # No side effect was attempted. Leave the row queued for
+                    # a later fresh read rather than marking it uncertain.
+                    logger.warning('Blacklist preparation deferred (%s)', type(exc).__name__)
+                    return "deferred"
 
     with lock(f"blacklist-sync:{server_number}"):
         with maker() as session, session.begin():
@@ -108,6 +124,11 @@ def process_one(server_number: int, handler, *, is_ready=None) -> str:
             if not ready or (probed_at is not None and monotonic() - probed_at > 5):
                 # The oldest row may have changed during the unlocked probe.
                 # A queued action needs a successful probe before dispatch.
+                return "deferred"
+            if prepare is not None and (prepared_id != row.id or prepared_at is None
+                                        or monotonic() - prepared_at > 5):
+                # Another worker may have advanced the queue while preparing.
+                # Never apply a snapshot to a different or stale delivery.
                 return "deferred"
             # The handlers read the current source state. Consecutive changes
             # to the same record therefore need one reconciliation, not one
@@ -210,7 +231,7 @@ def process_one(server_number: int, handler, *, is_ready=None) -> str:
             delivery_ids, command = [item.id for item in group], row.command
 
         try:
-            if handler(command) is False:
+            if (handler(command, prepared) if prepare is not None else handler(command)) is False:
                 raise RuntimeError("game server rejected blacklist synchronization")
         except Exception as exc:
             with maker() as session, session.begin():
