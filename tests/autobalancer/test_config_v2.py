@@ -31,3 +31,15 @@ def test_hard_warning_must_not_be_below_soft_limit():
 def test_skill_first_cannot_be_selected_as_executable_strategy():
     with pytest.raises(ValidationError):
         AutobalancerUserConfig(skill_strategy="skill-first")
+
+
+@pytest.mark.parametrize("command", ["!", " ! ", "  ", "! with-space", "!" + "a" * 32])
+def test_invalid_volunteer_command_is_rejected_after_trimming(command):
+    with pytest.raises(ValidationError):
+        AutobalancerUserConfig(volunteer_command=command)
+
+
+@pytest.mark.parametrize("language", ["de", "en", "fr", "de+en+fr"])
+def test_volunteer_command_is_trimmed_before_validating(language):
+    config = AutobalancerUserConfig(volunteer_command="  !balance  ", message_language=language)
+    assert config.volunteer_command == "!balance"

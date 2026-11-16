@@ -398,10 +398,14 @@ class AutobalancerUserConfig(BaseUserConfig):
         description="Eigenständige französische Vorlagen mit denselben Platzhaltern.",
     )
 
+    @field_validator("volunteer_command", mode="before")
+    @classmethod
+    def normalize_volunteer_command(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
     @field_validator("volunteer_command")
     @classmethod
     def validate_volunteer_command(cls, value: str) -> str:
-        value = value.strip()
         if not value.startswith("!") or any(character.isspace() for character in value):
             raise ValueError("volunteer_command muss ein einzelner !Chatbefehl sein")
         return value
