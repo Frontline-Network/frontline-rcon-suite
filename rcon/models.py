@@ -2091,7 +2091,7 @@ class Blacklist(Base):
     sync: Mapped[BlacklistSyncMethod] = mapped_column(
         Enum(BlacklistSyncMethod), default=BlacklistSyncMethod.KICK_ONLY
     )
-    servers: Mapped[Optional[int]]
+    servers: Mapped[Optional[int]] = mapped_column(BigInteger)
 
     records: Mapped[list["BlacklistRecord"]] = relationship(
         back_populates="blacklist", cascade="all, delete"
