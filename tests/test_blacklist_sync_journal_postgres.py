@@ -297,6 +297,52 @@ def existing_blacklist(database, monkeypatch):
         return record.id, first.id, second.id
 
 
+def test_hllv_steam_restriction_targets_verified_eos_with_real_database(database, existing_blacklist, monkeypatch):
+    from contextlib import contextmanager
+    from rcon import hooks
+
+    eos = '0123456789abcdef0123456789abcdef'
+    steam = '76561198036685843'
+    record_id, first, _ = existing_blacklist
+    with database() as session, session.begin():
+        record = session.get(BlacklistRecord, record_id)
+        record.player.player_id = steam
+        record.blacklist.servers = 4  # RCON3 only.
+        session.add(PlayerID(player_id=eos))
+    @contextmanager
+    def session_scope():
+        with database() as session:
+            yield session
+    monkeypatch.setattr(hooks, 'enter_session', session_scope)
+    monkeypatch.setattr(hooks, 'get_server_number', lambda: 3)
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', mock.Mock())
+    api = mock.Mock()
+    api.perma_ban.return_value = True
+    assert hooks.ban_if_blacklisted(api, eos, 'synthetic', verified_steam_id=steam) == (True, True)
+    assert api.perma_ban.call_args.kwargs['player_id'] == eos
+    assert action_guard.pending_players(3, 'BlacklistEnforcement') == set()
+
+
+def test_hllv_alias_respects_expiry_and_server_scope(database, existing_blacklist, monkeypatch):
+    from rcon import hooks
+
+    record_id, first, _ = existing_blacklist
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    with database() as session, session.begin():
+        record = session.get(BlacklistRecord, record_id)
+        record.player.player_id = '76561198036685843'
+        record.blacklist.servers = 2  # Different server.
+    with database() as session:
+        assert hooks._connect_blacklist_record(session, 'synthetic-eos', '76561198036685843') is None
+    with database() as session, session.begin():
+        record = session.get(BlacklistRecord, record_id)
+        record.blacklist.servers = 4
+        record.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    with database() as session:
+        assert hooks._connect_blacklist_record(session, 'synthetic-eos', '76561198036685843') is None
+
+
 def test_edit_commits_both_target_deliveries_with_record(database, existing_blacklist):
     record_id, _first, second = existing_blacklist
     result = blacklist.edit_record_from_blacklist(record_id, blacklist_id=second, reason="new")

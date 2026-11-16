@@ -15,6 +15,7 @@ from rcon.automods import action_guard
 from rcon.blacklist import (
     apply_blacklist_punishment,
     blacklist_or_ban,
+    get_highest_priority_record,
     is_player_blacklisted,
 )
 from rcon.cache_utils import invalidates, get_redis_client
@@ -411,10 +412,34 @@ def record_map_end(rcon: Rcon, struct_log: StructuredLogLineWithMetaData):
     )
 
 
-def ban_if_blacklisted(rcon: Rcon, player_id: str, name: str):
+def _verified_hllv_steam_id(rcon, player_id: str, player_info: dict | None) -> str | None:
+    """Trust only a current, self-consistent HLLV Steam player response."""
+    if (getattr(getattr(rcon, 'game_profile', None), 'game', None) != GameEnum.HLL_VIETNAM
+            or not isinstance(player_info, dict)
+            or player_info.get('player_id') != player_id
+            or player_info.get('eos_id') != player_id
+            or str(player_info.get('platform') or '').strip().lower() != 'eplatformfamily::steam'):
+        return None
+    steam_id = player_info.get('steam_id')
+    if not isinstance(steam_id, str) or not steam_utils.is_steam_id_64(steam_id):
+        return None
+    if len(player_id) != 32 or not all(c in '0123456789abcdefABCDEF' for c in player_id):
+        return None
+    return steam_id
+
+
+def _connect_blacklist_record(sess, player_id: str, verified_steam_id: str | None):
+    records = [is_player_blacklisted(sess, player_id)]
+    if verified_steam_id and verified_steam_id != player_id:
+        records.append(is_player_blacklisted(sess, verified_steam_id))
+    records = [record for record in records if record is not None]
+    return get_highest_priority_record(records) if records else None
+
+
+def ban_if_blacklisted(rcon: Rcon, player_id: str, name: str, verified_steam_id: str | None = None):
     """Return whether a restriction exists and whether its action was confirmed."""
     with enter_session() as sess:
-        blacklist = is_player_blacklisted(sess, player_id)
+        blacklist = _connect_blacklist_record(sess, player_id, verified_steam_id)
         if not blacklist:
             return False, False
     try:
@@ -422,7 +447,7 @@ def ban_if_blacklisted(rcon: Rcon, player_id: str, name: str):
             # Re-read under the same lock used by blacklist synchronization;
             # the first lookup may have raced with a record change.
             with enter_session() as sess:
-                blacklist = is_player_blacklisted(sess, player_id)
+                blacklist = _connect_blacklist_record(sess, player_id, verified_steam_id)
                 if not blacklist:
                     return False, False
                 confirmed = apply_blacklist_punishment(
@@ -613,7 +638,10 @@ def handle_on_connect(
     if player_info:
         PlayerSoldier.update(player_info)
 
-    blacklisted, blacklist_action_confirmed = ban_if_blacklisted(rcon, player_id, struct_log["player_name_1"])
+    verified_steam_id = _verified_hllv_steam_id(rcon, player_id, player_info)
+    blacklisted, blacklist_action_confirmed = ban_if_blacklisted(
+        rcon, player_id, struct_log["player_name_1"], verified_steam_id=verified_steam_id
+    )
     if blacklist_action_confirmed:
         # We don't need the player potentially blacklisted a second
         # time because of VAC bans. So we return here.
