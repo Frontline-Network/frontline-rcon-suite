@@ -25,7 +25,7 @@ if [[ "$mode" != "--check-only" && "$mode" != "--deploy" ]]; then
   exit 2
 fi
 
-for command_name in git docker mktemp sha256sum; do
+for command_name in git docker mktemp sha256sum python3; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "Required command not found: $command_name" >&2
     exit 1
@@ -93,9 +93,13 @@ git diff --check "$current_sha" "$target_sha"
 
 target_override="$(mktemp "${TMPDIR:-/tmp}/crcon-compose.XXXXXX.yaml")"
 target_worker_override="$(mktemp "${TMPDIR:-/tmp}/crcon-workers.XXXXXX.yaml")"
-trap 'rm -f "$target_override" "$target_worker_override"' EXIT
+target_health_override="$(mktemp "${TMPDIR:-/tmp}/crcon-health.XXXXXX.json")"
+target_health_generator="$(mktemp "${TMPDIR:-/tmp}/crcon-health-generator.XXXXXX.py")"
+trap 'rm -f "$target_override" "$target_worker_override" "$target_health_override" "$target_health_generator"' EXIT
 git show "$target_sha:compose.mobile-admin.yaml" > "$target_override"
 git show "$target_sha:compose.combined-workers.yaml" > "$target_worker_override"
+git show "$target_sha:scripts/backend_health_override.py" > "$target_health_generator"
+python3 "$target_health_generator" "$target_health_override" "${deployment_services[@]}"
 
 resolved_environment="$(
   docker compose \
@@ -103,6 +107,7 @@ resolved_environment="$(
     -f compose.yaml \
     -f "$target_override" \
     -f "$target_worker_override" \
+    -f "$target_health_override" \
     config --environment
 )"
 mobile_integration_enabled="$(
@@ -218,6 +223,7 @@ HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
   -f compose.yaml \
   -f "$target_override" \
   -f "$target_worker_override" \
+  -f "$target_health_override" \
   config --quiet
 
 combined_worker_enabled=false
@@ -255,6 +261,44 @@ fi
 if [[ "$current_sha" == "$target_sha" ]]; then
   echo "Already deployed at $target_short."
   exit 0
+fi
+
+verify_readiness_images() {
+  local images="$1" backend_image
+  while IFS= read -r backend_image; do
+    [[ -n "$backend_image" ]] || continue
+    if ! docker image inspect "$backend_image" >/dev/null 2>&1; then
+      docker pull "$backend_image"
+    fi
+    if ! docker run --rm --network none --entrypoint python "$backend_image" -c \
+      'import sys; from pathlib import Path; p=Path("/code/scripts/backend_healthcheck.py"); u=Path("/code/rconweb/rconweb/urls.py"); sys.exit(0 if p.is_file() and u.is_file() and "healthz" in u.read_text() else 1)'; then
+      echo "Backend image is missing the required readiness probe or endpoint; deployment stopped." >&2
+      return 1
+    fi
+  done <<< "$images"
+}
+
+# Backends above 4 may retain a separately configured legacy image. Verify
+# those images before checkout or worker changes; unlike the managed images,
+# they are not guaranteed to be built by the Frontline override below.
+extra_backend_services=()
+for service in "${deployment_services[@]}"; do
+  if [[ "$service" =~ ^backend_([1-9][0-9]*)$ ]]; then
+    number="${BASH_REMATCH[1]}"
+    if (( number > 4 && number <= 32 )); then
+      extra_backend_services+=("$service")
+    fi
+  fi
+done
+if ((${#extra_backend_services[@]})); then
+  extra_backend_images="$(
+    HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
+      CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
+      "${target_profiles[@]}" -f compose.yaml -f "$target_override" \
+      -f "$target_worker_override" -f "$target_health_override" config --format json |
+      python3 "$target_health_generator" --images "${extra_backend_services[@]}"
+  )"
+  verify_readiness_images "$extra_backend_images"
 fi
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -305,6 +349,7 @@ compose_target() {
     -f compose.yaml \
     -f compose.mobile-admin.yaml \
     -f compose.combined-workers.yaml \
+    -f "$target_health_override" \
     "$@"
 }
 
@@ -318,8 +363,36 @@ compose_all_worker_profiles() {
     -f compose.yaml \
     -f compose.mobile-admin.yaml \
     -f compose.combined-workers.yaml \
+    -f "$target_health_override" \
     "$@"
 }
+
+# Build and validate every configured backend image before stopping workers.
+# Some generated installations use a different image for backend 5 and up;
+# do not apply a probe that such an image cannot possibly satisfy.
+abort_before_service_change() {
+  echo "Deployment stopped before changing running services." >&2
+  if git diff --quiet && git diff --cached --quiet && git reset --keep "$current_sha"; then
+    echo "Restored the previous checkout; runtime and environment were not changed." >&2
+  else
+    echo "Could not safely restore the previous checkout; inspect the worktree before retrying." >&2
+  fi
+  exit 1
+}
+echo "Building immutable images for $target_short..."
+if ! compose_target build --pull "${deployment_services[@]}"; then
+  abort_before_service_change
+fi
+if ! backend_images="$(
+  compose_target config --format json |
+    python3 "$target_health_generator" --images "${deployment_services[@]}"
+)"; then
+  abort_before_service_change
+fi
+if ! verify_readiness_images "$backend_images"; then
+  abort_before_service_change
+fi
+
 if [[ "$background_worker_mode" == combined ]]; then
   # Configured services from the inactive split profile are not orphans. Stop
   # them explicitly so a host can never poll the same outbox twice.
@@ -346,8 +419,6 @@ else
       >/dev/null 2>&1 || true
   fi
 fi
-echo "Building immutable images for $target_short..."
-compose_target build --pull "${deployment_services[@]}"
 
 env_tmp="$(mktemp "$repo_root/.env.XXXXXX")"
 awk -v image_tag="$target_short" -v release_version="$target_version" \
