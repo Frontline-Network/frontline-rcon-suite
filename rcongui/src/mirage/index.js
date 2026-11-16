@@ -959,8 +959,9 @@ export function makeServer({ environment = "development" } = {}) {
         const teamkill = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("teamkill_hold") === "1";
         const switching = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("switch_hold") === "1";
         const nameKick = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("name_kick_hold") === "1";
+        const vac = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("vac_hold") === "1";
         return ok({ results: showFixture ? [{ token: "synthetic-token", player_id: globalHold ? "*" : "fake-console-id",
-          updated_at: "2023-11-14T22:13:20+00:00", actions: [{ rule: nameKick ? "NameKick" : switching ? "AutobalancerSwitch" : teamkill ? "AutoMod_TeamKillAfterConnect" : "AutoMod_NoLeaderWatch", action: nameKick ? "kick" : switching ? "switch" : teamkill ? "ban" : "message" }] }] : [], more: false });
+          updated_at: "2023-11-14T22:13:20+00:00", actions: [{ rule: vac ? "VacHistory" : nameKick ? "NameKick" : switching ? "AutobalancerSwitch" : teamkill ? "AutoMod_TeamKillAfterConnect" : "AutoMod_NoLeaderWatch", action: vac ? "ban" : nameKick ? "kick" : switching ? "switch" : teamkill ? "ban" : "message" }] }] : [], more: false });
       });
       this.post("/review_pending_automod_action", (_schema, request) => {
         const payload = JSON.parse(request.requestBody);

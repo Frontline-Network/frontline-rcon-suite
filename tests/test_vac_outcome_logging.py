@@ -7,6 +7,13 @@ import pytest
 from rcon.hooks import ban_if_has_vac_bans
 
 
+@pytest.fixture(autouse=True)
+def fake_vac_guard(monkeypatch):
+    monkeypatch.setattr('rcon.hooks.get_server_number', lambda: 3)
+    monkeypatch.setattr('rcon.hooks.action_guard.reserve', Mock(return_value='synthetic-token'))
+    monkeypatch.setattr('rcon.hooks.action_guard.finish', Mock(return_value=1))
+
+
 @pytest.mark.parametrize('result', [False, None])
 def test_unconfirmed_direct_vac_ban_is_not_logged_as_success(result, caplog):
     player = SimpleNamespace(flags=[], steaminfo=SimpleNamespace(bans={

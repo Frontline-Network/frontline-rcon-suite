@@ -17,6 +17,7 @@ TABLE = 'automod_action_guard'
 CONSTRAINT = 'ck_automod_guard_action'
 OLD = {'message', 'punish', 'kick'}
 NEW = OLD | {'switch'}
+LATER = NEW | {'ban'}
 
 
 def _set_allowed(target):
@@ -27,6 +28,10 @@ def _set_allowed(target):
         raise RuntimeError('Automatic action guard constraint is missing or ambiguous')
     values = set(re.findall(r"'([^']+)'", matches[0]['sqltext']))
     if values == target:
+        return
+    # A later migration may have been staged without advancing the shared
+    # Alembic revision. Never narrow it while replaying this upgrade.
+    if target == NEW and values == LATER:
         return
     if values not in (OLD, NEW):
         raise RuntimeError('Unexpected automatic action guard constraint')

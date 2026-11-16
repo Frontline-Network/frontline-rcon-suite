@@ -6,6 +6,13 @@ from rcon.hooks import ban_if_has_vac_bans, should_ban
 from rcon.models import PlayerFlag
 
 
+@pytest.fixture(autouse=True)
+def fake_vac_guard(monkeypatch):
+    monkeypatch.setattr('rcon.hooks.get_server_number', lambda: 3)
+    monkeypatch.setattr('rcon.hooks.action_guard.reserve', Mock(return_value='synthetic-token'))
+    monkeypatch.setattr('rcon.hooks.action_guard.finish', Mock(return_value=1))
+
+
 @pytest.mark.parametrize('flag', ['trusted', {'flag': 'trusted'}, PlayerFlag(flag='trusted')])
 def test_whitelisted_flag_prevents_eligible_vac_ban(flag):
     bans = {'VACBanned': True, 'DaysSinceLastBan': 1, 'NumberOfGameBans': 0}
