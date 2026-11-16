@@ -30,7 +30,7 @@ from rcon.logs.loop import (
     on_match_start,
 )
 from rcon.message_variables import format_message_string, populate_message_variables
-from rcon.models import PlayerID, PlayerSoldier, enter_session, GameLayout
+from rcon.models import PlayerID, PlayerFlag, PlayerSoldier, enter_session, GameLayout
 from rcon.player_history import (
     _get_set_player,
     get_player,
@@ -422,14 +422,31 @@ def should_ban(
     bans: SteamBansType | None,
     max_game_bans: float,
     max_days_since_ban: int,
-    player_flags: list[PlayerFlagType] = [],
-    whitelist_flags: list[str] = [],
+    player_flags: list[PlayerFlag | PlayerFlagType | str] | None = None,
+    whitelist_flags: list[str] | None = None,
 ) -> bool | None:
     if not bans:
         return
 
-    if any(player_flag in whitelist_flags for player_flag in player_flags):
-        return False
+    if whitelist_flags:
+        if player_flags is None:
+            logger.warning("Skipping VAC ban: player exemption flags unavailable")
+            return None
+        try:
+            flags = [
+                flag if isinstance(flag, str) else
+                flag.get("flag") if isinstance(flag, dict) else
+                flag.flag if isinstance(flag, PlayerFlag) else None
+                for flag in player_flags
+            ]
+        except Exception:
+            logger.exception("Skipping VAC ban: unable to read player exemption flags")
+            return None
+        if any(not isinstance(flag, str) for flag in flags):
+            logger.warning("Skipping VAC ban: invalid player exemption flags")
+            return None
+        if any(flag in whitelist_flags for flag in flags):
+            return False
 
     try:
         days_since_last_ban = int(bans["DaysSinceLastBan"])

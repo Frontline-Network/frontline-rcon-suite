@@ -1,6 +1,54 @@
 import pytest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
-from rcon.hooks import should_ban
+from rcon.hooks import ban_if_has_vac_bans, should_ban
+from rcon.models import PlayerFlag
+
+
+@pytest.mark.parametrize('flag', ['trusted', {'flag': 'trusted'}, PlayerFlag(flag='trusted')])
+def test_whitelisted_flag_prevents_eligible_vac_ban(flag):
+    bans = {'VACBanned': True, 'DaysSinceLastBan': 1, 'NumberOfGameBans': 0}
+    assert should_ban(bans, float('inf'), 40, [flag], ['trusted']) is False
+
+
+def test_unreadable_flags_do_not_authorize_automatic_ban():
+    bans = {'VACBanned': True, 'DaysSinceLastBan': 1, 'NumberOfGameBans': 0}
+    assert should_ban(bans, float('inf'), 40, [object()], ['trusted']) is None
+
+
+def test_vac_handler_respects_database_flag_before_any_ban():
+    player = SimpleNamespace(
+        flags=[PlayerFlag(flag='trusted')],
+        steaminfo=SimpleNamespace(bans={'VACBanned': True, 'DaysSinceLastBan': 1, 'NumberOfGameBans': 0}),
+    )
+    config = SimpleNamespace(vac_history_days=40, game_ban_threshhold=0, whitelist_flags=['trusted'])
+    with patch('rcon.hooks.VacGameBansUserConfig.load_from_db', return_value=config), \
+         patch('rcon.hooks.enter_session'), patch('rcon.hooks.get_player', return_value=player), \
+         patch('rcon.hooks.blacklist_or_ban') as ban:
+        ban_if_has_vac_bans(Mock(), 'synthetic-player', 'synthetic-name')
+    ban.assert_not_called()
+
+
+def test_vac_handler_still_processes_confirmed_non_exempt_player():
+    player = SimpleNamespace(
+        flags=[PlayerFlag(flag='other')],
+        steaminfo=SimpleNamespace(bans={'VACBanned': True, 'DaysSinceLastBan': 1, 'NumberOfGameBans': 0}),
+    )
+    config = SimpleNamespace(vac_history_days=40, game_ban_threshhold=0, whitelist_flags=['trusted'],
+                             ban_on_vac_history_reason='VAC {DAYS_SINCE_LAST_BAN}', auto_expire=False,
+                             blacklist_id=None)
+    with patch('rcon.hooks.VacGameBansUserConfig.load_from_db', return_value=config), \
+         patch('rcon.hooks.enter_session'), patch('rcon.hooks.get_player', return_value=player), \
+         patch('rcon.hooks.blacklist_or_ban') as ban:
+        ban_if_has_vac_bans(Mock(), 'synthetic-player', 'synthetic-name')
+    ban.assert_called_once()
+
+
+def test_missing_flags_fail_closed_only_when_exemptions_are_configured():
+    bans = {'VACBanned': True, 'DaysSinceLastBan': 1, 'NumberOfGameBans': 0}
+    assert should_ban(bans, float('inf'), 40, None, ['trusted']) is None
+    assert should_ban(bans, float('inf'), 40, None, []) is True
 
 
 @pytest.mark.parametrize(
