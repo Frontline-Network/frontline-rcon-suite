@@ -26,39 +26,152 @@ final localeProvider = StateProvider<Locale>((ref) => const Locale('de'));
 bool _firebaseAvailable = false;
 
 extension FrontlineCopy on BuildContext {
-  bool get isGerman => Localizations.localeOf(this).languageCode == 'de';
-  String tr(String german, String english) => isGerman ? german : english;
+  String tr(String german, String english, String french) =>
+      switch (Localizations.localeOf(this).languageCode) {
+        'de' => german,
+        'fr' => french,
+        _ => english,
+      };
+
+  String localizeError(Object? error) {
+    final message = error.toString();
+    final invalidResponse = RegExp(
+      r'^CRCON hat eine ungültige Antwort geliefert(?: \(HTTP (\d+)\))?\.$',
+    ).firstMatch(message);
+    if (invalidResponse != null) {
+      final status = invalidResponse.group(1);
+      final suffix = status == null ? '' : ' (HTTP $status)';
+      return tr(
+        'CRCON hat eine ungültige Antwort geliefert$suffix.',
+        'CRCON returned an invalid response$suffix.',
+        'CRCON a renvoyé une réponse invalide$suffix.',
+      );
+    }
+    return switch (message) {
+      'CRCON requires a public HTTPS URL.' => tr(
+        'CRCON benötigt eine öffentliche HTTPS-Adresse.',
+        'CRCON requires a public HTTPS URL.',
+        'CRCON nécessite une adresse HTTPS publique.',
+      ),
+      'Unsupported CRCON URL.' => tr(
+        'Die CRCON-Adresse wird nicht unterstützt.',
+        'Unsupported CRCON URL.',
+        'Cette adresse CRCON n’est pas prise en charge.',
+      ),
+      'CRCON hat kein gültiges Spielerprofil geliefert.' => tr(
+        message,
+        'CRCON did not return a valid player profile.',
+        'CRCON n’a pas renvoyé de profil de joueur valide.',
+      ),
+      'CRCON hat keinen gültigen Fallauszug geliefert.' => tr(
+        message,
+        'CRCON did not return valid incident context.',
+        'CRCON n’a pas renvoyé de contexte d’incident valide.',
+      ),
+      'CRCON hat keinen gültigen Spielerkader geliefert.' => tr(
+        message,
+        'CRCON did not return a valid player roster.',
+        'CRCON n’a pas renvoyé de liste de joueurs valide.',
+      ),
+      'CRCON hat keine gültigen Squad-Daten geliefert.' => tr(
+        message,
+        'CRCON did not return valid squad data.',
+        'CRCON n’a pas renvoyé de données d’escouade valides.',
+      ),
+      'CRCON hat keinen gültigen Autobalancer-Status geliefert.' => tr(
+        message,
+        'CRCON did not return a valid autobalancer status.',
+        'CRCON n’a pas renvoyé d’état valide de l’équilibrage automatique.',
+      ),
+      'CRCON hat keinen gültigen Serverstatus geliefert.' => tr(
+        message,
+        'CRCON did not return a valid server status.',
+        'CRCON n’a pas renvoyé d’état de serveur valide.',
+      ),
+      'Die CRCON-Kopplung ist abgelaufen. Bitte dieses Gerät neu koppeln.' => tr(
+        message,
+        'The CRCON pairing has expired. Please pair this device again.',
+        'L’association CRCON a expiré. Veuillez associer à nouveau cet appareil.',
+      ),
+      'CRCON Mobile API ist noch nicht auf dem benötigten Stand.' => tr(
+        message,
+        'The CRCON mobile API needs to be updated.',
+        'L’API mobile CRCON doit être mise à jour.',
+      ),
+      'CRCON hat ein unerwartetes Antwortformat geliefert.' => tr(
+        message,
+        'CRCON returned an unexpected response format.',
+        'CRCON a renvoyé un format de réponse inattendu.',
+      ),
+      'CRCON request failed' => tr(
+        'Die CRCON-Anfrage ist fehlgeschlagen.',
+        message,
+        'La requête CRCON a échoué.',
+      ),
+      'FormatException: Push relay returned an invalid identity' => tr(
+        'Der Push-Dienst hat eine ungültige Identität geliefert.',
+        'The push relay returned an invalid identity.',
+        'Le relais de notifications a renvoyé une identité invalide.',
+      ),
+      'FormatException: Push relay returned an empty response' => tr(
+        'Der Push-Dienst hat eine leere Antwort geliefert.',
+        'The push relay returned an empty response.',
+        'Le relais de notifications a renvoyé une réponse vide.',
+      ),
+      'FormatException: This is not a CRCON pairing code.' => tr(
+        'Dies ist kein CRCON-Kopplungscode.',
+        'This is not a CRCON pairing code.',
+        'Ce code n’est pas un code d’association CRCON.',
+      ),
+      'FormatException: Unsupported CRCON mobile protocol.' => tr(
+        'Das CRCON-Mobilprotokoll wird nicht unterstützt.',
+        'Unsupported CRCON mobile protocol.',
+        'Ce protocole mobile CRCON n’est pas pris en charge.',
+      ),
+      'FormatException: Incomplete CRCON pairing code.' => tr(
+        'Der CRCON-Kopplungscode ist unvollständig.',
+        'Incomplete CRCON pairing code.',
+        'Le code d’association CRCON est incomplet.',
+      ),
+      'Bad state: Push registration returned no device identity' => tr(
+        'Die Push-Registrierung lieferte keine Geräteidentität.',
+        'Push registration returned no device identity.',
+        'L’inscription aux notifications n’a renvoyé aucune identité d’appareil.',
+      ),
+      _ => message,
+    };
+  }
 
   String incidentStatus(String value) => switch (value.toLowerCase()) {
-    'new' => tr('Neu', 'New'),
-    'claimed' => tr('Übernommen', 'Claimed'),
-    'resolved' => tr('Erledigt', 'Resolved'),
-    'dismissed' => tr('Abgewiesen', 'Dismissed'),
+    'new' => tr('Neu', 'New', "Nouveau"),
+    'claimed' => tr('Übernommen', 'Claimed', "Pris en charge"),
+    'resolved' => tr('Erledigt', 'Resolved', "Résolu"),
+    'dismissed' => tr('Abgewiesen', 'Dismissed', "Rejeté"),
     _ => value,
   };
 
   String subjectState(String value) => switch (value.toLowerCase()) {
-    'suggested' => tr('Vorschlag', 'Suggested'),
-    'confirmed' => tr('Bestätigt', 'Confirmed'),
-    'rejected' => tr('Verworfen', 'Rejected'),
+    'suggested' => tr('Vorschlag', 'Suggested', "Proposé"),
+    'confirmed' => tr('Bestätigt', 'Confirmed', "Confirmé"),
+    'rejected' => tr('Verworfen', 'Rejected', "Rejeté"),
     _ => value,
   };
 
   String teamName(String? value) => switch (value?.toLowerCase()) {
-    'allies' || 'allied' => tr('Alliierte', 'Allies'),
-    'axis' => tr('Achsenmächte', 'Axis'),
+    'allies' || 'allied' => tr('Alliierte', 'Allies', "Alliés"),
+    'axis' => tr('Achsenmächte', 'Axis', "Axe"),
     _ => value ?? '—',
   };
 
   String squadTypeName(String? value) =>
       switch (value?.replaceAll(RegExp(r'[_ -]'), '').toLowerCase()) {
-        'infantry' => tr('Infanterie', 'Infantry'),
-        'recon' => tr('Aufklärung', 'Recon'),
-        'armor' || 'armour' => tr('Panzer', 'Armor'),
-        'commander' => tr('Kommandant', 'Commander'),
-        'artillery' => tr('Artillerie', 'Artillery'),
-        'squad' => tr('Squad', 'Squad'),
-        _ => value ?? tr('Squad', 'Squad'),
+        'infantry' => tr('Infanterie', 'Infantry', "Infanterie"),
+        'recon' => tr('Aufklärung', 'Recon', "Reconnaissance"),
+        'armor' || 'armour' => tr('Panzer', 'Armor', "Blindés"),
+        'commander' => tr('Kommandant', 'Commander', "Commandant"),
+        'artillery' => tr('Artillerie', 'Artillery', "Artillerie"),
+        'squad' => tr('Squad', 'Squad', "Escouade"),
+        _ => value ?? tr('Squad', 'Squad', "Escouade"),
       };
 
   String squadName(String? value) {
@@ -69,23 +182,28 @@ extension FrontlineCopy on BuildContext {
         : squad;
   }
 
-  String roleName(String? value) =>
-      switch (value?.replaceAll(RegExp(r'[_ -]'), '').toLowerCase()) {
-        'officer' => tr('Squadleader', 'Squad leader'),
-        'tankcommander' => tr('Panzerkommandant', 'Tank commander'),
-        'spotter' => tr('Späher', 'Spotter'),
-        'commander' => tr('Kommandant', 'Commander'),
-        'rifleman' => tr('Schütze', 'Rifleman'),
-        'assault' => tr('Sturmtrupp', 'Assault'),
-        'automaticrifleman' => tr('MG-Schütze', 'Automatic rifleman'),
-        'machinegunner' => tr('MG-Schütze', 'Machine gunner'),
-        'medic' => tr('Sanitäter', 'Medic'),
-        'support' => tr('Unterstützung', 'Support'),
-        'engineer' => tr('Pionier', 'Engineer'),
-        'antitank' => tr('Panzerabwehr', 'Anti-tank'),
-        'crewman' => tr('Panzerbesatzung', 'Crewman'),
-        _ => value ?? '—',
-      };
+  String roleName(String? value) => switch (value
+      ?.replaceAll(RegExp(r'[_ -]'), '')
+      .toLowerCase()) {
+    'officer' => tr('Squadleader', 'Squad leader', "Chef d’escouade"),
+    'tankcommander' => tr('Panzerkommandant', 'Tank commander', "Chef de char"),
+    'spotter' => tr('Späher', 'Spotter', "Observateur"),
+    'commander' => tr('Kommandant', 'Commander', "Commandant"),
+    'rifleman' => tr('Schütze', 'Rifleman', "Fusilier"),
+    'assault' => tr('Sturmtrupp', 'Assault', "Assaut"),
+    'automaticrifleman' => tr(
+      'MG-Schütze',
+      'Automatic rifleman',
+      "Fusilier automatique",
+    ),
+    'machinegunner' => tr('MG-Schütze', 'Machine gunner', "Mitrailleur"),
+    'medic' => tr('Sanitäter', 'Medic', "Médecin"),
+    'support' => tr('Unterstützung', 'Support', "Soutien"),
+    'engineer' => tr('Pionier', 'Engineer', "Ingénieur"),
+    'antitank' => tr('Panzerabwehr', 'Anti-tank', "Antichar"),
+    'crewman' => tr('Panzerbesatzung', 'Crewman', "Membre d’équipage"),
+    _ => value ?? '—',
+  };
 }
 
 Map<String, dynamic> _mapValue(Object? value) =>
@@ -437,7 +555,7 @@ class _CrconMobileAppState extends ConsumerState<CrconMobileApp> {
       title: 'Frontline',
       debugShowCheckedModeBanner: false,
       locale: locale,
-      supportedLocales: const [Locale('de'), Locale('en')],
+      supportedLocales: const [Locale('de'), Locale('en'), Locale('fr')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -454,7 +572,7 @@ class _LanguageButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => PopupMenuButton<String>(
-    tooltip: context.tr('Sprache', 'Language'),
+    tooltip: context.tr('Sprache', 'Language', "Langue"),
     icon: const Icon(Icons.language),
     initialValue: ref.watch(localeProvider).languageCode,
     onSelected: (language) {
@@ -471,6 +589,7 @@ class _LanguageButton extends ConsumerWidget {
     itemBuilder: (_) => const [
       PopupMenuItem(value: 'de', child: Text('Deutsch')),
       PopupMenuItem(value: 'en', child: Text('English')),
+      PopupMenuItem(value: 'fr', child: Text('Français')),
     ],
   );
 }
@@ -486,7 +605,11 @@ class DiagnosticsScreen extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            context.tr('Diagnoseprotokoll kopiert.', 'Diagnostics log copied.'),
+            context.tr(
+              'Diagnoseprotokoll kopiert.',
+              'Diagnostics log copied.',
+              "Journal de diagnostic copié.",
+            ),
           ),
         ),
       );
@@ -511,7 +634,7 @@ class DiagnosticsScreen extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        ).showSnackBar(SnackBar(content: Text(context.localizeError(error))));
       }
     }
   }
@@ -520,21 +643,28 @@ class DiagnosticsScreen extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(context.tr('Protokoll löschen?', 'Clear diagnostics?')),
+        title: Text(
+          context.tr(
+            'Protokoll löschen?',
+            'Clear diagnostics?',
+            "Effacer les diagnostics ?",
+          ),
+        ),
         content: Text(
           context.tr(
             'Alle lokal gespeicherten Diagnoseeinträge werden entfernt.',
             'All locally stored diagnostic entries will be removed.',
+            "Toutes les entrées de diagnostic stockées localement seront supprimées.",
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(context.tr('Abbrechen', 'Cancel')),
+            child: Text(context.tr('Abbrechen', 'Cancel', "Annuler")),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(context.tr('Löschen', 'Clear')),
+            child: Text(context.tr('Löschen', 'Clear', "Effacer")),
           ),
         ],
       ),
@@ -557,20 +687,26 @@ class DiagnosticsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(context.tr('Diagnoseprotokoll', 'Diagnostics log')),
+      title: Text(
+        context.tr(
+          'Diagnoseprotokoll',
+          'Diagnostics log',
+          "Journal des diagnostics",
+        ),
+      ),
       actions: [
         IconButton(
-          tooltip: context.tr('Kopieren', 'Copy'),
+          tooltip: context.tr('Kopieren', 'Copy', "Copier"),
           onPressed: () => _copy(context),
           icon: const Icon(Icons.copy_outlined),
         ),
         IconButton(
-          tooltip: context.tr('Teilen', 'Share'),
+          tooltip: context.tr('Teilen', 'Share', "Partager"),
           onPressed: () => _share(context),
           icon: const Icon(Icons.share_outlined),
         ),
         IconButton(
-          tooltip: context.tr('Löschen', 'Clear'),
+          tooltip: context.tr('Löschen', 'Clear', "Effacer"),
           onPressed: () => _clear(context),
           icon: const Icon(Icons.delete_outline),
         ),
@@ -590,6 +726,7 @@ class DiagnosticsScreen extends StatelessWidget {
                 context.tr(
                   'Enthält lokale App-, Netzwerk- und Fehlerereignisse. Zugangsdaten und Pairing-Geheimnisse werden automatisch geschwärzt.',
                   'Contains local app, network and error events. Credentials and pairing secrets are automatically redacted.',
+                  "Contient les événements locaux de l’application, du réseau et les erreurs. Les identifiants et secrets d’association sont automatiquement masqués.",
                 ),
                 style: const TextStyle(color: FrontlineTheme.muted),
               ),
@@ -601,6 +738,7 @@ class DiagnosticsScreen extends StatelessWidget {
                         context.tr(
                           'Noch keine Diagnoseeinträge.',
                           'No diagnostic entries yet.',
+                          "Aucune entrée de diagnostic pour le moment.",
                         ),
                       ),
                     )
@@ -659,10 +797,14 @@ class ConnectionsScreen extends ConsumerWidget {
       appBar: appIsWindows
           ? null
           : AppBar(
-              title: Text(context.tr('Mehr', 'More')),
+              title: Text(context.tr('Mehr', 'More', "Plus")),
               actions: [
                 IconButton(
-                  tooltip: context.tr('Diagnoseprotokoll', 'Diagnostics log'),
+                  tooltip: context.tr(
+                    'Diagnoseprotokoll',
+                    'Diagnostics log',
+                    "Journal des diagnostics",
+                  ),
                   onPressed: () => context.push('/diagnostics'),
                   icon: const Icon(Icons.bug_report_outlined),
                 ),
@@ -676,7 +818,7 @@ class ConnectionsScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
             Text(
-              context.tr('Verbindungen', 'Connections'),
+              context.tr('Verbindungen', 'Connections', "Connexions"),
               style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
@@ -684,6 +826,7 @@ class ConnectionsScreen extends ConsumerWidget {
               context.tr(
                 'Gekoppelte CRCON-Installationen und dieses Gerät.',
                 'Paired CRCON installations and this device.',
+                "Installations CRCON associées et cet appareil.",
               ),
               style: const TextStyle(color: FrontlineTheme.muted),
             ),
@@ -695,12 +838,17 @@ class ConnectionsScreen extends ConsumerWidget {
                   color: FrontlineTheme.gold,
                 ),
                 title: Text(
-                  context.tr('Fair Autobalancer', 'Fair Autobalancer'),
+                  context.tr(
+                    'Fair Autobalancer',
+                    'Fair Autobalancer',
+                    "Équilibrage automatique équitable",
+                  ),
                 ),
                 subtitle: Text(
                   context.tr(
                     'Live-Stand aller Teams ansehen',
                     'View the live state of all teams',
+                    "Voir l’état en direct de toutes les équipes",
                   ),
                 ),
                 trailing: const Icon(Icons.chevron_right),
@@ -720,6 +868,7 @@ class ConnectionsScreen extends ConsumerWidget {
                     context.tr(
                       'Kopple zuerst eine CRCON-Installation.',
                       'Pair your first CRCON installation.',
+                      "Associez votre première installation CRCON.",
                     ),
                   ),
                 ),
@@ -741,8 +890,16 @@ class ConnectionsScreen extends ConsumerWidget {
               ),
               label: Text(
                 appIsWindows
-                    ? context.tr('CRCON verbinden', 'Connect CRCON')
-                    : context.tr('CRCON koppeln', 'Pair CRCON'),
+                    ? context.tr(
+                        'CRCON verbinden',
+                        'Connect CRCON',
+                        "Connecter CRCON",
+                      )
+                    : context.tr(
+                        'CRCON koppeln',
+                        'Pair CRCON',
+                        "Associer CRCON",
+                      ),
               ),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(52),
@@ -762,12 +919,14 @@ class _WindowsConnectionsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _WindowsDesktopScaffold(
-    title: context.tr('Verbindungen', 'Connections'),
+    title: context.tr('Verbindungen', 'Connections', "Connexions"),
     actions: [
       OutlinedButton.icon(
         onPressed: () => context.push('/pair'),
         icon: const Icon(Icons.open_in_browser_outlined),
-        label: Text(context.tr('CRCON verbinden', 'Connect CRCON')),
+        label: Text(
+          context.tr('CRCON verbinden', 'Connect CRCON', "Connecter CRCON"),
+        ),
       ),
     ],
     child: profiles.when(
@@ -780,16 +939,22 @@ class _WindowsConnectionsPage extends StatelessWidget {
             title: context.tr(
               'Leitstellen-Verbindungen',
               'Command connections',
+              "Connexions de commande",
             ),
             description: context.tr(
               'Jede Verbindung bleibt einem persönlichen CRCON-Konto zugeordnet. Windows verwendet dafür die Browser-Anmeldung – keinen QR-Code.',
               'Every connection remains tied to a personal CRCON account. Windows uses browser sign-in – not a QR code.',
+              "Chaque connexion reste liée à un compte CRCON personnel. Sous Windows, la connexion s’effectue dans le navigateur, sans code QR.",
             ),
           ),
           const SizedBox(height: 24),
           if (items.isEmpty)
             _WindowsPanel(
-              title: context.tr('Noch nicht verbunden', 'Not connected'),
+              title: context.tr(
+                'Noch nicht verbunden',
+                'Not connected',
+                "Non connecté",
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -797,6 +962,7 @@ class _WindowsConnectionsPage extends StatelessWidget {
                     context.tr(
                       'Starte die Browser-Anmeldung, gib die HTTPS-Adresse deines CRCON ein und bestätige den Gerätecode in deinem Browser.',
                       'Start browser sign-in, enter your CRCON HTTPS address, and confirm the device code in your browser.',
+                      "Démarrez la connexion par navigateur, saisissez l’adresse HTTPS de CRCON et confirmez le code de l’appareil dans votre navigateur.",
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -807,6 +973,7 @@ class _WindowsConnectionsPage extends StatelessWidget {
                       context.tr(
                         'Browser-Anmeldung starten',
                         'Start browser sign-in',
+                        "Démarrer la connexion par navigateur",
                       ),
                     ),
                   ),
@@ -838,7 +1005,7 @@ class _WindowsConnectionsPage extends StatelessWidget {
                         size: 11,
                       ),
                       const SizedBox(width: 7),
-                      Text(context.tr('Verbunden', 'Connected')),
+                      Text(context.tr('Verbunden', 'Connected', "Connecté")),
                     ],
                   ),
                 ),
@@ -885,23 +1052,29 @@ class SettingsScreen extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(34, 30, 34, 40),
       children: [
         _WindowsSectionLead(
-          title: context.tr('Frontline-Einstellungen', 'Frontline settings'),
+          title: context.tr(
+            'Frontline-Einstellungen',
+            'Frontline settings',
+            "Paramètres Frontline",
+          ),
           description: context.tr(
             'Diese Einstellungen gelten nur für Frontline. Rollen, Rechte und Serverkonfiguration bleiben in CRCON.',
             'These settings apply only to Frontline. Roles, permissions, and server configuration remain in CRCON.',
+            "Ces paramètres ne s’appliquent qu’à Frontline. Les rôles, autorisations et la configuration du serveur restent dans CRCON.",
           ),
         ),
         const SizedBox(height: 24),
         _WindowsPanel(
-          title: context.tr('Darstellung', 'Appearance'),
+          title: context.tr('Darstellung', 'Appearance', "Apparence"),
           child: DropdownButtonFormField<String>(
             initialValue: locale,
             decoration: InputDecoration(
-              labelText: context.tr('Sprache', 'Language'),
+              labelText: context.tr('Sprache', 'Language', "Langue"),
             ),
             items: const [
               DropdownMenuItem(value: 'de', child: Text('Deutsch')),
               DropdownMenuItem(value: 'en', child: Text('English')),
+              DropdownMenuItem(value: 'fr', child: Text('Français')),
             ],
             onChanged: (value) {
               if (value == null) return;
@@ -915,18 +1088,20 @@ class SettingsScreen extends ConsumerWidget {
           title: context.tr(
             'Windows-Benachrichtigungen',
             'Windows notifications',
+            "Notifications Windows",
           ),
           child: Text(
             context.tr(
               'Während Frontline geöffnet ist, hält die Live-Verbindung die Leitstelle aktuell. Native Hintergrund-Benachrichtigungen werden als eigener Windows-Kanal ergänzt.',
               'While Frontline is open, the live connection keeps the command center current. Native background notifications will be added as a dedicated Windows channel.',
+              "Lorsque Frontline est ouvert, la connexion en direct actualise le centre de commande. Les notifications natives en arrière-plan seront ajoutées dans un canal Windows dédié.",
             ),
             style: const TextStyle(color: FrontlineTheme.muted, height: 1.45),
           ),
         ),
         const SizedBox(height: 14),
         _WindowsPanel(
-          title: context.tr('Diagnose', 'Diagnostics'),
+          title: context.tr('Diagnose', 'Diagnostics', "Diagnostics"),
           child: Row(
             children: [
               Expanded(
@@ -934,6 +1109,7 @@ class SettingsScreen extends ConsumerWidget {
                   context.tr(
                     'Diagnoseprotokolle enthalten keine Zugangsdaten oder Pairing-Geheimnisse.',
                     'Diagnostic logs do not include credentials or pairing secrets.',
+                    "Les journaux de diagnostic ne contiennent ni identifiants ni secrets d’association.",
                   ),
                   style: const TextStyle(color: FrontlineTheme.muted),
                 ),
@@ -942,7 +1118,13 @@ class SettingsScreen extends ConsumerWidget {
               OutlinedButton.icon(
                 onPressed: () => context.push('/diagnostics'),
                 icon: const Icon(Icons.bug_report_outlined),
-                label: Text(context.tr('Protokoll öffnen', 'Open log')),
+                label: Text(
+                  context.tr(
+                    'Protokoll öffnen',
+                    'Open log',
+                    "Ouvrir le journal",
+                  ),
+                ),
               ),
             ],
           ),
@@ -951,12 +1133,14 @@ class SettingsScreen extends ConsumerWidget {
     );
     if (appIsWindows) {
       return _WindowsDesktopScaffold(
-        title: context.tr('Einstellungen', 'Settings'),
+        title: context.tr('Einstellungen', 'Settings', "Réglages"),
         child: content,
       );
     }
     return Scaffold(
-      appBar: AppBar(title: Text(context.tr('Einstellungen', 'Settings'))),
+      appBar: AppBar(
+        title: Text(context.tr('Einstellungen', 'Settings', "Réglages")),
+      ),
       body: content,
     );
   }
@@ -985,11 +1169,18 @@ class _MoreOperations extends ConsumerWidget {
                   Icons.visibility_outlined,
                   color: FrontlineTheme.gold,
                 ),
-                title: Text(context.tr('Beobachtungsliste', 'Watchlist')),
+                title: Text(
+                  context.tr(
+                    'Beobachtungsliste',
+                    'Watchlist',
+                    "Liste de surveillance",
+                  ),
+                ),
                 subtitle: Text(
                   context.tr(
                     'Beobachtete Spieler und letzter Kontakt',
                     'Watched players and last contact',
+                    "Joueurs surveillés et dernier contact",
                   ),
                 ),
                 trailing: const Icon(Icons.chevron_right),
@@ -1004,11 +1195,18 @@ class _MoreOperations extends ConsumerWidget {
                   Icons.radar_outlined,
                   color: FrontlineTheme.gold,
                 ),
-                title: Text(context.tr('Server-Lage', 'Server situation')),
+                title: Text(
+                  context.tr(
+                    'Server-Lage',
+                    'Server situation',
+                    "Situation du serveur",
+                  ),
+                ),
                 subtitle: Text(
                   context.tr(
                     'Karte, Teams, Warteschlange und Admins',
                     'Map, teams, queue and admins',
+                    "Carte, équipes, file d’attente et administrateurs",
                   ),
                 ),
                 trailing: const Icon(Icons.chevron_right),
@@ -1101,7 +1299,7 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
                 DropdownButtonFormField<int>(
                   initialValue: _serverNumber,
                   decoration: InputDecoration(
-                    labelText: context.tr('Server', 'Server'),
+                    labelText: context.tr('Server', 'Server', "Serveur"),
                   ),
                   items: _servers.map((server) {
                     final number = (server['server_number'] as num).toInt();
@@ -1130,6 +1328,7 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
                       context.tr(
                         'Keine Spieler werden aktuell beobachtet.',
                         'No players are currently watched.',
+                        "Aucun joueur n'est actuellement surveillé.",
                       ),
                     ),
                   ),
@@ -1152,9 +1351,9 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
                       [
                             player['reason']?.toString(),
                             if (player['by'] case final by?)
-                              '${context.tr('von', 'by')} $by',
+                              '${context.tr('von', 'by', "par")} $by',
                             modified ?? '',
-                            '${player['count'] ?? 0} ${context.tr('Sichtungen', 'sightings')}',
+                            '${player['count'] ?? 0} ${context.tr('Sichtungen', 'sightings', "observations")}',
                           ]
                           .whereType<String>()
                           .where((value) => value.isNotEmpty)
@@ -1174,11 +1373,11 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
     final refresh = IconButton(
       onPressed: _loading ? null : _load,
       icon: const Icon(Icons.refresh),
-      tooltip: context.tr('Aktualisieren', 'Refresh'),
+      tooltip: context.tr('Aktualisieren', 'Refresh', "Actualiser"),
     );
     if (appIsWindows) {
       return _WindowsDesktopScaffold(
-        title: context.tr('Watchlist', 'Watchlist'),
+        title: context.tr('Watchlist', 'Watchlist', "Liste de surveillance"),
         actions: [refresh],
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 12, 28, 24),
@@ -1190,7 +1389,13 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
       appBar: appIsWindows
           ? null
           : AppBar(
-              title: Text(context.tr('Beobachtungsliste', 'Watchlist')),
+              title: Text(
+                context.tr(
+                  'Beobachtungsliste',
+                  'Watchlist',
+                  "Liste de surveillance",
+                ),
+              ),
               actions: [refresh],
             ),
       bottomNavigationBar: const _FrontlineBottomBar(currentIndex: 2),
@@ -1280,7 +1485,7 @@ class _LiveStatusScreenState extends ConsumerState<LiveStatusScreen> {
                 DropdownButtonFormField<int>(
                   initialValue: _serverNumber,
                   decoration: InputDecoration(
-                    labelText: context.tr('Server', 'Server'),
+                    labelText: context.tr('Server', 'Server', "Serveur"),
                   ),
                   items: _servers.map((server) {
                     final number = (server['server_number'] as num).toInt();
@@ -1313,24 +1518,36 @@ class _LiveStatusScreenState extends ConsumerState<LiveStatusScreen> {
                       ),
                       const SizedBox(height: 12),
                       _LiveStatusRow(
-                        label: context.tr('Aktuelle Karte', 'Current map'),
+                        label: context.tr(
+                          'Aktuelle Karte',
+                          'Current map',
+                          "Carte actuelle",
+                        ),
                         value: _liveMapName(
                           match['current_map'] ?? status['map'],
                         ),
                       ),
                       if (_status?['next_map'] != null)
                         _LiveStatusRow(
-                          label: context.tr('Nächste Karte', 'Next map'),
+                          label: context.tr(
+                            'Nächste Karte',
+                            'Next map',
+                            "Prochaine carte",
+                          ),
                           value: _liveMapName(_status?['next_map']),
                         ),
                       if (match['time_remaining'] != null)
                         _LiveStatusRow(
-                          label: context.tr('Restzeit', 'Time remaining'),
+                          label: context.tr(
+                            'Restzeit',
+                            'Time remaining',
+                            "Temps restant",
+                          ),
                           value: match['time_remaining'].toString(),
                         ),
                       if (status.isNotEmpty)
                         _LiveStatusRow(
-                          label: context.tr('Spieler', 'Players'),
+                          label: context.tr('Spieler', 'Players', "Joueurs"),
                           value:
                               '${status['current_players'] ?? '—'} / ${status['max_players'] ?? '—'}',
                         ),
@@ -1346,7 +1563,11 @@ class _LiveStatusScreenState extends ConsumerState<LiveStatusScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        context.tr('Teams & Betrieb', 'Teams & operations'),
+                        context.tr(
+                          'Teams & Betrieb',
+                          'Teams & operations',
+                          "Équipes et opérations",
+                        ),
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 10),
@@ -1355,29 +1576,42 @@ class _LiveStatusScreenState extends ConsumerState<LiveStatusScreen> {
                           label: context.tr(
                             'Alliierte / Achse',
                             'Allies / Axis',
+                            "Alliés / Axe",
                           ),
                           value:
                               '${counts['allies'] ?? '—'} / ${counts['axis'] ?? '—'}',
                         ),
                       if (scores.isNotEmpty)
                         _LiveStatusRow(
-                          label: context.tr('Punkte', 'Scores'),
+                          label: context.tr('Punkte', 'Scores', "Scores"),
                           value:
                               '${scores['allies'] ?? '—'} / ${scores['axis'] ?? '—'}',
                         ),
                       if (_status?['queue_length'] != null)
                         _LiveStatusRow(
-                          label: context.tr('Warteschlange', 'Queue'),
+                          label: context.tr(
+                            'Warteschlange',
+                            'Queue',
+                            "File d’attente",
+                          ),
                           value: _status!['queue_length'].toString(),
                         ),
                       if (_status?['ingame_admin_count'] != null)
                         _LiveStatusRow(
-                          label: context.tr('Ingame-Admins', 'In-game admins'),
+                          label: context.tr(
+                            'Ingame-Admins',
+                            'In-game admins',
+                            "Administrateurs en jeu",
+                          ),
                           value: _status!['ingame_admin_count'].toString(),
                         ),
                       if (_status?['crcon_admin_count'] != null)
                         _LiveStatusRow(
-                          label: context.tr('CRCON-Admins', 'CRCON admins'),
+                          label: context.tr(
+                            'CRCON-Admins',
+                            'CRCON admins',
+                            "Administrateurs CRCON",
+                          ),
                           value: _status!['crcon_admin_count'].toString(),
                         ),
                     ],
@@ -1392,6 +1626,7 @@ class _LiveStatusScreenState extends ConsumerState<LiveStatusScreen> {
                   context.tr(
                     'Fair Autobalancer öffnen',
                     'Open Fair Autobalancer',
+                    "Ouvrir l’équilibrage automatique équitable",
                   ),
                 ),
               ),
@@ -1400,11 +1635,11 @@ class _LiveStatusScreenState extends ConsumerState<LiveStatusScreen> {
     final refresh = IconButton(
       onPressed: _loading ? null : _load,
       icon: const Icon(Icons.refresh),
-      tooltip: context.tr('Aktualisieren', 'Refresh'),
+      tooltip: context.tr('Aktualisieren', 'Refresh', "Actualiser"),
     );
     if (appIsWindows) {
       return _WindowsDesktopScaffold(
-        title: context.tr('Live-Lage', 'Live situation'),
+        title: context.tr('Live-Lage', 'Live situation', "Situation en direct"),
         actions: [refresh],
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 12, 28, 24),
@@ -1414,7 +1649,9 @@ class _LiveStatusScreenState extends ConsumerState<LiveStatusScreen> {
     }
     return Scaffold(
       appBar: AppBar(
-        title: Text(context.tr('Server-Lage', 'Server situation')),
+        title: Text(
+          context.tr('Server-Lage', 'Server situation', "Situation du serveur"),
+        ),
         actions: [refresh],
       ),
       bottomNavigationBar: const _FrontlineBottomBar(currentIndex: 2),
@@ -1552,17 +1789,29 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
   String _serverLabel(BuildContext context, Map<String, dynamic> server) {
     final number = (server['server_number'] as num).toInt();
     return server['name']?.toString() ??
-        context.tr('Server $number', 'Server $number');
+        context.tr('Server $number', 'Server $number', "Serveur $number");
   }
 
   String _phase(BuildContext context, String phase) => switch (phase) {
-    'idle' => context.tr('Ausgeglichen', 'Balanced'),
-    'armed' => context.tr('Beobachtet', 'Monitoring'),
-    'proposed' => context.tr('Vorschlag aktiv', 'Proposal active'),
-    'volunteer' => context.tr('Freiwillige gesucht', 'Seeking volunteers'),
-    'verifying' => context.tr('Wechsel wird geprüft', 'Checking switch'),
-    'cooldown' => context.tr('Abkühlphase', 'Cooldown'),
-    'blocked' => context.tr('Pausiert', 'Paused'),
+    'idle' => context.tr('Ausgeglichen', 'Balanced', "Équilibré"),
+    'armed' => context.tr('Beobachtet', 'Monitoring', "Surveillance"),
+    'proposed' => context.tr(
+      'Vorschlag aktiv',
+      'Proposal active',
+      "Proposition active",
+    ),
+    'volunteer' => context.tr(
+      'Freiwillige gesucht',
+      'Seeking volunteers',
+      "Recherche de volontaires",
+    ),
+    'verifying' => context.tr(
+      'Wechsel wird geprüft',
+      'Checking switch',
+      "Vérification du transfert",
+    ),
+    'cooldown' => context.tr('Abkühlphase', 'Cooldown', "Délai de protection"),
+    'blocked' => context.tr('Pausiert', 'Paused', "En pause"),
     _ => phase.isEmpty ? '—' : phase,
   };
 
@@ -1594,6 +1843,7 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
                 context.tr(
                   'Kopple zuerst eine CRCON-Installation.',
                   'Pair a CRCON installation first.',
+                  "Associez d’abord une installation CRCON.",
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -1608,7 +1858,11 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
                   initialValue: _serverNumber,
                   isExpanded: true,
                   decoration: InputDecoration(
-                    labelText: context.tr('Spielserver', 'Game server'),
+                    labelText: context.tr(
+                      'Spielserver',
+                      'Game server',
+                      "Serveur de jeu",
+                    ),
                     prefixIcon: const Icon(Icons.dns_outlined),
                   ),
                   items: _servers
@@ -1674,6 +1928,7 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
                 context.tr(
                   'Diese mobile Ansicht ist nur lesend. Entscheidungen, Konfiguration und Eingriffe bleiben in CRCON.',
                   'This mobile view is read-only. Decisions, configuration, and interventions remain in CRCON.',
+                  "Cette vue mobile est en lecture seule. Les décisions, la configuration et les interventions restent dans CRCON.",
                 ),
                 style: const TextStyle(
                   color: FrontlineTheme.muted,
@@ -1683,13 +1938,17 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
             ],
           );
     final refresh = IconButton(
-      tooltip: context.tr('Aktualisieren', 'Refresh'),
+      tooltip: context.tr('Aktualisieren', 'Refresh', "Actualiser"),
       onPressed: _loading ? null : _load,
       icon: const Icon(Icons.refresh),
     );
     if (appIsWindows) {
       return _WindowsDesktopScaffold(
-        title: context.tr('Fair Autobalancer', 'Fair Autobalancer'),
+        title: context.tr(
+          'Fair Autobalancer',
+          'Fair Autobalancer',
+          "Équilibrage automatique équitable",
+        ),
         actions: [refresh],
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 12, 28, 24),
@@ -1703,7 +1962,13 @@ class _AutobalancerScreenState extends ConsumerState<AutobalancerScreen> {
           children: [
             Image.asset('assets/fln_logo.png', width: 20, height: 20),
             const SizedBox(width: 8),
-            Text(context.tr('Fair Autobalancer', 'Fair Autobalancer')),
+            Text(
+              context.tr(
+                'Fair Autobalancer',
+                'Fair Autobalancer',
+                "Équilibrage automatique équitable",
+              ),
+            ),
           ],
         ),
         actions: [refresh],
@@ -1766,16 +2031,21 @@ class _AutobalancerHero extends StatelessWidget {
                     context.tr(
                       '$requiredSwitches Wechsel nötig',
                       '$requiredSwitches switch${requiredSwitches == 1 ? '' : 'es'} needed',
+                      "$requiredSwitches changement${requiredSwitches == 1 ? '' : 's'} requis",
                     )
                   else
-                    context.tr('Kein Wechsel nötig', 'No switch needed'),
+                    context.tr(
+                      'Kein Wechsel nötig',
+                      'No switch needed',
+                      "Aucun transfert nécessaire",
+                    ),
                 ].join(' · '),
                 style: const TextStyle(color: FrontlineTheme.muted),
               ),
               if (updatedAt != null) ...[
                 const SizedBox(height: 5),
                 Text(
-                  '${context.tr('Stand', 'Updated')} ${_compactAutobalancerTime(updatedAt!)}',
+                  '${context.tr('Stand', 'Updated', "Mis à jour")} ${_compactAutobalancerTime(updatedAt!)}',
                   style: const TextStyle(
                     color: FrontlineTheme.muted,
                     fontSize: 12,
@@ -1819,7 +2089,7 @@ class _AutobalancerTeamsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            context.tr('Teamstärke', 'Team strength'),
+            context.tr('Teamstärke', 'Team strength', "Force de l’équipe"),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 14),
@@ -1837,6 +2107,7 @@ class _AutobalancerTeamsCard extends StatelessWidget {
                     context.tr(
                       'Noch keine Live-Teamzählung verfügbar.',
                       'Live team counts are not available yet.',
+                      "Les effectifs des équipes en direct ne sont pas encore disponibles.",
                     ),
                     style: const TextStyle(color: FrontlineTheme.muted),
                   ),
@@ -1848,7 +2119,7 @@ class _AutobalancerTeamsCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: _AutobalancerTeamCount(
-                    label: context.tr('Alliierte', 'Allies'),
+                    label: context.tr('Alliierte', 'Allies', "Alliés"),
                     count: allies,
                     color: const Color(0xff5d8ebf),
                     alignEnd: false,
@@ -1857,7 +2128,7 @@ class _AutobalancerTeamsCard extends StatelessWidget {
                 const SizedBox(width: 18),
                 Expanded(
                   child: _AutobalancerTeamCount(
-                    label: context.tr('Achsenmächte', 'Axis'),
+                    label: context.tr('Achsenmächte', 'Axis', "Axe"),
                     count: axis,
                     color: const Color(0xffb55c52),
                     alignEnd: true,
@@ -1886,7 +2157,7 @@ class _AutobalancerTeamsCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              '${context.tr('Differenz', 'Difference')}: ${difference ?? '—'} ${context.tr('Spieler', 'players')}',
+              '${context.tr('Differenz', 'Difference', "Différence")}: ${difference ?? '—'} ${context.tr('Spieler', 'players', "joueurs")}',
               style: const TextStyle(color: FrontlineTheme.muted),
             ),
           ],
@@ -1948,30 +2219,42 @@ class _AutobalancerDataCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            context.tr('Bewertungsbasis', 'Assessment basis'),
+            context.tr(
+              'Bewertungsbasis',
+              'Assessment basis',
+              "Base de l’évaluation",
+            ),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 11),
           _AutobalancerDataRow(
             icon: Icons.psychology_outlined,
-            label: context.tr('Datenvertrauen', 'Data confidence'),
+            label: context.tr(
+              'Datenvertrauen',
+              'Data confidence',
+              "Fiabilité des données",
+            ),
             value: confidence is num ? '${(confidence * 100).round()} %' : '—',
           ),
           if (strategy != null && strategy.isNotEmpty) ...[
             const SizedBox(height: 8),
             _AutobalancerDataRow(
               icon: Icons.account_tree_outlined,
-              label: context.tr('Strategie', 'Strategy'),
+              label: context.tr('Strategie', 'Strategy', "Stratégie"),
               value: strategy,
             ),
           ],
           const SizedBox(height: 8),
           _AutobalancerDataRow(
             icon: Icons.settings_input_component_outlined,
-            label: context.tr('HLL-Autobalance', 'HLL autobalance'),
+            label: context.tr(
+              'HLL-Autobalance',
+              'HLL autobalance',
+              "Équilibrage automatique HLL",
+            ),
             value: native['enabled'] == true
-                ? context.tr('aktiv', 'enabled')
-                : context.tr('inaktiv', 'disabled'),
+                ? context.tr('aktiv', 'enabled', "activé")
+                : context.tr('inaktiv', 'disabled', "désactivé"),
           ),
         ],
       ),
@@ -2099,7 +2382,7 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        ).showSnackBar(SnackBar(content: Text(context.localizeError(error))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -2125,6 +2408,7 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
                 context.tr(
                   'Benachrichtigungen wurden nicht freigegeben. Erlaube sie in den Browser- oder App-Einstellungen und versuche es erneut.',
                   'Notifications were not authorized. Allow them in your browser or app settings, then try again.',
+                  "Les notifications ne sont pas autorisées. Autorisez-les dans les paramètres du navigateur ou de l’application, puis réessayez.",
                 ),
               ),
             ),
@@ -2151,6 +2435,7 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
               context.tr(
                 'Push-Benachrichtigungen sind für diese Verbindung aktiv.',
                 'Push notifications are active for this connection.',
+                "Les notifications push sont actives pour cette connexion.",
               ),
             ),
           ),
@@ -2166,7 +2451,7 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        ).showSnackBar(SnackBar(content: Text(context.localizeError(error))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -2177,21 +2462,28 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(context.tr('Gerät widerrufen?', 'Revoke this device?')),
+        title: Text(
+          context.tr(
+            'Gerät widerrufen?',
+            'Revoke this device?',
+            "Révoquer cet appareil ?",
+          ),
+        ),
         content: Text(
           context.tr(
             'CRCON entwertet Zugriffs- und Erneuerungstoken sofort.',
             'CRCON will invalidate its access and refresh tokens immediately.',
+            "CRCON invalidera immédiatement ses jetons d’accès et de renouvellement.",
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(context.tr('Abbrechen', 'Cancel')),
+            child: Text(context.tr('Abbrechen', 'Cancel', "Annuler")),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(context.tr('Widerrufen', 'Revoke')),
+            child: Text(context.tr('Widerrufen', 'Revoke', "Révoquer")),
           ),
         ],
       ),
@@ -2210,7 +2502,7 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        ).showSnackBar(SnackBar(content: Text(context.localizeError(error))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -2244,6 +2536,7 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
                     context.tr(
                       'Vorfallbenachrichtigungen',
                       'Incident notifications',
+                      "Notifications d’incidents",
                     ),
                   ),
                 ),
@@ -2270,6 +2563,7 @@ class _ConnectionCardState extends ConsumerState<_ConnectionCard> {
                   context.tr(
                     'Push auf diesem Gerät aktivieren',
                     'Enable push on this device',
+                    "Activer les notifications push sur cet appareil",
                   ),
                 ),
               ),
@@ -2454,6 +2748,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
         () => _error = context.tr(
           'Browser konnte nicht geöffnet werden. Öffne die CRCON-Adresse manuell und gib den Gerätecode ein.',
           'The browser could not be opened. Open the CRCON address manually and enter the device code.',
+          "Impossible d’ouvrir le navigateur. Ouvrez manuellement l’adresse CRCON et saisissez le code de l’appareil.",
         ),
       );
     }
@@ -2501,7 +2796,11 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    context.tr('Windows-App verbinden', 'Connect Windows app'),
+                    context.tr(
+                      'Windows-App verbinden',
+                      'Connect Windows app',
+                      "Connecter l’application Windows",
+                    ),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
@@ -2511,10 +2810,12 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                         ? context.tr(
                             'Gib die öffentliche HTTPS-Adresse deines CRCON ein. Anschließend öffnet sich der Browser zur sicheren Freigabe.',
                             'Enter the public HTTPS address of your CRCON. The browser will then open for secure approval.',
+                            "Entrez l'adresse publique HTTPS de votre CRCON. Le navigateur s'ouvrira ensuite pour une approbation sécurisée.",
                           )
                         : context.tr(
                             'Bestätige diesen Code im CRCON-Browser mit deinem eigenen Konto. Die Windows-App verbindet sich danach automatisch.',
                             'Confirm this code in the CRCON browser with your own account. The Windows app will then connect automatically.',
+                            "Confirmez ce code dans le navigateur CRCON avec votre propre compte. L'application Windows se connectera ensuite automatiquement.",
                           ),
                     textAlign: TextAlign.center,
                   ),
@@ -2525,7 +2826,11 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                       keyboardType: TextInputType.url,
                       autofillHints: const [AutofillHints.url],
                       decoration: InputDecoration(
-                        labelText: context.tr('CRCON-Adresse', 'CRCON address'),
+                        labelText: context.tr(
+                          'CRCON-Adresse',
+                          'CRCON address',
+                          "Adresse CRCON",
+                        ),
                         hintText: 'https://crcon.example.org',
                         prefixIcon: const Icon(Icons.language_outlined),
                       ),
@@ -2539,12 +2844,17 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                         context.tr(
                           'Browser öffnen und verbinden',
                           'Open browser and connect',
+                          "Ouvrir le navigateur et se connecter",
                         ),
                       ),
                     ),
                   ] else ...[
                     Semantics(
-                      label: context.tr('Gerätecode', 'Device code'),
+                      label: context.tr(
+                        'Gerätecode',
+                        'Device code',
+                        "Code de l’appareil",
+                      ),
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 20),
                         decoration: BoxDecoration(
@@ -2569,7 +2879,13 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                         ClipboardData(text: session.userCode),
                       ),
                       icon: const Icon(Icons.copy_outlined),
-                      label: Text(context.tr('Code kopieren', 'Copy code')),
+                      label: Text(
+                        context.tr(
+                          'Code kopieren',
+                          'Copy code',
+                          "Copier le code",
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     FilledButton.tonalIcon(
@@ -2579,6 +2895,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                         context.tr(
                           'Browser erneut öffnen',
                           'Open browser again',
+                          "Rouvrir le navigateur",
                         ),
                       ),
                     ),
@@ -2586,7 +2903,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                   if (_error != null) ...[
                     const SizedBox(height: 16),
                     Text(
-                      _error!,
+                      context.localizeError(_error),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
@@ -2607,8 +2924,12 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
     appBar: AppBar(
       title: Text(
         appIsWindows
-            ? context.tr('Windows-App verbinden', 'Connect Windows app')
-            : context.tr('CRCON koppeln', 'Pair CRCON'),
+            ? context.tr(
+                'Windows-App verbinden',
+                'Connect Windows app',
+                "Connecter l’application Windows",
+              )
+            : context.tr('CRCON koppeln', 'Pair CRCON', "Associer CRCON"),
       ),
       actions: const [_LanguageButton()],
     ),
@@ -2639,11 +2960,13 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          _error ??
-                              context.tr(
-                                'Öffne in CRCON „Apps einrichten“, erstelle einen QR-Code und scanne ihn hier.',
-                                'Open “Set up apps” in CRCON, create a QR code, then scan it here.',
-                              ),
+                          _error != null
+                              ? context.localizeError(_error)
+                              : context.tr(
+                                  'Öffne in CRCON „Apps einrichten“, erstelle einen QR-Code und scanne ihn hier.',
+                                  'Open “Set up apps” in CRCON, create a QR code, then scan it here.',
+                                  "Dans CRCON, ouvrez « Configurer les applications », créez un code QR, puis scannez-le ici.",
+                                ),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -2672,6 +2995,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                         context.tr(
                           'Vergleiche diesen Code mit CRCON',
                           'Compare this code with CRCON',
+                          "Comparez ce code avec CRCON",
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -2688,6 +3012,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                         context.tr(
                           'Bestätige das Gerät im CRCON-Browser. Kehre anschließend hierher zurück – die Verbindung wird automatisch abgeschlossen.',
                           'Approve the device in the CRCON browser, then return here. The connection will finish automatically.',
+                          "Approuvez l'appareil dans le navigateur CRCON, puis retournez ici. La connexion se terminera automatiquement.",
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -2708,10 +3033,12 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                               ? context.tr(
                                   'Verbindung wird geprüft …',
                                   'Checking connection …',
+                                  "Vérification de la connexion…",
                                 )
                               : context.tr(
                                   'Verbindung abschließen',
                                   'Finish connection',
+                                  "Terminer la connexion",
                                 ),
                         ),
                       ),
@@ -2719,7 +3046,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen>
                         Padding(
                           padding: const EdgeInsets.only(top: 16),
                           child: Text(
-                            _error!,
+                            context.localizeError(_error),
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.error,
                             ),
@@ -2777,7 +3104,9 @@ class _ManualIncidentDialogState extends State<ManualIncidentDialog> {
     return AlertDialog(
       scrollable: true,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      title: Text(context.tr('Vorfall erstellen', 'Create incident')),
+      title: Text(
+        context.tr('Vorfall erstellen', 'Create incident', "Créer un incident"),
+      ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: Column(
@@ -2813,7 +3142,11 @@ class _ManualIncidentDialogState extends State<ManualIncidentDialog> {
               initialValue: _serverNumber,
               isExpanded: true,
               decoration: InputDecoration(
-                labelText: context.tr('Gameserver', 'Game server'),
+                labelText: context.tr(
+                  'Gameserver',
+                  'Game server',
+                  "Serveur de jeu",
+                ),
               ),
               items: serverItems
                   .map(
@@ -2840,7 +3173,7 @@ class _ManualIncidentDialogState extends State<ManualIncidentDialog> {
               maxLines: 3,
               textInputAction: TextInputAction.done,
               decoration: InputDecoration(
-                labelText: context.tr('Grund', 'Reason'),
+                labelText: context.tr('Grund', 'Reason', "Raison"),
               ),
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _submit(),
@@ -2851,11 +3184,11 @@ class _ManualIncidentDialogState extends State<ManualIncidentDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text(context.tr('Abbrechen', 'Cancel')),
+          child: Text(context.tr('Abbrechen', 'Cancel', "Annuler")),
         ),
         FilledButton(
           onPressed: _reason.text.trim().isEmpty ? null : _submit,
-          child: Text(context.tr('Erstellen', 'Create')),
+          child: Text(context.tr('Erstellen', 'Create', "Créer")),
         ),
       ],
     );
@@ -2895,7 +3228,7 @@ Future<void> _createManualIncident(BuildContext context, WidgetRef ref) async {
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ).showSnackBar(SnackBar(content: Text(context.localizeError(error))));
     }
     return;
   }
@@ -2922,7 +3255,7 @@ Future<void> _createManualIncident(BuildContext context, WidgetRef ref) async {
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ).showSnackBar(SnackBar(content: Text(context.localizeError(error))));
     }
   }
 }
@@ -2934,9 +3267,17 @@ class _FrontlineBottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final entries = <(IconData, String, String)>[
-      (Icons.inbox_outlined, context.tr('Inbox', 'Inbox'), '/inbox'),
-      (Icons.person_outline, context.tr('Spieler', 'Players'), '/players'),
-      (Icons.more_horiz, context.tr('Mehr', 'More'), '/connections'),
+      (
+        Icons.inbox_outlined,
+        context.tr('Inbox', 'Inbox', "Boîte de réception"),
+        '/inbox',
+      ),
+      (
+        Icons.person_outline,
+        context.tr('Spieler', 'Players', "Joueurs"),
+        '/players',
+      ),
+      (Icons.more_horiz, context.tr('Mehr', 'More', "Plus"), '/connections'),
     ];
     return SafeArea(
       top: false,
@@ -3033,7 +3374,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
             Image.asset('assets/fln_logo.png', width: 20, height: 20),
             const SizedBox(width: 8),
             Text(
-              context.tr('Leitstelle', 'Command center'),
+              context.tr(
+                'Leitstelle',
+                'Command center',
+                "Centre de commandement",
+              ),
               style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w500),
             ),
           ],
@@ -3042,7 +3387,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Tooltip(
-              message: context.tr('Neuer Vorfall', 'New incident'),
+              message: context.tr(
+                'Neuer Vorfall',
+                'New incident',
+                "Nouvel incident",
+              ),
               child: SizedBox(
                 width: 42,
                 height: 42,
@@ -3063,11 +3412,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           ),
           const SizedBox(width: 6),
           PopupMenuButton<String>(
-            tooltip: context.tr('Weitere Bereiche', 'More areas'),
+            tooltip: context.tr(
+              'Weitere Bereiche',
+              'More areas',
+              "Autres sections",
+            ),
             onSelected: (value) {
               if (value == 'connections') context.push('/connections');
               if (value == 'diagnostics') context.push('/diagnostics');
-              if (value == 'de' || value == 'en') {
+              if (value == 'de' || value == 'en' || value == 'fr') {
                 ref.read(localeProvider.notifier).state = Locale(value);
                 unawaited(ref.read(secureStoreProvider).writeLanguage(value));
               }
@@ -3076,16 +3429,27 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               PopupMenuItem(
                 value: 'connections',
                 child: Text(
-                  context.tr('CRCON-Verbindungen', 'CRCON connections'),
+                  context.tr(
+                    'CRCON-Verbindungen',
+                    'CRCON connections',
+                    "Connexions CRCON",
+                  ),
                 ),
               ),
               PopupMenuItem(
                 value: 'diagnostics',
-                child: Text(context.tr('Diagnoseprotokoll', 'Diagnostics log')),
+                child: Text(
+                  context.tr(
+                    'Diagnoseprotokoll',
+                    'Diagnostics log',
+                    "Journal des diagnostics",
+                  ),
+                ),
               ),
               const PopupMenuDivider(),
               const PopupMenuItem(value: 'de', child: Text('Deutsch')),
               const PopupMenuItem(value: 'en', child: Text('English')),
+              const PopupMenuItem(value: 'fr', child: Text('Français')),
             ],
           ),
         ],
@@ -3135,7 +3499,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        context.tr('$openCount offen', '$openCount open'),
+                        context.tr(
+                          '$openCount offen',
+                          '$openCount open',
+                          "$openCount ouvert(s)",
+                        ),
                         style: const TextStyle(
                           fontSize: 17,
                           color: FrontlineTheme.chalk,
@@ -3149,6 +3517,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                         context.tr(
                           '$claimedCount übernommen',
                           '$claimedCount claimed',
+                          "$claimedCount pris en charge",
                         ),
                         style: const TextStyle(
                           fontSize: 17,
@@ -3163,10 +3532,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                   if (filtered.isEmpty)
                     _InboxEmptyState(
                       message: items.isEmpty
-                          ? context.tr('Keine Vorfälle.', 'No incidents.')
+                          ? context.tr(
+                              'Keine Vorfälle.',
+                              'No incidents.',
+                              "Pas d'incident.",
+                            )
                           : context.tr(
                               'Keine Meldungen in diesem Filter.',
                               'No reports in this filter.',
+                              "Aucun rapport dans ce filtre.",
                             ),
                     )
                   else
@@ -3186,12 +3560,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         itemBuilder: (context) => [
           PopupMenuItem<int?>(
             value: null,
-            child: Text(context.tr('Alle Server', 'All servers')),
+            child: Text(
+              context.tr('Alle Server', 'All servers', "Tous les serveurs"),
+            ),
           ),
           ...servers.map(
             (server) => PopupMenuItem<int?>(
               value: server,
-              child: Text(context.tr('Server $server', 'Server $server')),
+              child: Text(
+                context.tr(
+                  'Server $server',
+                  'Server $server',
+                  "Serveur $server",
+                ),
+              ),
             ),
           ),
         ],
@@ -3214,10 +3596,15 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               Expanded(
                 child: Text(
                   _serverNumber == null
-                      ? context.tr('Alle Server', 'All servers')
+                      ? context.tr(
+                          'Alle Server',
+                          'All servers',
+                          "Tous les serveurs",
+                        )
                       : context.tr(
                           'Server $_serverNumber',
                           'Server $_serverNumber',
+                          "Serveur $_serverNumber",
                         ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -3289,7 +3676,11 @@ class _WindowsLeitstelleState extends State<_WindowsLeitstelle> {
               child: selected == null
                   ? Center(
                       child: Text(
-                        context.tr('Keine Vorfälle.', 'No incidents.'),
+                        context.tr(
+                          'Keine Vorfälle.',
+                          'No incidents.',
+                          "Pas d'incident.",
+                        ),
                         style: const TextStyle(color: FrontlineTheme.muted),
                       ),
                     )
@@ -3314,33 +3705,37 @@ class _WindowsNavigation extends StatelessWidget {
     final entries = <(IconData, String, String)>[
       (
         Icons.inbox_outlined,
-        context.tr('Leitstelle', 'Command center'),
+        context.tr('Leitstelle', 'Command center', "Centre de commandement"),
         '/inbox',
       ),
-      (Icons.person_outline, context.tr('Spieler', 'Players'), '/players'),
+      (
+        Icons.person_outline,
+        context.tr('Spieler', 'Players', "Joueurs"),
+        '/players',
+      ),
       (
         Icons.visibility_outlined,
-        context.tr('Watchlist', 'Watchlist'),
+        context.tr('Watchlist', 'Watchlist', "Liste de surveillance"),
         '/watchlist',
       ),
       (
         Icons.radar_outlined,
-        context.tr('Live-Lage', 'Live situation'),
+        context.tr('Live-Lage', 'Live situation', "Situation en direct"),
         '/live-status',
       ),
       (
         Icons.balance_outlined,
-        context.tr('Autobalancer', 'Autobalancer'),
+        context.tr('Autobalancer', 'Autobalancer', "Autobalancer"),
         '/autobalancer',
       ),
       (
         Icons.link_outlined,
-        context.tr('Verbindungen', 'Connections'),
+        context.tr('Verbindungen', 'Connections', "Connexions"),
         '/connections',
       ),
       (
         Icons.settings_outlined,
-        context.tr('Einstellungen', 'Settings'),
+        context.tr('Einstellungen', 'Settings', "Réglages"),
         '/settings',
       ),
     ];
@@ -3429,7 +3824,7 @@ class _WindowsNavigation extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    context.tr('Verbunden', 'Connected'),
+                    context.tr('Verbunden', 'Connected', "Connecté"),
                     style: const TextStyle(
                       color: FrontlineTheme.muted,
                       fontSize: 12,
@@ -3548,7 +3943,11 @@ class _WindowsCaseQueue extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  context.tr('Vorfallliste', 'Case list'),
+                  context.tr(
+                    'Vorfallliste',
+                    'Case list',
+                    "Liste des incidents",
+                  ),
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w600,
@@ -3556,17 +3955,29 @@ class _WindowsCaseQueue extends StatelessWidget {
                 ),
               ),
               PopupMenuButton<int?>(
-                tooltip: context.tr('Server filtern', 'Filter servers'),
+                tooltip: context.tr(
+                  'Server filtern',
+                  'Filter servers',
+                  "Filtrer les serveurs",
+                ),
                 onSelected: onServerChanged,
                 itemBuilder: (context) => [
                   PopupMenuItem(
                     value: null,
-                    child: Text(context.tr('Alle Server', 'All servers')),
+                    child: Text(
+                      context.tr(
+                        'Alle Server',
+                        'All servers',
+                        "Tous les serveurs",
+                      ),
+                    ),
                   ),
                   ...servers.map(
                     (value) => PopupMenuItem(
                       value: value,
-                      child: Text('${context.tr('Server', 'Server')} $value'),
+                      child: Text(
+                        '${context.tr('Server', 'Server', "Serveur")} $value',
+                      ),
                     ),
                   ),
                 ],
@@ -3579,7 +3990,13 @@ class _WindowsCaseQueue extends StatelessWidget {
         Expanded(
           child: items.isEmpty
               ? Center(
-                  child: Text(context.tr('Keine Meldungen.', 'No reports.')),
+                  child: Text(
+                    context.tr(
+                      'Keine Meldungen.',
+                      'No reports.',
+                      "Pas de rapport.",
+                    ),
+                  ),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: 8),
@@ -3590,17 +4007,33 @@ class _WindowsCaseQueue extends StatelessWidget {
                     final subject = item.primarySubject;
                     final isSquad = subject?.kind == 'squad';
                     final target = subject == null
-                        ? context.tr('Allgemeine Meldung', 'General report')
+                        ? context.tr(
+                            'Allgemeine Meldung',
+                            'General report',
+                            "Signalement général",
+                          )
                         : isSquad
                         ? context.squadName(
                             subject.squadName ?? subject.displayName,
                           )
                         : subject.displayName;
                     final type = subject == null
-                        ? context.tr('Allgemeine Meldung', 'General report')
+                        ? context.tr(
+                            'Allgemeine Meldung',
+                            'General report',
+                            "Signalement général",
+                          )
                         : isSquad
-                        ? context.tr('Squadmeldung', 'Squad report')
-                        : context.tr('Spielermeldung', 'Player report');
+                        ? context.tr(
+                            'Squadmeldung',
+                            'Squad report',
+                            "Signalement d’escouade",
+                          )
+                        : context.tr(
+                            'Spielermeldung',
+                            'Player report',
+                            "Signalement du joueur",
+                          );
                     final selected = item.id == selectedId;
                     return InkWell(
                       onTap: () => onSelected(item),
@@ -3641,7 +4074,7 @@ class _WindowsCaseQueue extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    '${context.tr('Server', 'Server')} ${item.serverNumber} · ${_relativeIncidentTime(context, item.createdAt)}',
+                                    '${context.tr('Server', 'Server', "Serveur")} ${item.serverNumber} · ${_relativeIncidentTime(context, item.createdAt)}',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: FrontlineTheme.chalk,
@@ -3687,7 +4120,11 @@ class _WindowsIncidentWorkspace extends StatelessWidget {
     final subject = item.primarySubject;
     final isSquad = subject?.kind == 'squad';
     final target = subject == null
-        ? context.tr('Allgemeine Meldung', 'General report')
+        ? context.tr(
+            'Allgemeine Meldung',
+            'General report',
+            "Signalement général",
+          )
         : isSquad
         ? context.squadName(subject.squadName ?? subject.displayName)
         : subject.displayName;
@@ -3706,7 +4143,7 @@ class _WindowsIncidentWorkspace extends StatelessWidget {
         _desktopMemberName(
           members.where((value) => value['is_leader'] == true),
         ) ??
-        context.tr('Unbekannt', 'Unknown');
+        context.tr('Unbekannt', 'Unknown', "Inconnu");
     return ColoredBox(
       color: const Color(0xff10130f),
       child: Column(
@@ -3726,7 +4163,7 @@ class _WindowsIncidentWorkspace extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${isSquad ? context.tr('Squad', 'Squad') : context.tr('Spieler', 'Player')} $target',
+                        '${isSquad ? context.tr('Squad', 'Squad', "Escouade") : context.tr('Spieler', 'Player', "Joueur")} $target',
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w600,
@@ -3735,13 +4172,13 @@ class _WindowsIncidentWorkspace extends StatelessWidget {
                       const SizedBox(height: 5),
                       Text(
                         [
-                          '${context.tr('Server', 'Server')} ${item.serverNumber}',
+                          '${context.tr('Server', 'Server', "Serveur")} ${item.serverNumber}',
                           if (subject?.team != null)
-                            '${context.tr('Seite', 'Side')}: ${context.teamName(subject?.team)}',
+                            '${context.tr('Seite', 'Side', "Camp")}: ${context.teamName(subject?.team)}',
                           if (subject?.squadType != null)
                             context.squadTypeName(subject?.squadType),
                           if (isSquad)
-                            '${context.tr('Squadleader', 'Squad leader')}: $leader',
+                            '${context.tr('Squadleader', 'Squad leader', "Chef d’escouade")}: $leader',
                         ].join('  ·  '),
                         style: const TextStyle(
                           color: FrontlineTheme.chalk,
@@ -3768,7 +4205,11 @@ class _WindowsIncidentWorkspace extends StatelessWidget {
               children: [
                 Text(
                   context
-                      .tr('Originalmeldung', 'Original report')
+                      .tr(
+                        'Originalmeldung',
+                        'Original report',
+                        "Rapport initial",
+                      )
                       .toUpperCase(),
                   style: const TextStyle(
                     fontSize: 12,
@@ -3796,34 +4237,39 @@ class _WindowsIncidentWorkspace extends StatelessWidget {
                         title: context.tr(
                           'Melder (nicht Ziel)',
                           'Reporter (not target)',
+                          "Auteur du signalement (pas la cible)",
                         ),
                         icon: Icons.person_outline,
                         lines: [
                           item.reporterName ??
-                              context.tr('Unbekannt', 'Unknown'),
+                              context.tr('Unbekannt', 'Unknown', "Inconnu"),
                           if (item.reporterId != null)
                             'SteamID: ${item.reporterId}',
                           if (reporterTeam != null)
-                            '${context.tr('Seite', 'Side')}: ${context.teamName(reporterTeam)}',
+                            '${context.tr('Seite', 'Side', "Camp")}: ${context.teamName(reporterTeam)}',
                           if (reporterSquad != null)
-                            '${context.tr('Squad', 'Squad')}: ${context.squadName(reporterSquad)}',
+                            '${context.tr('Squad', 'Squad', "Escouade")}: ${context.squadName(reporterSquad)}',
                         ],
                       ),
                     ),
                     const SizedBox(width: 18),
                     Expanded(
                       child: _WindowsInfoBlock(
-                        title: context.tr('Gemeldetes Ziel', 'Reported target'),
+                        title: context.tr(
+                          'Gemeldetes Ziel',
+                          'Reported target',
+                          "Personne signalée",
+                        ),
                         icon: isSquad
                             ? Icons.groups_2_outlined
                             : Icons.gps_fixed,
                         lines: [
                           target,
-                          '${context.tr('Server', 'Server')} ${item.serverNumber}',
+                          '${context.tr('Server', 'Server', "Serveur")} ${item.serverNumber}',
                           if (subject?.team != null)
-                            '${context.tr('Seite', 'Side')}: ${context.teamName(subject?.team)}',
+                            '${context.tr('Seite', 'Side', "Camp")}: ${context.teamName(subject?.team)}',
                           if (isSquad)
-                            '${context.tr('Squadleader', 'Squad leader')}: $leader',
+                            '${context.tr('Squadleader', 'Squad leader', "Chef d’escouade")}: $leader',
                         ],
                       ),
                     ),
@@ -3920,11 +4366,11 @@ class _WindowsWorkspaceTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labels = [
-      context.tr('Meldung', 'Report'),
-      context.tr('Ziele', 'Targets'),
-      context.tr('Squad', 'Squad'),
-      context.tr('Ereignisse', 'Events'),
-      context.tr('Verlauf', 'History'),
+      context.tr('Meldung', 'Report', "Signalement"),
+      context.tr('Ziele', 'Targets', "Cibles"),
+      context.tr('Squad', 'Squad', "Escouade"),
+      context.tr('Ereignisse', 'Events', "Évènements"),
+      context.tr('Verlauf', 'History', "Historique"),
     ];
     return Row(
       children: List.generate(
@@ -3959,7 +4405,7 @@ class _WindowsReportPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _WindowsPanel(
-    title: context.tr('Meldung einordnen', 'Report context'),
+    title: context.tr('Meldung einordnen', 'Report context', "Contexte"),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3967,12 +4413,13 @@ class _WindowsReportPanel extends StatelessWidget {
           context.tr(
             'Die Meldung bezieht sich auf das oben markierte Ziel. Der Melder wird nur als Quelle angezeigt und ist keine automatische Maßnahmenauswahl.',
             'This report concerns the highlighted target above. The reporter is shown as a source only and is not selected for actions automatically.',
+            "Ce signalement concerne la cible indiquée ci-dessus. Son auteur est affiché uniquement comme source et n’est pas automatiquement sélectionné pour les actions.",
           ),
           style: const TextStyle(color: FrontlineTheme.chalk, height: 1.45),
         ),
         const SizedBox(height: 15),
         Text(
-          '${context.tr('Zeitpunkt', 'Time')}: ${item.createdAt.toLocal()}',
+          '${context.tr('Zeitpunkt', 'Time', "Heure")}: ${item.createdAt.toLocal()}',
           style: const TextStyle(color: FrontlineTheme.muted),
         ),
         if (report.isNotEmpty) ...[
@@ -3998,7 +4445,11 @@ class _WindowsTargetsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _WindowsPanel(
-    title: context.tr('Bestätigte Ziele', 'Confirmed targets'),
+    title: context.tr(
+      'Bestätigte Ziele',
+      'Confirmed targets',
+      "Cibles confirmées",
+    ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4011,9 +4462,9 @@ class _WindowsTargetsPanel extends StatelessWidget {
           title: Text(target),
           subtitle: Text(
             [
-              '${context.tr('Server', 'Server')} ${item.serverNumber}',
+              '${context.tr('Server', 'Server', "Serveur")} ${item.serverNumber}',
               if (isSquad)
-                '${context.tr('Squadleader', 'Squad leader')}: $leader',
+                '${context.tr('Squadleader', 'Squad leader', "Chef d’escouade")}: $leader',
             ].join('  ·  '),
           ),
         ),
@@ -4023,10 +4474,12 @@ class _WindowsTargetsPanel extends StatelessWidget {
               ? context.tr(
                   'Maßnahmen bleiben immer auf einen einzelnen Spieler begrenzt. Beim Squad ist der Leader vorausgewählt; ein Mitglied kann anschließend bewusst gewählt werden.',
                   'Actions always remain limited to one player. For a squad, the leader is preselected; a member can then be chosen deliberately.',
+                  "Les actions concernent toujours un seul joueur. Pour une escouade, le chef est présélectionné ; un autre membre peut ensuite être choisi volontairement.",
                 )
               : context.tr(
                   'Dieses bestätigte Spielerziel wird für Maßnahmen verwendet.',
                   'This confirmed player target is used for actions.',
+                  "Ce joueur confirmé est utilisé comme cible des actions.",
                 ),
           style: const TextStyle(color: FrontlineTheme.chalk, height: 1.45),
         ),
@@ -4052,12 +4505,17 @@ class _WindowsOverviewPanel extends StatelessWidget {
     children: [
       Expanded(
         child: _WindowsPanel(
-          title: context.tr('Squad-Snapshot', 'Squad snapshot'),
+          title: context.tr(
+            'Squad-Snapshot',
+            'Squad snapshot',
+            "Instantané de l’escouade",
+          ),
           child: members.isEmpty
               ? Text(
                   context.tr(
                     'Kein Squad-Snapshot verfügbar.',
                     'No squad snapshot available.',
+                    "Aucun instantané d’escouade disponible.",
                   ),
                   style: const TextStyle(color: FrontlineTheme.muted),
                 )
@@ -4065,7 +4523,7 @@ class _WindowsOverviewPanel extends StatelessWidget {
                   children: members.take(8).map((member) {
                     final name =
                         _desktopMemberName([member]) ??
-                        context.tr('Unbekannt', 'Unknown');
+                        context.tr('Unbekannt', 'Unknown', "Inconnu");
                     final role = member['role']?.toString();
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 5),
@@ -4100,19 +4558,28 @@ class _WindowsOverviewPanel extends StatelessWidget {
       const SizedBox(width: 18),
       Expanded(
         child: _WindowsPanel(
-          title: context.tr('Aktuelle Zuordnung', 'Current assignment'),
+          title: context.tr(
+            'Aktuelle Zuordnung',
+            'Current assignment',
+            "Affectation actuelle",
+          ),
           child: Column(
             children: [
               _WindowsFact(
-                label: context.tr('Serverzuordnung', 'Server assignment'),
-                value: '${context.tr('Server', 'Server')} ${item.serverNumber}',
+                label: context.tr(
+                  'Serverzuordnung',
+                  'Server assignment',
+                  "Affectation du serveur",
+                ),
+                value:
+                    '${context.tr('Server', 'Server', "Serveur")} ${item.serverNumber}',
               ),
               _WindowsFact(
-                label: context.tr('Seite', 'Side'),
+                label: context.tr('Seite', 'Side', "Camp"),
                 value: context.teamName(subject?.team),
               ),
               _WindowsFact(
-                label: context.tr('Squad', 'Squad'),
+                label: context.tr('Squad', 'Squad', "Escouade"),
                 value: subject?.kind == 'squad'
                     ? context.squadName(
                         subject?.squadName ?? subject?.displayName,
@@ -4120,11 +4587,15 @@ class _WindowsOverviewPanel extends StatelessWidget {
                     : context.squadName(subject?.squadName),
               ),
               _WindowsFact(
-                label: context.tr('Squadleader', 'Squad leader'),
+                label: context.tr(
+                  'Squadleader',
+                  'Squad leader',
+                  "Chef d’escouade",
+                ),
                 value: leader,
               ),
               _WindowsFact(
-                label: context.tr('Mitglieder', 'Members'),
+                label: context.tr('Mitglieder', 'Members', "Membres"),
                 value: members.isEmpty ? '—' : '${members.length}',
               ),
             ],
@@ -4190,10 +4661,18 @@ class _WindowsEventsPanel extends StatelessWidget {
   final List<Map<String, dynamic>> events;
   @override
   Widget build(BuildContext context) => _WindowsPanel(
-    title: context.tr('Ereignisse zum Vorfall', 'Incident events'),
+    title: context.tr(
+      'Ereignisse zum Vorfall',
+      'Incident events',
+      "Événements de l’incident",
+    ),
     child: events.isEmpty
         ? Text(
-            context.tr('Keine Ereignisse verfügbar.', 'No events available.'),
+            context.tr(
+              'Keine Ereignisse verfügbar.',
+              'No events available.',
+              "Pas d'événements disponibles.",
+            ),
             style: const TextStyle(color: FrontlineTheme.muted),
           )
         : Column(
@@ -4243,21 +4722,25 @@ class _WindowsHistoryPanel extends StatelessWidget {
   final AdminIncident item;
   @override
   Widget build(BuildContext context) => _WindowsPanel(
-    title: context.tr('Fallverlauf', 'Case history'),
+    title: context.tr(
+      'Fallverlauf',
+      'Case history',
+      "Historique des incidents",
+    ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${context.tr('Eingegangen', 'Received')}: ${item.createdAt.toLocal()}',
+          '${context.tr('Eingegangen', 'Received', "Reçu")}: ${item.createdAt.toLocal()}',
         ),
         const SizedBox(height: 10),
         Text(
-          '${context.tr('Aktueller Status', 'Current status')}: ${context.incidentStatus(item.status)}',
+          '${context.tr('Aktueller Status', 'Current status', "État actuel")}: ${context.incidentStatus(item.status)}',
         ),
         if (item.assignedTo != null) ...[
           const SizedBox(height: 10),
           Text(
-            '${context.tr('Zugewiesen an', 'Assigned to')}: ${item.assignedTo}',
+            '${context.tr('Zugewiesen an', 'Assigned to', "Attribué à")}: ${item.assignedTo}',
           ),
         ],
       ],
@@ -4284,14 +4767,29 @@ class _WindowsActions extends StatelessWidget {
             onPressed: () =>
                 context.push('/incidents/${item.connectionId}/${item.id}'),
             icon: const Icon(Icons.chat_bubble_outline),
-            label: Text(context.tr('Nachricht an $leader', 'Message $leader')),
+            label: Text(
+              context.tr(
+                'Nachricht an $leader',
+                'Message $leader',
+                "Envoyer un message à $leader",
+              ),
+            ),
           ),
         ),
         const SizedBox(width: 10),
         for (final action in <(IconData, String)>[
-          (Icons.shield_outlined, context.tr('Warnung', 'Warning')),
-          (Icons.person_remove_alt_1_outlined, context.tr('Kick', 'Kick')),
-          (Icons.timer_outlined, context.tr('Tempban', 'Tempban')),
+          (
+            Icons.shield_outlined,
+            context.tr('Warnung', 'Warning', "Avertissement"),
+          ),
+          (
+            Icons.person_remove_alt_1_outlined,
+            context.tr('Kick', 'Kick', "Expulser"),
+          ),
+          (
+            Icons.timer_outlined,
+            context.tr('Tempban', 'Tempban', "Bannissement temporaire"),
+          ),
         ]) ...[
           Expanded(
             child: OutlinedButton.icon(
@@ -4373,8 +4871,13 @@ class _FirstConnectionWizard extends StatelessWidget {
                       ? context.tr(
                           'Windows-App einrichten',
                           'Set up Windows app',
+                          "Configurer l’application Windows",
                         )
-                      : context.tr('Frontline einrichten', 'Set up Frontline'),
+                      : context.tr(
+                          'Frontline einrichten',
+                          'Set up Frontline',
+                          "Configurer Frontline",
+                        ),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
@@ -4386,10 +4889,12 @@ class _FirstConnectionWizard extends StatelessWidget {
                       ? context.tr(
                           'Melde die Windows-App direkt über deinen Browser und dein eigenes CRCON-Konto an.',
                           'Sign the Windows app in directly through your browser and your own CRCON account.',
+                          "Connectez l’application Windows directement via votre navigateur et votre compte CRCON personnel.",
                         )
                       : context.tr(
                           'Kopple dein persönliches CRCON-Konto sicher in weniger als einer Minute.',
                           'Securely connect your own CRCON account in less than a minute.',
+                          "Connectez en toute sécurité votre propre compte CRCON en moins d'une minute.",
                         ),
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: FrontlineTheme.muted),
@@ -4401,51 +4906,75 @@ class _FirstConnectionWizard extends StatelessWidget {
                       ? context.tr(
                           'CRCON-Adresse eingeben',
                           'Enter CRCON address',
+                          "Saisir l’adresse CRCON",
                         )
-                      : context.tr('CRCON öffnen', 'Open CRCON'),
+                      : context.tr(
+                          'CRCON öffnen',
+                          'Open CRCON',
+                          "Ouvrir CRCON",
+                        ),
                   description: appIsWindows
                       ? context.tr(
                           'Gib die öffentliche HTTPS-Adresse deiner CRCON-Installation ein.',
                           'Enter the public HTTPS address of your CRCON installation.',
+                          "Entrez l'adresse publique HTTPS de votre installation CRCON.",
                         )
                       : context.tr(
                           'Melde dich im CRCON mit deinem eigenen Admin-Konto an.',
                           'Sign in to CRCON with your own administrator account.',
+                          "Connectez-vous à CRCON avec votre propre compte administrateur.",
                         ),
                 ),
                 const SizedBox(height: 12),
                 _WizardStep(
                   number: '2',
                   title: appIsWindows
-                      ? context.tr('Browser-Anmeldung', 'Browser sign-in')
-                      : context.tr('QR-Code erstellen', 'Create a QR code'),
+                      ? context.tr(
+                          'Browser-Anmeldung',
+                          'Browser sign-in',
+                          "Connexion par navigateur",
+                        )
+                      : context.tr(
+                          'QR-Code erstellen',
+                          'Create a QR code',
+                          "Créer un code QR",
+                        ),
                   description: appIsWindows
                       ? context.tr(
                           'Frontline öffnet den Browser. Melde dich dort mit deinem eigenen Admin-Konto an.',
                           'Frontline opens your browser. Sign in there with your own administrator account.',
+                          "Frontline ouvre votre navigateur. Connectez-vous avec votre propre compte administrateur.",
                         )
                       : context.tr(
                           'Öffne dort „Apps einrichten“ und wähle „Gerät koppeln“.',
                           'Open “Set up apps” there and choose “Pair device”.',
+                          "Ouvrez « Configurer les applications », puis choisissez « Associer un appareil ».",
                         ),
                 ),
                 const SizedBox(height: 12),
                 _WizardStep(
                   number: '3',
                   title: appIsWindows
-                      ? context.tr('Freigabe abschließen', 'Finish approval')
+                      ? context.tr(
+                          'Freigabe abschließen',
+                          'Finish approval',
+                          "Terminer l’approbation",
+                        )
                       : context.tr(
                           'Scannen und bestätigen',
                           'Scan and approve',
+                          "Scanner et approuver",
                         ),
                   description: appIsWindows
                       ? context.tr(
                           'Bestätige den Gerätecode im Browser. Die Windows-App verbindet sich automatisch.',
                           'Approve the device code in your browser. The Windows app connects automatically.',
+                          "Approuvez le code de l’appareil dans votre navigateur. L’application Windows se connecte automatiquement.",
                         )
                       : context.tr(
                           'Scanne den Code hier und bestätige anschließend den Vergleichscode im CRCON.',
                           'Scan the code here, then confirm the comparison code in CRCON.',
+                          "Scannez le code ici, puis confirmez le code de comparaison dans CRCON.",
                         ),
                 ),
                 const SizedBox(height: 30),
@@ -4461,10 +4990,12 @@ class _FirstConnectionWizard extends StatelessWidget {
                         ? context.tr(
                             'Browser-Anmeldung starten',
                             'Start browser sign-in',
+                            "Démarrer la connexion par navigateur",
                           )
                         : context.tr(
                             'QR-Code jetzt scannen',
                             'Scan QR code now',
+                            "Scanner le code QR maintenant",
                           ),
                   ),
                   style: FilledButton.styleFrom(
@@ -4480,6 +5011,9 @@ class _FirstConnectionWizard extends StatelessWidget {
                     appIsWindows
                         ? 'Windows does not use a QR code. CRCON continues to determine your roles and permissions.'
                         : 'CRCON continues to determine your roles and permissions. Frontline does not store shared credentials.',
+                    appIsWindows
+                        ? "Windows n'utilise pas de code QR. CRCON continue de déterminer vos rôles et vos autorisations."
+                        : "CRCON continue de déterminer vos rôles et autorisations. Frontline ne stocke pas d’identifiants partagés.",
                   ),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
@@ -4523,6 +5057,7 @@ class _WebAppInstallCard extends StatelessWidget {
                 context.tr(
                   'Als App installieren (empfohlen)',
                   'Install as an app (recommended)',
+                  "Installer comme application (recommandé)",
                 ),
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
@@ -4534,6 +5069,7 @@ class _WebAppInstallCard extends StatelessWidget {
           context.tr(
             'iPhone: Öffne diese Seite in Safari, tippe auf „Teilen“ und wähle „Zum Home-Bildschirm“. Android: In Chrome das Menü öffnen und „Installieren & verknüpfen“, „App installieren“ oder „Zum Startbildschirm hinzufügen“ wählen.',
             'iPhone: Open this page in Safari, tap Share, then choose Add to Home Screen. Android: Open Chrome’s menu and choose Install and link, Install app, or Add to Home screen.',
+            "iPhone : ouvrez cette page dans Safari, touchez Partager, puis choisissez Sur l’écran d’accueil. Android : ouvrez le menu de Chrome et choisissez Installer et associer, Installer l’application ou Ajouter à l’écran d’accueil.",
           ),
           style: const TextStyle(color: FrontlineTheme.muted, height: 1.35),
         ),
@@ -4648,15 +5184,15 @@ class _IncidentRow extends StatelessWidget {
     final primary = item.primarySubject;
     final isSquad = primary?.kind == 'squad';
     final targetName = primary == null
-        ? context.tr('Allgemein', 'General')
+        ? context.tr('Allgemein', 'General', "Général")
         : isSquad
         ? context.squadName(primary.squadName ?? primary.displayName)
         : primary.displayName;
     final targetType = primary == null
-        ? context.tr('Meldung', 'Report')
+        ? context.tr('Meldung', 'Report', "Signalement")
         : isSquad
-        ? context.tr('Squad', 'Squad')
-        : context.tr('Spieler', 'Player');
+        ? context.tr('Squad', 'Squad', "Escouade")
+        : context.tr('Spieler', 'Player', "Joueur");
     final snapshotPlayers = primary?.snapshot['players'];
     final memberCount = snapshotPlayers is List ? snapshotPlayers.length : null;
     final facts = <(IconData, String)>[
@@ -4665,6 +5201,7 @@ class _IncidentRow extends StatelessWidget {
         context.tr(
           'Server ${item.serverNumber}',
           'Server ${item.serverNumber}',
+          "Serveur ${item.serverNumber}",
         ),
       ),
       if (isSquad)
@@ -4684,12 +5221,14 @@ class _IncidentRow extends StatelessWidget {
           context.tr(
             '$memberCount ${memberCount == 1 ? 'Mitglied' : 'Mitglieder'} aktiv',
             '$memberCount ${memberCount == 1 ? 'member' : 'members'} active',
+            "$memberCount ${memberCount == 1 ? 'membre' : 'membres'} en activité",
           ),
         )
       else if (!isSquad && primary?.role != null)
         (Icons.military_tech_outlined, context.roleName(primary?.role)),
     ]..removeWhere((item) => item.$2.isEmpty);
-    final reporter = item.reporterName ?? context.tr('manuell', 'manual');
+    final reporter =
+        item.reporterName ?? context.tr('manuell', 'manual', "manuel");
 
     return InkWell(
       onTap: () => context.push('/incidents/${item.connectionId}/${item.id}'),
@@ -4812,7 +5351,11 @@ class _IncidentRow extends StatelessWidget {
                       ),
                       children: [
                         TextSpan(
-                          text: context.tr('gemeldet von ', 'reported by '),
+                          text: context.tr(
+                            'gemeldet von ',
+                            'reported by ',
+                            "signalé par ",
+                          ),
                         ),
                         TextSpan(
                           text: reporter,
@@ -5209,7 +5752,7 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
     final choices = [
       <String, dynamic>{
         'server_number': null,
-        'name': context.tr('Alle Server', 'All servers'),
+        'name': context.tr('Alle Server', 'All servers', "Tous les serveurs"),
       },
       ..._servers,
     ];
@@ -5229,8 +5772,12 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
               ),
               title: Text(
                 value == null
-                    ? context.tr('Alle Server', 'All servers')
-                    : '${context.tr('Server', 'Server')} $value',
+                    ? context.tr(
+                        'Alle Server',
+                        'All servers',
+                        "Tous les serveurs",
+                      )
+                    : '${context.tr('Server', 'Server', "Serveur")} $value',
               ),
               trailing: selected
                   ? const Icon(Icons.check, color: FrontlineTheme.gold)
@@ -5278,7 +5825,7 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                   Image.asset('assets/fln_logo.png', width: 20, height: 20),
                   const SizedBox(width: 8),
                   Text(
-                    context.tr('Spieler', 'Players'),
+                    context.tr('Spieler', 'Players', "Joueurs"),
                     style: const TextStyle(
                       fontSize: 25,
                       fontWeight: FontWeight.w500,
@@ -5288,7 +5835,7 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
               ),
               actions: [
                 IconButton(
-                  tooltip: context.tr('Aktualisieren', 'Refresh'),
+                  tooltip: context.tr('Aktualisieren', 'Refresh', "Actualiser"),
                   onPressed: _busy
                       ? null
                       : () => _loadDirectory(
@@ -5303,10 +5850,10 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
           ? null
           : const _FrontlineBottomBar(currentIndex: 1),
       body: _WindowsBodyLayout(
-        title: context.tr('Spieler', 'Players'),
+        title: context.tr('Spieler', 'Players', "Joueurs"),
         actions: [
           IconButton(
-            tooltip: context.tr('Aktualisieren', 'Refresh'),
+            tooltip: context.tr('Aktualisieren', 'Refresh', "Actualiser"),
             onPressed: _busy
                 ? null
                 : () => _loadDirectory(
@@ -5325,6 +5872,7 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                   context.tr(
                     'Verbinde zuerst eine CRCON-Installation.',
                     'Pair a CRCON connection first.',
+                    "Associez d’abord une connexion CRCON.",
                   ),
                 ),
               );
@@ -5337,8 +5885,8 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
             }
             final players = _visiblePlayers();
             final activeServerLabel = _serverNumber == null
-                ? context.tr('Alle Server', 'All servers')
-                : '${context.tr('Server', 'Server')} $_serverNumber';
+                ? context.tr('Alle Server', 'All servers', "Tous les serveurs")
+                : '${context.tr('Server', 'Server', "Serveur")} $_serverNumber';
             return LayoutBuilder(
               builder: (context, constraints) => Center(
                 child: ConstrainedBox(
@@ -5376,12 +5924,17 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                           hintText: context.tr(
                             'Spielername oder Steam-ID suchen',
                             'Search player name or Steam ID',
+                            "Rechercher un nom de joueur ou un identifiant Steam",
                           ),
                           prefixIcon: const Icon(Icons.search),
                           suffixIcon: IconButton(
                             onPressed: () => _search(items),
                             icon: const Icon(Icons.arrow_forward),
-                            tooltip: context.tr('Suchen', 'Search'),
+                            tooltip: context.tr(
+                              'Suchen',
+                              'Search',
+                              "Rechercher",
+                            ),
                           ),
                         ),
                         textInputAction: TextInputAction.search,
@@ -5404,10 +5957,15 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                         children: [
                           Text(
                             _results.isNotEmpty
-                                ? context.tr('Suchergebnisse', 'Search results')
+                                ? context.tr(
+                                    'Suchergebnisse',
+                                    'Search results',
+                                    "Résultats de la recherche",
+                                  )
                                 : context.tr(
                                     'Spieler im Einsatz',
                                     'Players in action',
+                                    "Joueurs concernés",
                                   ),
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
@@ -5422,7 +5980,9 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                                       ? FrontlineTheme.gold
                                       : FrontlineTheme.muted,
                                 ),
-                                child: Text(context.tr('Online', 'Online')),
+                                child: Text(
+                                  context.tr('Online', 'Online', "En ligne"),
+                                ),
                               ),
                               TextButton(
                                 onPressed: () =>
@@ -5432,7 +5992,7 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                                       ? FrontlineTheme.gold
                                       : FrontlineTheme.muted,
                                 ),
-                                child: Text(context.tr('Alle', 'All')),
+                                child: Text(context.tr('Alle', 'All', "Tous")),
                               ),
                             ],
                           ),
@@ -5447,6 +6007,7 @@ class _PlayerSearchScreenState extends ConsumerState<PlayerSearchScreen> {
                               context.tr(
                                 'Keine Spieler gefunden.',
                                 'No players found.',
+                                "Aucun joueur trouvé.",
                               ),
                               style: const TextStyle(
                                 color: FrontlineTheme.muted,
@@ -5497,14 +6058,14 @@ class PlayerDirectoryRow extends StatelessWidget {
     final name =
         player['name']?.toString() ??
         player['player_name']?.toString() ??
-        context.tr('Unbekannt', 'Unknown');
+        context.tr('Unbekannt', 'Unknown', "Inconnu");
     final serverNumber = (player['server_number'] as num?)?.toInt();
     final online = player['online'] != false;
     final role = player['role']?.toString();
     final isLeader = _isSquadLeader(role);
     final details = [
       if (serverNumber != null)
-        '${context.tr('Server', 'Server')} $serverNumber',
+        '${context.tr('Server', 'Server', "Serveur")} $serverNumber',
       context.teamName(player['team']?.toString()),
       context.squadName(player['unit_name']?.toString()),
       context.roleName(role),
@@ -5631,13 +6192,19 @@ class PlayerProfileScreen extends ConsumerWidget {
               children: [
                 Image.asset('assets/fln_logo.png', width: 23, height: 23),
                 const SizedBox(width: 9),
-                Text(context.tr('Spielerprofil', 'Player profile')),
+                Text(
+                  context.tr(
+                    'Spielerprofil',
+                    'Player profile',
+                    "Profil du joueur",
+                  ),
+                ),
               ],
             ),
             actions: const [_LanguageButton()],
           ),
     body: _WindowsBodyLayout(
-      title: context.tr('Spielerprofil', 'Player profile'),
+      title: context.tr('Spielerprofil', 'Player profile', "Profil du joueur"),
       child: FutureBuilder<Map<String, dynamic>>(
         future: _load(ref),
         builder: (context, snapshot) {
@@ -5824,9 +6391,17 @@ class _PlayerWatchCardState extends ConsumerState<_PlayerWatchCard> {
     final reason = await showDialog<String>(
       context: context,
       builder: (_) => _TextInputDialog(
-        title: context.tr('Spieler beobachten', 'Watch player'),
-        label: context.tr('Pflichtgrund', 'Required reason'),
-        confirmLabel: context.tr('Beobachten', 'Watch'),
+        title: context.tr(
+          'Spieler beobachten',
+          'Watch player',
+          "Surveiller le joueur",
+        ),
+        label: context.tr(
+          'Pflichtgrund',
+          'Required reason',
+          "Justification requise",
+        ),
+        confirmLabel: context.tr('Beobachten', 'Watch', "Surveiller"),
         maxLines: 3,
       ),
     );
@@ -5855,7 +6430,7 @@ class _PlayerWatchCardState extends ConsumerState<_PlayerWatchCard> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        ).showSnackBar(SnackBar(content: Text(context.localizeError(error))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -5866,21 +6441,30 @@ class _PlayerWatchCardState extends ConsumerState<_PlayerWatchCard> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text(context.tr('Beobachtung beenden?', 'End watch?')),
+        title: Text(
+          context.tr(
+            'Beobachtung beenden?',
+            'End watch?',
+            "Arrêter la surveillance ?",
+          ),
+        ),
         content: Text(
           context.tr(
             'Der Spieler wird aus der CRCON-Watchlist entfernt.',
             'The player will be removed from CRCON\'s watchlist.',
+            "Le joueur sera retiré de la liste de surveillance de CRCON.",
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(context.tr('Abbrechen', 'Cancel')),
+            child: Text(context.tr('Abbrechen', 'Cancel', "Annuler")),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(context.tr('Beenden', 'End watch')),
+            child: Text(
+              context.tr('Beenden', 'End watch', "Arrêter la surveillance"),
+            ),
           ),
         ],
       ),
@@ -5898,7 +6482,7 @@ class _PlayerWatchCardState extends ConsumerState<_PlayerWatchCard> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        ).showSnackBar(SnackBar(content: Text(context.localizeError(error))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -5927,14 +6511,14 @@ class _PlayerWatchCardState extends ConsumerState<_PlayerWatchCard> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    context.tr('Beobachtung', 'Watch'),
+                    context.tr('Beobachtung', 'Watch', "Surveiller"),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
                 Text(
                   watched
-                      ? context.tr('aktiv', 'active')
-                      : context.tr('inaktiv', 'inactive'),
+                      ? context.tr('aktiv', 'active', "actif")
+                      : context.tr('inaktiv', 'inactive', "inactif"),
                   style: TextStyle(
                     color: watched
                         ? FrontlineTheme.success
@@ -5950,10 +6534,10 @@ class _PlayerWatchCardState extends ConsumerState<_PlayerWatchCard> {
               Text(
                 [
                   if (_watch?['by'] != null)
-                    '${context.tr('gesetzt von', 'set by')} ${_watch?['by']}',
+                    '${context.tr('gesetzt von', 'set by', "défini par")} ${_watch?['by']}',
                   if (_watch?['modified'] != null)
                     _watch?['modified'].toString(),
-                  '${_watch?['count'] ?? 0} ${context.tr('Sichtungen', 'sightings')}',
+                  '${_watch?['count'] ?? 0} ${context.tr('Sichtungen', 'sightings', "observations")}',
                 ].join(' · '),
                 style: const TextStyle(color: FrontlineTheme.muted),
               ),
@@ -5963,13 +6547,19 @@ class _PlayerWatchCardState extends ConsumerState<_PlayerWatchCard> {
               OutlinedButton.icon(
                 onPressed: _busy ? null : _watchPlayer,
                 icon: const Icon(Icons.visibility_outlined),
-                label: Text(context.tr('Beobachten', 'Watch')),
+                label: Text(context.tr('Beobachten', 'Watch', "Surveiller")),
               ),
             if (watched && canRemove)
               OutlinedButton.icon(
                 onPressed: _busy ? null : _unwatchPlayer,
                 icon: const Icon(Icons.visibility_off_outlined),
-                label: Text(context.tr('Beobachtung beenden', 'End watch')),
+                label: Text(
+                  context.tr(
+                    'Beobachtung beenden',
+                    'End watch',
+                    "Arrêter la surveillance",
+                  ),
+                ),
               ),
           ],
         ),
@@ -6020,7 +6610,11 @@ class _PlayerContextExcerpt extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                context.tr('Ereignisse zum Vorfall', 'Incident events'),
+                context.tr(
+                  'Ereignisse zum Vorfall',
+                  'Incident events',
+                  "Événements de l’incident",
+                ),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 4),
@@ -6028,6 +6622,7 @@ class _PlayerContextExcerpt extends ConsumerWidget {
                 context.tr(
                   '10 Minuten vor / nach der Meldung',
                   '10 minutes before / after the report',
+                  "10 minutes avant / après le rapport",
                 ),
                 style: const TextStyle(color: FrontlineTheme.muted),
               ),
@@ -6050,7 +6645,9 @@ class _PlayerContextExcerpt extends ConsumerWidget {
                   child: TextButton.icon(
                     onPressed: () => _openAll(context, ref),
                     icon: const Icon(Icons.format_list_bulleted),
-                    label: Text(context.tr('Alle anzeigen', 'Show all')),
+                    label: Text(
+                      context.tr('Alle anzeigen', 'Show all', "Tout afficher"),
+                    ),
                   ),
                 ),
             ],
@@ -6084,7 +6681,11 @@ class _PlayerContextExcerpt extends ConsumerWidget {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
                         child: Text(
-                          context.tr('Alle Ereignisse', 'All events'),
+                          context.tr(
+                            'Alle Ereignisse',
+                            'All events',
+                            "Tous les événements",
+                          ),
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                       ),
@@ -6136,6 +6737,7 @@ class _ContextSummary extends StatelessWidget {
             context.tr(
               '$teamkills ${teamkills == 1 ? 'Teamkill' : 'Teamkills'} im Zeitfenster',
               '$teamkills team ${teamkills == 1 ? 'kill' : 'kills'} in time window',
+              "$teamkills ${teamkills == 1 ? 'tir allié' : 'tirs alliés'} pendant la période",
             ),
             style: const TextStyle(
               color: FrontlineTheme.warning,
@@ -6146,7 +6748,7 @@ class _ContextSummary extends StatelessWidget {
         if (showAll)
           TextButton(
             onPressed: onShowAll,
-            child: Text(context.tr('Alle', 'All')),
+            child: Text(context.tr('Alle', 'All', "Tous")),
           ),
       ],
     ),
@@ -6164,7 +6766,7 @@ class _ContextEventRow extends StatelessWidget {
     final isTeamkill = kind == 'teamkill';
     final actor =
         event['actor_name']?.toString() ??
-        context.tr('Unbekannter Spieler', 'Unknown player');
+        context.tr('Unbekannter Spieler', 'Unknown player', "Joueur inconnu");
     final other = event['other_name']?.toString();
     final weapon = event['weapon']?.toString();
     final message = event['message']?.toString().trim() ?? '';
@@ -6254,31 +6856,45 @@ String _contextEventTitle(
   String actor,
   String? other,
 ) => switch (kind) {
-  'chat' => context.tr('$actor schrieb im Chat', '$actor sent a chat message'),
+  'chat' => context.tr(
+    '$actor schrieb im Chat',
+    '$actor sent a chat message',
+    "$actor a envoyé un message de chat",
+  ),
   'kill' =>
     other == null
-        ? context.tr('$actor tötete einen Spieler', '$actor killed a player')
+        ? context.tr(
+            '$actor tötete einen Spieler',
+            '$actor killed a player',
+            "$actor a tué un joueur",
+          )
         : '$actor → $other',
   'teamkill' =>
     other == null
         ? context.tr(
             '$actor teamkillte einen Spieler',
             '$actor teamkilled a player',
+            "$actor a éliminé un allié",
           )
         : '$actor → $other',
-  'join' => context.tr('$actor ist beigetreten', '$actor joined'),
+  'join' => context.tr(
+    '$actor ist beigetreten',
+    '$actor joined',
+    "$actor a rejoint",
+  ),
   'leave' => context.tr(
     '$actor hat den Server verlassen',
     '$actor left the server',
+    "$actor a quitté le serveur",
   ),
-  _ => context.tr('Ereignis', 'Event'),
+  _ => context.tr('Ereignis', 'Event', "Événement"),
 };
 
 String? _contextEventEyebrow(BuildContext context, String? kind) =>
     switch (kind) {
-      'teamkill' => context.tr('TEAMKILL', 'TEAM KILL'),
-      'kill' => context.tr('KILL', 'KILL'),
-      'chat' => context.tr('CHAT', 'CHAT'),
+      'teamkill' => context.tr('TEAMKILL', 'TEAM KILL', "TIR ALLIÉ"),
+      'kill' => context.tr('KILL', 'KILL', "ÉLIMINATION"),
+      'chat' => context.tr('CHAT', 'CHAT', "CHAT"),
       _ => null,
     };
 
@@ -6353,8 +6969,8 @@ class _PlayerIdentityHeader extends StatelessWidget {
                     const SizedBox(width: 7),
                     Text(
                       live == null
-                          ? context.tr('Offline', 'Offline')
-                          : context.tr('Online', 'Online'),
+                          ? context.tr('Offline', 'Offline', "Hors ligne")
+                          : context.tr('Online', 'Online', "En ligne"),
                       style: TextStyle(
                         color: live == null
                             ? FrontlineTheme.muted
@@ -6394,7 +7010,8 @@ class _PlayerIdentityHeader extends StatelessWidget {
                   const SizedBox(height: 5),
                   _ProfileFact(
                     icon: Icons.military_tech_outlined,
-                    text: '${context.tr('Level', 'Level')} ${soldier['level']}',
+                    text:
+                        '${context.tr('Level', 'Level', "Niveau")} ${soldier['level']}',
                   ),
                 ],
               ],
@@ -6445,7 +7062,9 @@ class _PlayerIncidentReport extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                buildContext.tr('Meldung', 'Report').toUpperCase(),
+                buildContext
+                    .tr('Meldung', 'Report', "Signalement")
+                    .toUpperCase(),
                 style: const TextStyle(
                   color: FrontlineTheme.gold,
                   letterSpacing: .5,
@@ -6463,12 +7082,16 @@ class _PlayerIncidentReport extends StatelessWidget {
                   style: const TextStyle(color: FrontlineTheme.muted),
                   children: [
                     TextSpan(
-                      text: buildContext.tr('gemeldet von ', 'reported by '),
+                      text: buildContext.tr(
+                        'gemeldet von ',
+                        'reported by ',
+                        "signalé par ",
+                      ),
                     ),
                     TextSpan(
                       text:
                           context.reporterName ??
-                          buildContext.tr('unbekannt', 'unknown'),
+                          buildContext.tr('unbekannt', 'unknown', "inconnu"),
                       style: const TextStyle(color: FrontlineTheme.gold),
                     ),
                     TextSpan(
@@ -6500,19 +7123,19 @@ class _PlayerProfileStats extends StatelessWidget {
   Widget build(BuildContext context) {
     final values = <(String, String, IconData, Color)>[
       (
-        context.tr('Kills', 'Kills'),
+        context.tr('Kills', 'Kills', "Éliminations"),
         _profileNumberText(kills),
         Icons.gps_fixed,
         FrontlineTheme.gold,
       ),
       (
-        context.tr('Tode', 'Deaths'),
+        context.tr('Tode', 'Deaths', "Morts"),
         _profileNumberText(deaths),
         Icons.close,
         FrontlineTheme.chalk,
       ),
       (
-        context.tr('Teamkills', 'Teamkills'),
+        context.tr('Teamkills', 'Teamkills', "Tirs alliés"),
         _profileNumberText(teamkills),
         Icons.groups_2_outlined,
         (_profileNumber(teamkills) ?? 0) > 0
@@ -6587,7 +7210,11 @@ class _PlayerActivityTimeline extends StatelessWidget {
         _ProfileTimelineEntry(
           icon: Icons.warning_amber_rounded,
           title: incidentContext!.report,
-          subtitle: context.tr('Meldung eingegangen', 'Report received'),
+          subtitle: context.tr(
+            'Meldung eingegangen',
+            'Report received',
+            "Signalement reçu",
+          ),
           time: incidentContext!.reportedAt,
           accent: FrontlineTheme.gold,
         ),
@@ -6610,7 +7237,11 @@ class _PlayerActivityTimeline extends StatelessWidget {
       entries.add(
         _ProfileTimelineEntry(
           icon: Icons.login,
-          title: context.tr('Letzte Sitzung', 'Last session'),
+          title: context.tr(
+            'Letzte Sitzung',
+            'Last session',
+            "Dernière session",
+          ),
           subtitle: playerName,
           time: _profileDate(_mapValue(sessions.first)['created']),
           accent: FrontlineTheme.chalk,
@@ -6624,10 +7255,12 @@ class _PlayerActivityTimeline extends StatelessWidget {
           title: context.tr(
             'Keine weiteren Ereignisse verfügbar',
             'No further events available',
+            "Aucun autre événement disponible",
           ),
           subtitle: context.tr(
             'Live-Daten werden bei Verfügbarkeit ergänzt.',
             'Live data is added when available.',
+            "Les données en direct sont ajoutées lorsqu’elles sont disponibles.",
           ),
           time: null,
           accent: FrontlineTheme.muted,
@@ -6647,7 +7280,11 @@ class _PlayerActivityTimeline extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 11),
             child: Text(
               context
-                  .tr('Verlauf dieser Runde', 'Round timeline')
+                  .tr(
+                    'Verlauf dieser Runde',
+                    'Round timeline',
+                    "Chronologie de la manche",
+                  )
                   .toUpperCase(),
               style: const TextStyle(
                 fontWeight: FontWeight.w700,
@@ -6766,7 +7403,11 @@ class _PlayerIdentifiers extends StatelessWidget {
         ('EOS-ID', eosId!, Icons.videogame_asset_outlined),
       if (platformPlayerId != null && platformPlayerId!.isNotEmpty)
         (
-          context.tr('Plattform-ID', 'Platform ID'),
+          context.tr(
+            'Plattform-ID',
+            'Platform ID',
+            "Identifiant de plateforme",
+          ),
           platformPlayerId!,
           Icons.badge_outlined,
         ),
@@ -6774,7 +7415,7 @@ class _PlayerIdentifiers extends StatelessWidget {
           (eosId == null || eosId!.isEmpty) &&
           (platformPlayerId == null || platformPlayerId!.isEmpty))
         (
-          context.tr('Spieler-ID', 'Player ID'),
+          context.tr('Spieler-ID', 'Player ID', "Identifiant du joueur"),
           fallbackPlayerId,
           Icons.badge_outlined,
         ),
@@ -6794,7 +7435,9 @@ class _PlayerIdentifiers extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    context.tr('Kennungen', 'Identifiers').toUpperCase(),
+                    context
+                        .tr('Kennungen', 'Identifiers', "Identifiants")
+                        .toUpperCase(),
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       letterSpacing: .4,
@@ -6878,14 +7521,14 @@ class _PlayerAdminSummary extends StatelessWidget {
       children: [
         _ProfileSummaryRow(
           icon: Icons.flag_outlined,
-          label: context.tr('Markierungen', 'Flags'),
+          label: context.tr('Markierungen', 'Flags', "Drapeaux"),
           value: '${flags.length}',
           accent: flags.isEmpty ? FrontlineTheme.chalk : FrontlineTheme.warning,
         ),
         const Divider(height: 1),
         _ProfileSummaryRow(
           icon: Icons.gavel_outlined,
-          label: context.tr('Sperren', 'Bans'),
+          label: context.tr('Sperren', 'Bans', "Bannissements"),
           value: '${bans.length}',
           accent: bans.isEmpty
               ? FrontlineTheme.success
@@ -6894,7 +7537,11 @@ class _PlayerAdminSummary extends StatelessWidget {
         const Divider(height: 1),
         _ProfileSummaryRow(
           icon: Icons.comment_outlined,
-          label: context.tr('Admin-Kommentare', 'Admin comments'),
+          label: context.tr(
+            'Admin-Kommentare',
+            'Admin comments',
+            "Commentaires d’administration",
+          ),
           value: '${comments.length}',
           accent: FrontlineTheme.chalk,
         ),
@@ -6958,18 +7605,46 @@ class _PlayerProfileActionBar extends ConsumerWidget {
       context: context,
       builder: (_) => _TextInputDialog(
         title: message
-            ? context.tr('Nachricht an Spieler', 'Message player')
+            ? context.tr(
+                'Nachricht an Spieler',
+                'Message player',
+                "Envoyer un message au joueur",
+              )
             : switch (action) {
-                'punish' => context.tr('Spieler bestrafen', 'Punish player'),
-                'kick' => context.tr('Spieler kicken', 'Kick player'),
-                'temp_ban' => context.tr('Temporär sperren', 'Temporary ban'),
-                'perma_ban' => context.tr('Permanent sperren', 'Permanent ban'),
-                _ => context.tr('Maßnahme', 'Action'),
+                'punish' => context.tr(
+                  'Spieler bestrafen',
+                  'Punish player',
+                  "Sanctionner le joueur",
+                ),
+                'kick' => context.tr(
+                  'Spieler kicken',
+                  'Kick player',
+                  "Expulser le joueur",
+                ),
+                'temp_ban' => context.tr(
+                  'Temporär sperren',
+                  'Temporary ban',
+                  "Bannissement temporaire",
+                ),
+                'perma_ban' => context.tr(
+                  'Permanent sperren',
+                  'Permanent ban',
+                  "Bannissement permanent",
+                ),
+                _ => context.tr('Maßnahme', 'Action', "Action"),
               },
         label: message
-            ? context.tr('Nachricht', 'Message')
-            : context.tr('Pflichtgrund', 'Required reason'),
-        confirmLabel: context.tr('Ausführen', 'Run action'),
+            ? context.tr('Nachricht', 'Message', "Message")
+            : context.tr(
+                'Pflichtgrund',
+                'Required reason',
+                "Justification requise",
+              ),
+        confirmLabel: context.tr(
+          'Ausführen',
+          'Run action',
+          "Exécuter l’action",
+        ),
         maxLines: 3,
         templates: templates,
       ),
@@ -6990,7 +7665,13 @@ class _PlayerProfileActionBar extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(context.tr('Maßnahme ausgeführt', 'Action executed')),
+            content: Text(
+              context.tr(
+                'Maßnahme ausgeführt',
+                'Action executed',
+                "Action exécutée",
+              ),
+            ),
           ),
         );
       }
@@ -6998,7 +7679,7 @@ class _PlayerProfileActionBar extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$error')));
+        ).showSnackBar(SnackBar(content: Text(context.localizeError(error))));
       }
     }
   }
@@ -7022,7 +7703,7 @@ class _PlayerProfileActionBar extends ConsumerWidget {
               child: OutlinedButton.icon(
                 onPressed: () => _runAction(context, ref, 'message'),
                 icon: const Icon(Icons.message_outlined),
-                label: Text(context.tr('Nachricht', 'Message')),
+                label: Text(context.tr('Nachricht', 'Message', "Message")),
               ),
             ),
             const SizedBox(width: 9),
@@ -7032,22 +7713,30 @@ class _PlayerProfileActionBar extends ConsumerWidget {
                 itemBuilder: (_) => [
                   PopupMenuItem(
                     value: 'punish',
-                    child: Text(context.tr('Punish', 'Punish')),
+                    child: Text(context.tr('Punish', 'Punish', "Sanctionner")),
                   ),
                   PopupMenuItem(
                     value: 'kick',
-                    child: Text(context.tr('Kicken', 'Kick')),
+                    child: Text(context.tr('Kicken', 'Kick', "Expulser")),
                   ),
                   PopupMenuItem(
                     value: 'temp_ban',
                     child: Text(
-                      context.tr('Temporär sperren', 'Temporary ban'),
+                      context.tr(
+                        'Temporär sperren',
+                        'Temporary ban',
+                        "Bannissement temporaire",
+                      ),
                     ),
                   ),
                   PopupMenuItem(
                     value: 'perma_ban',
                     child: Text(
-                      context.tr('Permanent sperren', 'Permanent ban'),
+                      context.tr(
+                        'Permanent sperren',
+                        'Permanent ban',
+                        "Bannissement permanent",
+                      ),
                     ),
                   ),
                 ],
@@ -7067,7 +7756,7 @@ class _PlayerProfileActionBar extends ConsumerWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        context.tr('Maßnahme', 'Action'),
+                        context.tr('Maßnahme', 'Action', "Action"),
                         style: const TextStyle(
                           color: FrontlineTheme.gold,
                           fontWeight: FontWeight.w700,
@@ -7104,7 +7793,7 @@ String _playerProfileName(
       alias ??
       history['player_name']?.toString() ??
       history['name']?.toString() ??
-      context.tr('Unbekannter Spieler', 'Unknown player');
+      context.tr('Unbekannter Spieler', 'Unknown player', "Joueur inconnu");
 }
 
 Object? _profileFirstValue(Map<String, dynamic> value, List<String> keys) {
@@ -7135,21 +7824,23 @@ String _profileClock(DateTime value) =>
     '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 
 String _relativeProfileTime(BuildContext context, DateTime? value) {
-  if (value == null) return context.tr('unbekannt', 'unknown');
+  if (value == null) return context.tr('unbekannt', 'unknown', "inconnu");
   final difference = DateTime.now().difference(value).abs();
   if (difference.inMinutes < 1) {
-    return context.tr('gerade eben', 'just now');
+    return context.tr('gerade eben', 'just now', "à l’instant");
   }
   if (difference.inHours < 1) {
     return context.tr(
       'vor ${difference.inMinutes} Min.',
       '${difference.inMinutes} min ago',
+      "il y a ${difference.inMinutes} min",
     );
   }
   if (difference.inDays < 1) {
     return context.tr(
       'vor ${difference.inHours} Std.',
       '${difference.inHours} h ago',
+      "il y a ${difference.inHours} h",
     );
   }
   return '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}.${value.year}';
@@ -7158,13 +7849,23 @@ String _relativeProfileTime(BuildContext context, DateTime? value) {
 String _profileActionTitle(BuildContext context, Map<String, dynamic> value) {
   final action = value['action_type']?.toString().toLowerCase() ?? 'action';
   return switch (action) {
-    'punish' => context.tr('Punish ausgeführt', 'Punish executed'),
-    'kick' => context.tr('Spieler gekickt', 'Player kicked'),
-    'tempban' ||
-    'temp_ban' => context.tr('Temporär gesperrt', 'Temporarily banned'),
-    'permaban' ||
-    'perma_ban' => context.tr('Permanent gesperrt', 'Permanently banned'),
-    _ => context.tr('Admin-Maßnahme', 'Admin action'),
+    'punish' => context.tr(
+      'Punish ausgeführt',
+      'Punish executed',
+      "Sanction appliquée",
+    ),
+    'kick' => context.tr('Spieler gekickt', 'Player kicked', "Joueur expulsé"),
+    'tempban' || 'temp_ban' => context.tr(
+      'Temporär gesperrt',
+      'Temporarily banned',
+      "Banni temporairement",
+    ),
+    'permaban' || 'perma_ban' => context.tr(
+      'Permanent gesperrt',
+      'Permanently banned',
+      "Banni définitivement",
+    ),
+    _ => context.tr('Admin-Maßnahme', 'Admin action', "Action administrative"),
   };
 }
 
@@ -7196,14 +7897,14 @@ class SquadScreen extends ConsumerWidget {
     appBar: appIsWindows
         ? null
         : AppBar(
-            title: Text(context.tr('Squad', 'Squad')),
+            title: Text(context.tr('Squad', 'Squad', "Escouade")),
             actions: const [_LanguageButton()],
           ),
     bottomNavigationBar: appIsWindows
         ? null
         : const _FrontlineBottomBar(currentIndex: 1),
     body: _WindowsBodyLayout(
-      title: context.tr('Squad', 'Squad'),
+      title: context.tr('Squad', 'Squad', "Escouade"),
       child: FutureBuilder<Map<String, dynamic>>(
         future: _load(ref),
         builder: (context, snapshot) {
@@ -7258,7 +7959,7 @@ class SquadScreen extends ConsumerWidget {
                         _ContextChip(
                           icon: Icons.person_outline,
                           label:
-                              '${players.length} ${context.tr('Mitglieder', 'members')}',
+                              '${players.length} ${context.tr('Mitglieder', 'members', "membres")}',
                         ),
                       ],
                     ),
@@ -7279,10 +7980,12 @@ class SquadScreen extends ConsumerWidget {
                               ? context.tr(
                                   'Squadleader aktiv',
                                   'Squad leader active',
+                                  "Chef d’escouade actif",
                                 )
                               : context.tr(
                                   'Kein Squadleader',
                                   'No squad leader',
+                                  "Aucun chef d’escouade",
                                 ),
                         ),
                       ],
@@ -7308,12 +8011,12 @@ class SquadScreen extends ConsumerWidget {
                       child: Row(
                         children: [
                           Text(
-                            context.tr('Mitglieder', 'Members'),
+                            context.tr('Mitglieder', 'Members', "Membres"),
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const Spacer(),
                           Text(
-                            context.tr('Live', 'Live'),
+                            context.tr('Live', 'Live', "En direct"),
                             style: const TextStyle(
                               color: FrontlineTheme.success,
                             ),
@@ -7456,7 +8159,7 @@ class _TextInputDialogState extends State<_TextInputDialog> {
         if (widget.templates.isNotEmpty) ...[
           const SizedBox(height: 14),
           Text(
-            context.tr('Schnellvorlage', 'Quick template'),
+            context.tr('Schnellvorlage', 'Quick template', "Modèle rapide"),
             style: const TextStyle(color: FrontlineTheme.muted),
           ),
           const SizedBox(height: 6),
@@ -7484,7 +8187,7 @@ class _TextInputDialogState extends State<_TextInputDialog> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: Text(context.tr('Abbrechen', 'Cancel')),
+        child: Text(context.tr('Abbrechen', 'Cancel', "Annuler")),
       ),
       FilledButton(
         onPressed: () => Navigator.pop(context, _controller.text.trim()),
@@ -7549,32 +8252,55 @@ List<_ActionTemplate> _localActionTemplates(
 ) {
   final values = switch (action) {
     'message' => [
-      context.tr('Wir prüfen deine Meldung.', 'We are reviewing your report.'),
+      context.tr(
+        'Wir prüfen deine Meldung.',
+        'We are reviewing your report.',
+        "Nous examinons votre rapport.",
+      ),
       context.tr(
         'Bitte bleib kurz auf dem Server.',
         'Please stay on the server for a moment.',
+        "Restez sur le serveur un instant.",
       ),
       context.tr(
         'Danke für die Meldung. Ein Admin kümmert sich darum.',
         'Thanks for the report. An admin is handling it.',
+        "Merci pour le signalement. Un administrateur s’en occupe.",
       ),
     ],
     'punish' => [
-      context.tr('Teamkill', 'Team kill'),
-      context.tr('Regelverstoß', 'Rule violation'),
-      context.tr('Beleidigung', 'Abusive language'),
+      context.tr('Teamkill', 'Team kill', "Tir allié"),
+      context.tr('Regelverstoß', 'Rule violation', "Violation des règles"),
+      context.tr('Beleidigung', 'Abusive language', "Propos injurieux"),
     ],
     'kick' || 'temp_ban' || 'perma_ban' => [
-      context.tr('Wiederholtes Teamkilling', 'Repeated team killing'),
-      context.tr('Wiederholter Regelverstoß', 'Repeated rule violation'),
+      context.tr(
+        'Wiederholtes Teamkilling',
+        'Repeated team killing',
+        "Tirs alliés répétés",
+      ),
+      context.tr(
+        'Wiederholter Regelverstoß',
+        'Repeated rule violation',
+        "Violations répétées des règles",
+      ),
       context.tr(
         'Beleidigung / toxisches Verhalten',
         'Abusive / toxic behavior',
+        "Comportement abusif ou toxique",
       ),
     ],
     'disband_squad' || 'remove_from_squad' => [
-      context.tr('Kein Squadleader vorhanden', 'No squad leader present'),
-      context.tr('Verstoß gegen Squad-Regeln', 'Squad rule violation'),
+      context.tr(
+        'Kein Squadleader vorhanden',
+        'No squad leader present',
+        "Aucun chef d’escouade présent",
+      ),
+      context.tr(
+        'Verstoß gegen Squad-Regeln',
+        'Squad rule violation',
+        "Violation des règles d’escouade",
+      ),
     ],
     _ => const <String>[],
   };
@@ -7616,7 +8342,13 @@ class _HandoverDialogState extends State<_HandoverDialog> {
   Widget build(BuildContext context) => AlertDialog(
     insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
     scrollable: true,
-    title: Text(context.tr('Vorfall übergeben', 'Hand over incident')),
+    title: Text(
+      context.tr(
+        'Vorfall übergeben',
+        'Hand over incident',
+        "Transférer l’incident",
+      ),
+    ),
     content: Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -7625,6 +8357,7 @@ class _HandoverDialogState extends State<_HandoverDialog> {
           context.tr(
             'Der ausgewählte Admin übernimmt den Vorfall und erhält deine Übergabenotiz im Verlauf.',
             'The selected admin takes the incident and receives your handover note in the timeline.',
+            "L’administrateur sélectionné prend en charge l’incident et reçoit votre note de transfert dans la chronologie.",
           ),
           style: const TextStyle(color: FrontlineTheme.muted),
         ),
@@ -7632,7 +8365,11 @@ class _HandoverDialogState extends State<_HandoverDialog> {
         DropdownButtonFormField<String>(
           initialValue: _selectedAdmin,
           decoration: InputDecoration(
-            labelText: context.tr('Übernehmen durch', 'Assign to'),
+            labelText: context.tr(
+              'Übernehmen durch',
+              'Assign to',
+              "Attribuer à",
+            ),
           ),
           items: widget.admins
               .map(
@@ -7653,6 +8390,7 @@ class _HandoverDialogState extends State<_HandoverDialog> {
             labelText: context.tr(
               'Kurze Übergabenotiz (optional)',
               'Short handover note (optional)',
+              "Note de transfert courte (facultatif)",
             ),
           ),
         ),
@@ -7661,7 +8399,7 @@ class _HandoverDialogState extends State<_HandoverDialog> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: Text(context.tr('Abbrechen', 'Cancel')),
+        child: Text(context.tr('Abbrechen', 'Cancel', "Annuler")),
       ),
       FilledButton(
         onPressed: () => Navigator.pop(
@@ -7671,7 +8409,7 @@ class _HandoverDialogState extends State<_HandoverDialog> {
             note: _note.text.trim(),
           ),
         ),
-        child: Text(context.tr('Übergeben', 'Hand over')),
+        child: Text(context.tr('Übergeben', 'Hand over', "Transférer")),
       ),
     ],
   );
@@ -7704,7 +8442,13 @@ class _ActionTargetPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(context.tr('Spieler für Maßnahme', 'Player for action')),
+    title: Text(
+      context.tr(
+        'Spieler für Maßnahme',
+        'Player for action',
+        "Joueur concerné par l’action",
+      ),
+    ),
     content: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 420, maxHeight: 360),
       child: ListView.separated(
@@ -7728,8 +8472,13 @@ class _ActionTargetPicker extends StatelessWidget {
                   ? context.tr(
                       'Vorschlag – wird beim Ausführen bestätigt',
                       'Suggestion – confirmed when the action runs',
+                      "Suggestion — confirmée lorsque l’action est exécutée",
                     )
-                  : context.tr('Bestätigtes Ziel', 'Confirmed target'),
+                  : context.tr(
+                      'Bestätigtes Ziel',
+                      'Confirmed target',
+                      "Cible confirmée",
+                    ),
             ),
             onTap: () => Navigator.pop(
               context,
@@ -7746,7 +8495,7 @@ class _ActionTargetPicker extends StatelessWidget {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: Text(context.tr('Abbrechen', 'Cancel')),
+        child: Text(context.tr('Abbrechen', 'Cancel', "Annuler")),
       ),
     ],
   );
@@ -7764,7 +8513,11 @@ class _SquadMemberTargetPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: Text(
-      context.tr('Squadmitglied anschreiben', 'Message squad member'),
+      context.tr(
+        'Squadmitglied anschreiben',
+        'Message squad member',
+        "Envoyer un message à un membre de l’escouade",
+      ),
     ),
     content: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 420, maxHeight: 360),
@@ -7783,7 +8536,7 @@ class _SquadMemberTargetPicker extends StatelessWidget {
             title: Text(member['name']?.toString() ?? ''),
             subtitle: Text(
               isLeader
-                  ? context.tr('Squadleader', 'Squad leader')
+                  ? context.tr('Squadleader', 'Squad leader', "Chef d’escouade")
                   : context.roleName(member['role']?.toString()),
             ),
             onTap: () => Navigator.pop(
@@ -7801,7 +8554,7 @@ class _SquadMemberTargetPicker extends StatelessWidget {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: Text(context.tr('Abbrechen', 'Cancel')),
+        child: Text(context.tr('Abbrechen', 'Cancel', "Annuler")),
       ),
     ],
   );
@@ -7829,7 +8582,13 @@ class _LinkTargetDialogState extends State<_LinkTargetDialog> {
   Widget build(BuildContext context) => AlertDialog(
     insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
     scrollable: true,
-    title: Text(context.tr('Spielerziel verknüpfen', 'Link target player')),
+    title: Text(
+      context.tr(
+        'Spielerziel verknüpfen',
+        'Link target player',
+        "Associer le joueur ciblé",
+      ),
+    ),
     content: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -7837,13 +8596,21 @@ class _LinkTargetDialogState extends State<_LinkTargetDialog> {
           controller: _name,
           autofocus: true,
           decoration: InputDecoration(
-            labelText: context.tr('Spielername', 'Player name'),
+            labelText: context.tr(
+              'Spielername',
+              'Player name',
+              "Nom du joueur",
+            ),
           ),
         ),
         TextField(
           controller: _id,
           decoration: InputDecoration(
-            labelText: context.tr('Spieler-ID', 'Player ID'),
+            labelText: context.tr(
+              'Spieler-ID',
+              'Player ID',
+              "Identifiant du joueur",
+            ),
           ),
         ),
       ],
@@ -7851,14 +8618,14 @@ class _LinkTargetDialogState extends State<_LinkTargetDialog> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: Text(context.tr('Abbrechen', 'Cancel')),
+        child: Text(context.tr('Abbrechen', 'Cancel', "Annuler")),
       ),
       FilledButton(
         onPressed: () => Navigator.pop(context, {
           'player_id': _id.text.trim(),
           'player_name': _name.text.trim(),
         }),
-        child: Text(context.tr('Verknüpfen', 'Link')),
+        child: Text(context.tr('Verknüpfen', 'Link', "Lien")),
       ),
     ],
   );
@@ -8053,6 +8820,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
             context.tr(
               'Keine übernehmenden Admins verfügbar.',
               'No eligible admins are available.',
+              "Aucun administrateur admissible n’est disponible.",
             ),
           ),
         ),
@@ -8181,22 +8949,33 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: Text(
-          context.tr('Spielerziel erforderlich', 'Player target required'),
+          context.tr(
+            'Spielerziel erforderlich',
+            'Player target required',
+            "Un joueur cible est requis",
+          ),
         ),
         content: Text(
           context.tr(
             'Für diese Maßnahme muss ein Spieler ausgewählt werden. Der Fall wird erst bei der finalen Ausführung übernommen.',
             'Select a player before running this action. The incident is claimed only when the action is finally run.',
+            "Sélectionnez un joueur avant d’exécuter cette action. L’incident n’est pris en charge qu’au moment de l’exécution.",
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(context.tr('Abbrechen', 'Cancel')),
+            child: Text(context.tr('Abbrechen', 'Cancel', "Annuler")),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(context.tr('Spieler wählen', 'Choose player')),
+            child: Text(
+              context.tr(
+                'Spieler wählen',
+                'Choose player',
+                "Choisir le joueur",
+              ),
+            ),
           ),
         ],
       ),
@@ -8261,6 +9040,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           _error = context.tr(
             'Wähle zuerst einen bestätigten Squad aus.',
             'Select a confirmed squad first.',
+            "Sélectionnez une escouade confirmée en premier.",
           );
         });
         return;
@@ -8283,34 +9063,73 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       builder: (_) => _TextInputDialog(
         title: action == 'message'
             ? context.tr(
-                'Nachricht an ${target!.playerName ?? context.tr('Squadleader', 'Squad leader')}',
-                'Message ${target.playerName ?? context.tr('Squad leader', 'Squad leader')}',
+                'Nachricht an ${target!.playerName ?? context.tr('Squadleader', 'Squad leader', "Chef d’escouade")}',
+                'Message ${target.playerName ?? context.tr('Squad leader', 'Squad leader', "Chef d’escouade")}',
+                "Envoyer un message à ${target.playerName ?? context.tr('Squad leader', 'Squad leader', 'Chef d’escouade')}",
               )
             : switch (action) {
-                'temp_ban' => context.tr('Temporäre Sperre', 'Temporary ban'),
-                'perma_ban' => context.tr('Permanente Sperre', 'Permanent ban'),
-                'kick' => context.tr('Spieler kicken', 'Kick player'),
+                'temp_ban' => context.tr(
+                  'Temporäre Sperre',
+                  'Temporary ban',
+                  "Bannissement temporaire",
+                ),
+                'perma_ban' => context.tr(
+                  'Permanente Sperre',
+                  'Permanent ban',
+                  "Bannissement permanent",
+                ),
+                'kick' => context.tr(
+                  'Spieler kicken',
+                  'Kick player',
+                  "Expulser le joueur",
+                ),
                 'disband_squad' => context.tr(
                   'Squad auflösen',
                   'Disband squad',
+                  "Dissoudre l’escouade",
                 ),
                 'remove_from_squad' => context.tr(
                   'Aus Squad entfernen',
                   'Remove from squad',
+                  "Retirer de l’escouade",
                 ),
-                'punish' => context.tr('Spieler bestrafen', 'Punish player'),
-                'message' => context.tr('Nachricht senden', 'Send message'),
-                'comment' => context.tr('Admin-Kommentar', 'Admin comment'),
+                'punish' => context.tr(
+                  'Spieler bestrafen',
+                  'Punish player',
+                  "Sanctionner le joueur",
+                ),
+                'message' => context.tr(
+                  'Nachricht senden',
+                  'Send message',
+                  "Envoyer un message",
+                ),
+                'comment' => context.tr(
+                  'Admin-Kommentar',
+                  'Admin comment',
+                  "Commentaire d’administration",
+                ),
                 _ => action,
               },
         label: action == 'message'
-            ? context.tr('Nachricht', 'Message')
+            ? context.tr('Nachricht', 'Message', "Message")
             : action == 'comment'
-            ? context.tr('Admin-Kommentar', 'Admin comment')
-            : context.tr('Pflichtgrund', 'Required reason'),
+            ? context.tr(
+                'Admin-Kommentar',
+                'Admin comment',
+                "Commentaire d’administration",
+              )
+            : context.tr(
+                'Pflichtgrund',
+                'Required reason',
+                "Justification requise",
+              ),
         confirmLabel: incident.status == 'new'
-            ? context.tr('Übernehmen & ausführen', 'Claim & run')
-            : context.tr('Ausführen', 'Run action'),
+            ? context.tr(
+                'Übernehmen & ausführen',
+                'Claim & run',
+                "Prendre en charge et exécuter",
+              )
+            : context.tr('Ausführen', 'Run action', "Exécuter l’action"),
         maxLines: 3,
         templates: templates,
       ),
@@ -8408,31 +9227,31 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       if (incident.status == 'new')
         FilledButton(
           onPressed: _busy ? null : () => _mutate('claim'),
-          child: Text(context.tr('Übernehmen', 'Claim')),
+          child: Text(context.tr('Übernehmen', 'Claim', "Prendre en charge")),
         ),
       if (incident.status == 'claimed')
         OutlinedButton(
           onPressed: _busy ? null : () => _mutate('unclaim'),
-          child: Text(context.tr('Freigeben', 'Release')),
+          child: Text(context.tr('Freigeben', 'Release', "Libérer")),
         ),
       if (!{'resolved', 'dismissed'}.contains(incident.status))
         OutlinedButton(
           onPressed: _busy ? null : _reassign,
-          child: Text(context.tr('Neu zuweisen', 'Reassign')),
+          child: Text(context.tr('Neu zuweisen', 'Reassign', "Réattribuer")),
         ),
       if (!{'resolved', 'dismissed'}.contains(incident.status)) ...[
         FilledButton.tonal(
           onPressed: _busy ? null : () => _mutate('resolved'),
-          child: Text(context.tr('Erledigt', 'Resolve')),
+          child: Text(context.tr('Erledigt', 'Resolve', "Résoudre")),
         ),
         OutlinedButton(
           onPressed: _busy ? null : () => _mutate('dismissed'),
-          child: Text(context.tr('Abweisen', 'Dismiss')),
+          child: Text(context.tr('Abweisen', 'Dismiss', "Rejeter")),
         ),
       ] else
         FilledButton(
           onPressed: _busy ? null : () => _mutate('reopen'),
-          child: Text(context.tr('Wieder öffnen', 'Reopen')),
+          child: Text(context.tr('Wieder öffnen', 'Reopen', "Rouvrir")),
         ),
     ],
   );
@@ -8446,21 +9265,22 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         Text(
-          context.tr('Originalmeldung', 'Original report'),
+          context.tr('Originalmeldung', 'Original report', "Rapport initial"),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: 8),
         SelectableText(incident.rawMessage ?? incident.reason),
         const Divider(height: 32),
         Text(
-          context.tr('Melder', 'Reporter'),
+          context.tr('Melder', 'Reporter', "Auteur du signalement"),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         Card(
           child: ListTile(
             leading: const Icon(Icons.campaign_outlined),
             title: Text(
-              incident.reporterName ?? context.tr('Unbekannt', 'Unknown'),
+              incident.reporterName ??
+                  context.tr('Unbekannt', 'Unknown', "Inconnu"),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -8470,8 +9290,9 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                       ? context.tr(
                           'Kein Meldesnapshot verfügbar',
                           'No report snapshot available',
+                          "Aucun instantané du signalement disponible",
                         )
-                      : '${context.tr('Damals', 'Then')}: '
+                      : '${context.tr('Damals', 'Then', "À ce moment-là")}: '
                             '${_contextLine(incident.reporterContext)}',
                 ),
                 Text(
@@ -8479,8 +9300,9 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                       ? context.tr(
                           'Jetzt: offline oder nicht gefunden',
                           'Now: offline or not found',
+                          "Actuellement : hors ligne ou introuvable",
                         )
-                      : '${context.tr('Jetzt', 'Now')}: '
+                      : '${context.tr('Jetzt', 'Now', "Maintenant")}: '
                             '${_contextLine(liveReporter)}',
                   style: const TextStyle(color: FrontlineTheme.muted),
                 ),
@@ -8510,7 +9332,9 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
         OutlinedButton.icon(
           onPressed: _busy ? null : _addNote,
           icon: const Icon(Icons.note_add_outlined),
-          label: Text(context.tr('Notiz hinzufügen', 'Add note')),
+          label: Text(
+            context.tr('Notiz hinzufügen', 'Add note', "Ajouter une note"),
+          ),
         ),
       ],
     );
@@ -8524,6 +9348,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           context.tr(
             'Noch kein Spieler oder Squad erkannt.',
             'No player or squad has been recognized yet.',
+            "Aucun joueur ni aucune escouade n’a encore été identifié.",
           ),
         ),
       ...incident.subjects.map((subject) {
@@ -8565,8 +9390,8 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                   subtitle: Text(
                     [
                       subject.kind == 'squad'
-                          ? context.tr('Squad', 'Squad')
-                          : context.tr('Spieler', 'Player'),
+                          ? context.tr('Squad', 'Squad', "Escouade")
+                          : context.tr('Spieler', 'Player', "Joueur"),
                       context.subjectState(subject.state),
                       subject.matchMethod,
                       if (percent != null) '$percent %',
@@ -8588,14 +9413,17 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                       : null,
                 ),
                 if (thenLine.isNotEmpty)
-                  Text('${context.tr('Damals', 'Then')}: $thenLine'),
+                  Text(
+                    '${context.tr('Damals', 'Then', "À ce moment-là")}: $thenLine',
+                  ),
                 Text(
                   live == null
                       ? context.tr(
                           'Jetzt: offline oder nicht gefunden',
                           'Now: offline or not found',
+                          "Actuellement : hors ligne ou introuvable",
                         )
-                      : '${context.tr('Jetzt', 'Now')}: $nowLine',
+                      : '${context.tr('Jetzt', 'Now', "Maintenant")}: $nowLine',
                   style: TextStyle(
                     color: live == null ? FrontlineTheme.muted : null,
                   ),
@@ -8609,13 +9437,17 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                         onPressed: _busy
                             ? null
                             : () => _mutateSubject(subject, 'confirm'),
-                        child: Text(context.tr('Bestätigen', 'Confirm')),
+                        child: Text(
+                          context.tr('Bestätigen', 'Confirm', "Confirmer"),
+                        ),
                       ),
                       OutlinedButton(
                         onPressed: _busy
                             ? null
                             : () => _mutateSubject(subject, 'reject'),
-                        child: Text(context.tr('Verwerfen', 'Reject')),
+                        child: Text(
+                          context.tr('Verwerfen', 'Reject', "Rejeter"),
+                        ),
                       ),
                     ],
                     if (subject.state == 'confirmed' && !subject.isPrimary)
@@ -8624,7 +9456,11 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                             ? null
                             : () => _mutateSubject(subject, 'set_primary'),
                         child: Text(
-                          context.tr('Als Hauptziel', 'Make primary'),
+                          context.tr(
+                            'Als Hauptziel',
+                            'Make primary',
+                            "Définir comme principal",
+                          ),
                         ),
                       ),
                   ],
@@ -8639,7 +9475,11 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
         onPressed: _busy ? null : _linkTarget,
         icon: const Icon(Icons.person_add_alt),
         label: Text(
-          context.tr('Spieler manuell hinzufügen', 'Add player manually'),
+          context.tr(
+            'Spieler manuell hinzufügen',
+            'Add player manually',
+            "Ajouter un joueur manuellement",
+          ),
         ),
       ),
     ],
@@ -8657,6 +9497,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
             context.tr(
               'Kein Squad in dieser Meldung.',
               'No squad in this report.',
+              "Aucune escouade dans ce signalement.",
             ),
           ),
         ...squads.map((subject) {
@@ -8686,8 +9527,8 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                   ),
                   subtitle: Text(
                     '${context.squadTypeName(subject.squadType)} · '
-                    '${oldPlayers.length} ${context.tr('damals', 'then')} · '
-                    '${livePlayers.length} ${context.tr('jetzt', 'now')}',
+                    '${oldPlayers.length} ${context.tr('damals', 'then', "à ce moment-là")} · '
+                    '${livePlayers.length} ${context.tr('jetzt', 'now', "maintenant")}',
                   ),
                 ),
               ),
@@ -8707,6 +9548,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                       context.tr(
                         'Anderes Mitglied anschreiben',
                         'Message another member',
+                        "Écrire à un autre membre",
                       ),
                     ),
                   ),
@@ -8724,7 +9566,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                   title: Text(player['name']?.toString() ?? playerId),
                   subtitle: Text(
                     '${context.roleName(player['role']?.toString())} · '
-                    '${onlineInSquad ? context.tr('unverändert', 'unchanged') : context.tr('offline/gewechselt', 'offline/moved')}',
+                    '${onlineInSquad ? context.tr('unverändert', 'unchanged', "inchangé") : context.tr('offline/gewechselt', 'offline/moved', "hors ligne ou déplacé")}',
                   ),
                   trailing: subject.state != 'confirmed' || playerId.isEmpty
                       ? const Icon(Icons.lock_outline)
@@ -8744,16 +9586,28 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                             PopupMenuItem(
                               value: 'profile',
                               child: Text(
-                                context.tr('Profil öffnen', 'Open profile'),
+                                context.tr(
+                                  'Profil öffnen',
+                                  'Open profile',
+                                  "Ouvrir le profil",
+                                ),
                               ),
                             ),
                             PopupMenuItem(
                               value: 'message',
-                              child: Text(context.tr('Nachricht', 'Message')),
+                              child: Text(
+                                context.tr('Nachricht', 'Message', "Message"),
+                              ),
                             ),
                             PopupMenuItem(
                               value: 'punish',
-                              child: Text(context.tr('Bestrafen', 'Punish')),
+                              child: Text(
+                                context.tr(
+                                  'Bestrafen',
+                                  'Punish',
+                                  "Sanctionner",
+                                ),
+                              ),
                             ),
                             PopupMenuItem(
                               value: 'remove_from_squad',
@@ -8761,17 +9615,24 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                                 context.tr(
                                   'Aus Squad entfernen',
                                   'Remove from squad',
+                                  "Retirer de l’escouade",
                                 ),
                               ),
                             ),
                             PopupMenuItem(
                               value: 'kick',
-                              child: Text(context.tr('Kicken', 'Kick')),
+                              child: Text(
+                                context.tr('Kicken', 'Kick', "Expulser"),
+                              ),
                             ),
                             PopupMenuItem(
                               value: 'temp_ban',
                               child: Text(
-                                context.tr('Temporär sperren', 'Temporary ban'),
+                                context.tr(
+                                  'Temporär sperren',
+                                  'Temporary ban',
+                                  "Bannissement temporaire",
+                                ),
                               ),
                             ),
                             PopupMenuItem(
@@ -8780,6 +9641,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                                 context.tr(
                                   'Permanent sperren',
                                   'Permanent ban',
+                                  "Bannissement permanent",
                                 ),
                               ),
                             ),
@@ -8798,12 +9660,16 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                   title: Text(player['name']?.toString() ?? playerId),
                   subtitle: Text(
                     '${context.roleName(player['role']?.toString())} · '
-                    '${context.tr('seit der Meldung beigetreten', 'joined since report')}',
+                    '${context.tr('seit der Meldung beigetreten', 'joined since report', "a rejoint depuis le signalement")}',
                   ),
                   trailing: playerId.isEmpty
                       ? null
                       : IconButton(
-                          tooltip: context.tr('Profil öffnen', 'Open profile'),
+                          tooltip: context.tr(
+                            'Profil öffnen',
+                            'Open profile',
+                            "Ouvrir le profil",
+                          ),
                           onPressed: () => _openPlayer(playerId),
                           icon: const Icon(Icons.chevron_right),
                         ),
@@ -8895,9 +9761,9 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       return value?.toString() ?? '—';
     }
     if (seconds >= 60) {
-      return '${(seconds / 60).round()} ${context.tr('Min.', 'min')}';
+      return '${(seconds / 60).round()} ${context.tr('Min.', 'min', "min")}';
     }
-    return '${seconds.round()} ${context.tr('Sek.', 'sec')}';
+    return '${seconds.round()} ${context.tr('Sek.', 'sec', "sec")}';
   }
 
   Widget _dossierHeader(AdminIncident incident, IncidentSubject subject) {
@@ -8934,8 +9800,8 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
               children: [
                 Text(
                   (isSquad
-                          ? context.tr('Squad', 'Squad')
-                          : context.tr('Spieler', 'Player'))
+                          ? context.tr('Squad', 'Squad', "Escouade")
+                          : context.tr('Spieler', 'Player', "Joueur"))
                       .toUpperCase(),
                   style: const TextStyle(
                     color: FrontlineTheme.gold,
@@ -8984,7 +9850,11 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
             ),
           ),
           IconButton(
-            tooltip: context.tr('Spielerprofil', 'Player profile'),
+            tooltip: context.tr(
+              'Spielerprofil',
+              'Player profile',
+              "Profil du joueur",
+            ),
             onPressed: (subject.actionPlayerId ?? incident.targetId) == null
                 ? null
                 : () =>
@@ -9011,7 +9881,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          context.tr('Originalmeldung', 'Original report'),
+          context.tr('Originalmeldung', 'Original report', "Rapport initial"),
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 10),
@@ -9024,10 +9894,17 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           TextSpan(
             style: const TextStyle(color: FrontlineTheme.muted, fontSize: 13),
             children: [
-              TextSpan(text: context.tr('gemeldet von ', 'reported by ')),
+              TextSpan(
+                text: context.tr(
+                  'gemeldet von ',
+                  'reported by ',
+                  "signalé par ",
+                ),
+              ),
               TextSpan(
                 text:
-                    incident.reporterName ?? context.tr('unbekannt', 'unknown'),
+                    incident.reporterName ??
+                    context.tr('unbekannt', 'unknown', "inconnu"),
                 style: const TextStyle(color: FrontlineTheme.gold),
               ),
               TextSpan(
@@ -9047,14 +9924,18 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     final teamkills = _firstValue(live, ['teamkills', 'team_kills']);
     final stats = <(String, String, IconData)>[
       ('K/D', _ratioText(live), Icons.gps_fixed),
-      (context.tr('Kills', 'Kills'), _numberText(kills), Icons.close),
       (
-        context.tr('Teamkills', 'Teamkills'),
+        context.tr('Kills', 'Kills', "Éliminations"),
+        _numberText(kills),
+        Icons.close,
+      ),
+      (
+        context.tr('Teamkills', 'Teamkills', "Tirs alliés"),
         _numberText(teamkills),
         Icons.group_remove_outlined,
       ),
       (
-        context.tr('Spielzeit', 'Playtime'),
+        context.tr('Spielzeit', 'Playtime', "Temps de jeu"),
         _playtimeText(live),
         Icons.schedule,
       ),
@@ -9135,36 +10016,46 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
     final signals = <_DossierSignal>[
       _DossierSignal(
         icon: Icons.groups_2_outlined,
-        label: context.tr('Teamverhalten', 'Team behaviour'),
+        label: context.tr(
+          'Teamverhalten',
+          'Team behaviour',
+          "Comportement de l’équipe",
+        ),
         detail: teamkills == null
             ? context.tr(
                 'Keine Teamkill-Live-Daten verfügbar',
                 'No live teamkill data available',
+                "Aucune donnée de tirs alliés en direct disponible",
               )
-            : '${_numberText(teamkills)} ${context.tr('Teamkills in dieser Runde', 'teamkills this round')}',
+            : '${_numberText(teamkills)} ${context.tr('Teamkills in dieser Runde', 'teamkills this round', "tirs alliés pendant cette manche")}',
         accent: teamkills != null && (_number(teamkills) ?? 0) > 0
             ? FrontlineTheme.warning
             : FrontlineTheme.chalk,
       ),
       _DossierSignal(
         icon: Icons.gps_fixed,
-        label: context.tr('Trefferbild', 'Hit pattern'),
+        label: context.tr('Trefferbild', 'Hit pattern', "Répartition des tirs"),
         detail: headshots == null
             ? context.tr(
                 'Kopftreffer-Quote nicht verfügbar',
                 'Headshot rate unavailable',
+                "Taux de tirs à la tête indisponible",
               )
-            : '${_percentText(headshots)} ${context.tr('Kopftreffer in dieser Runde', 'headshots this round')} · K/D ${_ratioText(live)}',
+            : '${_percentText(headshots)} ${context.tr('Kopftreffer in dieser Runde', 'headshots this round', "tirs à la tête pendant cette manche")} · K/D ${_ratioText(live)}',
         accent: FrontlineTheme.chalk,
       ),
       _DossierSignal(
         icon: Icons.history,
-        label: context.tr('Verlauf', 'History'),
+        label: context.tr('Verlauf', 'History', "Historique"),
         detail: [
-          '$actions ${context.tr('frühere Maßnahmen', 'prior actions')}',
+          '$actions ${context.tr('frühere Maßnahmen', 'prior actions', "actions antérieures")}',
           bans.isEmpty
-              ? context.tr('keine aktive Sperre', 'no active ban')
-              : '${bans.length} ${context.tr('Sperren in der Historie', 'bans in history')}',
+              ? context.tr(
+                  'keine aktive Sperre',
+                  'no active ban',
+                  "aucun bannissement actif",
+                )
+              : '${bans.length} ${context.tr('Sperren in der Historie', 'bans in history', "bannissements dans l’historique")}',
         ].join(' · '),
         accent: bans.isEmpty ? FrontlineTheme.success : FrontlineTheme.warning,
       ),
@@ -9185,7 +10076,11 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
             child: Text(
-              context.tr('Prüfsignale', 'Review signals'),
+              context.tr(
+                'Prüfsignale',
+                'Review signals',
+                "Examiner les indicateurs",
+              ),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
           ),
@@ -9234,7 +10129,11 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            context.tr('Letzte Maßnahmen', 'Recent actions'),
+            context.tr(
+              'Letzte Maßnahmen',
+              'Recent actions',
+              "Actions récentes",
+            ),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
@@ -9249,7 +10148,8 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
               title: Text(_eventTitle(context, event)),
               subtitle: Text(
                 [
-                  event['actor']?.toString() ?? context.tr('System', 'System'),
+                  event['actor']?.toString() ??
+                      context.tr('System', 'System', "Système"),
                   _eventTime(event),
                 ].where((value) => value.isNotEmpty).join(' · '),
                 style: const TextStyle(color: FrontlineTheme.muted),
@@ -9282,7 +10182,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                     ? null
                     : () => _action('message', subject: subject),
                 icon: Icons.message_outlined,
-                label: context.tr('Nachricht', 'Message'),
+                label: context.tr('Nachricht', 'Message', "Message"),
               ),
             ),
             const SizedBox(width: 8),
@@ -9292,7 +10192,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                     ? null
                     : () => _action('punish', subject: subject),
                 icon: Icons.shield_outlined,
-                label: context.tr('Punish', 'Punish'),
+                label: context.tr('Punish', 'Punish', "Sanctionner"),
               ),
             ),
             const SizedBox(width: 8),
@@ -9301,35 +10201,49 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
                 onSelected: (action) => _action(action, subject: subject),
                 child: _DossierActionButton(
                   icon: Icons.gavel_outlined,
-                  label: context.tr('Maßnahme', 'Action'),
+                  label: context.tr('Maßnahme', 'Action', "Action"),
                   emphasized: true,
                 ),
                 itemBuilder: (_) => [
                   PopupMenuItem(
                     value: 'comment',
-                    child: Text(context.tr('Kommentar', 'Comment')),
+                    child: Text(
+                      context.tr('Kommentar', 'Comment', "Commentaire"),
+                    ),
                   ),
                   if (subject?.kind == 'squad' && subject?.state == 'confirmed')
                     PopupMenuItem(
                       value: 'disband_squad',
                       child: Text(
-                        context.tr('Squad auflösen', 'Disband squad'),
+                        context.tr(
+                          'Squad auflösen',
+                          'Disband squad',
+                          "Dissoudre l’escouade",
+                        ),
                       ),
                     ),
                   PopupMenuItem(
                     value: 'kick',
-                    child: Text(context.tr('Kicken', 'Kick')),
+                    child: Text(context.tr('Kicken', 'Kick', "Expulser")),
                   ),
                   PopupMenuItem(
                     value: 'temp_ban',
                     child: Text(
-                      context.tr('Temporär sperren', 'Temporary ban'),
+                      context.tr(
+                        'Temporär sperren',
+                        'Temporary ban',
+                        "Bannissement temporaire",
+                      ),
                     ),
                   ),
                   PopupMenuItem(
                     value: 'perma_ban',
                     child: Text(
-                      context.tr('Permanent sperren', 'Permanent ban'),
+                      context.tr(
+                        'Permanent sperren',
+                        'Permanent ban',
+                        "Bannissement permanent",
+                      ),
                     ),
                   ),
                 ],
@@ -9357,7 +10271,7 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           children: [
             Image.asset('assets/fln_logo.png', width: 20, height: 20),
             const SizedBox(width: 8),
-            Text(context.tr('Vorfall', 'Incident')),
+            Text(context.tr('Vorfall', 'Incident', "Incident")),
           ],
         ),
         actions: [
@@ -9392,53 +10306,83 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
               if (incident?.status == 'new')
                 PopupMenuItem(
                   value: 'claim',
-                  child: Text(context.tr('Übernehmen', 'Claim')),
+                  child: Text(
+                    context.tr('Übernehmen', 'Claim', "Prendre en charge"),
+                  ),
                 ),
               if (incident?.status == 'claimed')
                 PopupMenuItem(
                   value: 'unclaim',
-                  child: Text(context.tr('Freigeben', 'Release')),
+                  child: Text(context.tr('Freigeben', 'Release', "Libérer")),
                 ),
               PopupMenuItem(
                 value: 'message_details',
-                child: Text(context.tr('Meldedetails', 'Report details')),
+                child: Text(
+                  context.tr(
+                    'Meldedetails',
+                    'Report details',
+                    "Détails du signalement",
+                  ),
+                ),
               ),
               PopupMenuItem(
                 value: 'subjects',
-                child: Text(context.tr('Ziele verwalten', 'Manage subjects')),
+                child: Text(
+                  context.tr(
+                    'Ziele verwalten',
+                    'Manage subjects',
+                    "Gérer les personnes concernées",
+                  ),
+                ),
               ),
               PopupMenuItem(
                 value: 'squad',
-                child: Text(context.tr('Squad ansehen', 'View squad')),
+                child: Text(
+                  context.tr('Squad ansehen', 'View squad', "Voir l’escouade"),
+                ),
               ),
               PopupMenuItem(
                 value: 'timeline',
-                child: Text(context.tr('Gesamter Verlauf', 'Full timeline')),
+                child: Text(
+                  context.tr(
+                    'Gesamter Verlauf',
+                    'Full timeline',
+                    "Chronologie complète",
+                  ),
+                ),
               ),
               PopupMenuItem(
                 value: 'note',
-                child: Text(context.tr('Notiz hinzufügen', 'Add note')),
+                child: Text(
+                  context.tr(
+                    'Notiz hinzufügen',
+                    'Add note',
+                    "Ajouter une note",
+                  ),
+                ),
               ),
               if (incident != null &&
                   !{'resolved', 'dismissed'}.contains(incident.status)) ...[
                 PopupMenuItem(
                   value: 'reassign',
-                  child: Text(context.tr('Neu zuweisen', 'Reassign')),
+                  child: Text(
+                    context.tr('Neu zuweisen', 'Reassign', "Réattribuer"),
+                  ),
                 ),
                 PopupMenuItem(
                   value: 'resolved',
-                  child: Text(context.tr('Erledigt', 'Resolve')),
+                  child: Text(context.tr('Erledigt', 'Resolve', "Résoudre")),
                 ),
                 PopupMenuItem(
                   value: 'dismissed',
-                  child: Text(context.tr('Abweisen', 'Dismiss')),
+                  child: Text(context.tr('Abweisen', 'Dismiss', "Rejeter")),
                 ),
               ],
               if (incident != null &&
                   {'resolved', 'dismissed'}.contains(incident.status))
                 PopupMenuItem(
                   value: 'reopen',
-                  child: Text(context.tr('Wieder öffnen', 'Reopen')),
+                  child: Text(context.tr('Wieder öffnen', 'Reopen', "Rouvrir")),
                 ),
             ],
           ),
@@ -9450,7 +10394,11 @@ class _IncidentScreenState extends ConsumerState<IncidentScreen> {
           ? _ErrorView(
               message:
                   _error ??
-                  context.tr('Vorfall nicht verfügbar', 'Incident unavailable'),
+                  context.tr(
+                    'Vorfall nicht verfügbar',
+                    'Incident unavailable',
+                    "Incident non disponible",
+                  ),
             )
           : Stack(
               children: [
@@ -9615,53 +10563,78 @@ class _DossierSignalRow extends StatelessWidget {
 
 String _relativeIncidentTime(BuildContext context, DateTime value) {
   final difference = DateTime.now().difference(value);
-  if (difference.inMinutes < 1) return context.tr('gerade eben', 'just now');
+  if (difference.inMinutes < 1) {
+    return context.tr('gerade eben', 'just now', "à l’instant");
+  }
   if (difference.inMinutes < 60) {
     return context.tr(
       'vor ${difference.inMinutes} Min.',
       '${difference.inMinutes}m ago',
+      "il y a ${difference.inMinutes} min",
     );
   }
   if (difference.inHours < 24) {
     return context.tr(
       'vor ${difference.inHours} Std.',
       '${difference.inHours}h ago',
+      "il y a ${difference.inHours} h",
     );
   }
   return context.tr(
     'vor ${difference.inDays} Tg.',
     '${difference.inDays}d ago',
+    "il y a ${difference.inDays} j",
   );
 }
 
 String _eventTitle(BuildContext context, Map<String, dynamic> event) {
   final type = event['event_type']?.toString().toLowerCase() ?? '';
   if (type == 'reassign') {
-    return context.tr('Vorfall übergeben', 'Incident handed over');
+    return context.tr(
+      'Vorfall übergeben',
+      'Incident handed over',
+      "Incident transmis",
+    );
   }
   if (type.contains('punish')) {
-    return context.tr('Spieler bestraft', 'Player punished');
+    return context.tr(
+      'Spieler bestraft',
+      'Player punished',
+      "Joueur sanctionné",
+    );
   }
   if (type.contains('kick')) {
-    return context.tr('Spieler gekickt', 'Player kicked');
+    return context.tr('Spieler gekickt', 'Player kicked', "Joueur expulsé");
   }
   if (type.contains('ban')) {
-    return context.tr('Spieler gesperrt', 'Player banned');
+    return context.tr('Spieler gesperrt', 'Player banned', "Joueur banni");
   }
   if (type.contains('message')) {
-    return context.tr('Nachricht gesendet', 'Message sent');
+    return context.tr('Nachricht gesendet', 'Message sent', "Message envoyé");
   }
   if (type.contains('note')) {
-    return context.tr('Admin-Notiz hinzugefügt', 'Admin note added');
+    return context.tr(
+      'Admin-Notiz hinzugefügt',
+      'Admin note added',
+      "Note d’administration ajoutée",
+    );
   }
   if (type.contains('claim')) {
-    return context.tr('Vorfall übernommen', 'Incident claimed');
+    return context.tr(
+      'Vorfall übernommen',
+      'Incident claimed',
+      "Incident pris en charge",
+    );
   }
   if (type.contains('created')) {
-    return context.tr('Vorfall erstellt', 'Incident created');
+    return context.tr('Vorfall erstellt', 'Incident created', "Incident créé");
   }
   return event['event_type']?.toString() ??
-      context.tr('Vorfall aktualisiert', 'Incident updated');
+      context.tr(
+        'Vorfall aktualisiert',
+        'Incident updated',
+        "Incident mis à jour",
+      );
 }
 
 String _eventDetail(Map<String, dynamic> event) {
@@ -9695,7 +10668,7 @@ class _ErrorView extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.all(20),
     child: Text(
-      message,
+      context.localizeError(message),
       textAlign: TextAlign.center,
       style: TextStyle(color: Theme.of(context).colorScheme.error),
     ),

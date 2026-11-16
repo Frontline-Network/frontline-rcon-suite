@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _harness() => MaterialApp(
-  locale: const Locale('de'),
+Widget _harness([Locale locale = const Locale('de')]) => MaterialApp(
+  locale: locale,
   theme: FrontlineTheme.dark,
   localizationsDelegates: const [
     AppLocalizations.delegate,
@@ -48,6 +48,22 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('Server 12'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('French player row remains usable at ${width.toInt()}px', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(Size(width, 760));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(_harness(const Locale('fr')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Ein sehr langer Frontline-Spielername'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Serveur 12'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
