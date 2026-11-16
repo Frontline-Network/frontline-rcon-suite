@@ -149,6 +149,61 @@ def test_stale_successful_probe_does_not_dispatch(database, monkeypatch):
         assert session.scalar(select(journal.BlacklistSyncDelivery.status)) == 'queued'
 
 
+def test_slow_preparation_does_not_block_new_writes(database):
+    queue(database, b'first', 1)
+    started, release = Event(), Event()
+    def prepare(command):
+        assert command == b'first'
+        started.set()
+        assert release.wait(10)
+        return 'synthetic snapshot'
+    seen = mock.Mock()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        worker = pool.submit(journal.process_one, 1, seen, prepare=prepare)
+        assert started.wait(10)
+        writer = pool.submit(queue, database, b'second', 1)
+        try:
+            assert writer.result(timeout=2) == 1
+        finally:
+            release.set()
+        assert worker.result(timeout=10) == 'done'
+    seen.assert_called_once_with(b'first', 'synthetic snapshot')
+
+
+def test_preparation_failure_leaves_delivery_queued(database):
+    queue(database, b'first', 1)
+    dispatch = mock.Mock()
+    def unavailable(_command):
+        raise TimeoutError('synthetic read failure')
+    assert journal.process_one(1, dispatch, prepare=unavailable) == 'deferred'
+    dispatch.assert_not_called()
+    with database() as session:
+        assert session.scalar(select(journal.BlacklistSyncDelivery.status)) == 'queued'
+
+
+def test_snapshot_for_advanced_queue_is_not_dispatched(database):
+    queue(database, b'first', 1)
+    queue(database, b'second', 1)
+    def advance(_command):
+        with database() as session, session.begin():
+            row = session.scalar(select(journal.BlacklistSyncDelivery).order_by(journal.BlacklistSyncDelivery.id))
+            row.status = 'done'
+        return 'snapshot for first'
+    dispatch = mock.Mock()
+    assert journal.process_one(1, dispatch, prepare=advance) == 'deferred'
+    dispatch.assert_not_called()
+
+
+def test_uncertain_inflight_delivery_is_reviewed_without_preparation(database):
+    queue(database, b'first', 1)
+    with database() as session, session.begin():
+        session.scalar(select(journal.BlacklistSyncDelivery)).status = 'sending'
+    prepare, dispatch = mock.Mock(), mock.Mock()
+    assert journal.process_one(1, dispatch, prepare=prepare) == 'review'
+    prepare.assert_not_called()
+    dispatch.assert_not_called()
+
+
 def test_empty_queue_does_not_probe_or_dispatch(database):
     probe = mock.Mock()
     dispatch = mock.Mock()
@@ -343,6 +398,75 @@ def test_hllv_alias_respects_expiry_and_server_scope(database, existing_blacklis
         assert hooks._connect_blacklist_record(session, 'synthetic-eos', '76561198036685843') is None
 
 
+def test_hllv_online_steam_record_journal_targets_eos_once(database, existing_blacklist, monkeypatch):
+    from contextlib import nullcontext
+    from rcon.types import GameEnum
+
+    record_id, _, _ = existing_blacklist
+    steam = '76561198036685843'
+    eos = '0123456789abcdef0123456789abcdef'
+    with database() as session, session.begin():
+        record = session.get(BlacklistRecord, record_id)
+        record.player.player_id = steam
+        record.blacklist.servers = 4
+        record.blacklist.sync = BlacklistSyncMethod.KICK_ONLY
+        session.add(PlayerID(player_id=eos))
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', mock.Mock())
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    api.without_retries.return_value = nullcontext()
+    api.get_all_player_info.return_value = [{'iD': eos, 'eosId': eos, 'steamId': steam,
+                                             'platform': 'EPlatformFamily::Steam'}]
+    api.get_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
+                                                 'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
+    api.kick.return_value = True
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    command = blacklist.BlacklistCommand(command=blacklist.BlacklistCommandType.CREATE_RECORD,
+        server_mask=4, payload={'record_id': record_id, 'player_id': steam}).encode()
+    queue(database, command, 4)
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'done'
+    assert api.kick.call_count == 1 and api.kick.call_args.kwargs['player_id'] == eos
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'empty'
+    assert action_guard.pending_players(3, 'BlacklistEnforcement') == set()
+
+
+def test_hllv_online_uncertain_kick_is_never_replayed(database, existing_blacklist, monkeypatch):
+    from contextlib import nullcontext
+    from rcon.types import GameEnum
+
+    record_id, _, _ = existing_blacklist
+    steam, eos = '76561198036685843', '0123456789abcdef0123456789abcdef'
+    with database() as session, session.begin():
+        record = session.get(BlacklistRecord, record_id)
+        record.player.player_id = steam
+        record.blacklist.servers = 4
+        record.blacklist.sync = BlacklistSyncMethod.KICK_ONLY
+        session.add(PlayerID(player_id=eos))
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', mock.Mock())
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    api.without_retries.return_value = nullcontext()
+    api.get_all_player_info.return_value = [{'iD': eos, 'eosId': eos, 'steamId': steam,
+                                             'platform': 'EPlatformFamily::Steam'}]
+    api.get_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
+                                                 'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
+    api.kick.side_effect = TimeoutError('synthetic lost response')
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    command = blacklist.BlacklistCommand(command=blacklist.BlacklistCommandType.CREATE_RECORD,
+        server_mask=4, payload={'record_id': record_id, 'player_id': steam}).encode()
+    queue(database, command, 4)
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'review'
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'review'
+    assert api.kick.call_count == 1
+    assert action_guard.pending_players(3, 'BlacklistEnforcement') == {eos}
 def test_edit_commits_both_target_deliveries_with_record(database, existing_blacklist):
     record_id, _first, second = existing_blacklist
     result = blacklist.edit_record_from_blacklist(record_id, blacklist_id=second, reason="new")

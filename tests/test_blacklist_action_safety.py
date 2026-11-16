@@ -66,6 +66,41 @@ def test_offline_ban_without_saved_name_uses_player_id(monkeypatch):
     assert server.perma_ban.call_args.kwargs["player_id"] == "id"
 
 
+@pytest.mark.parametrize("state", [blacklist.BanState.NONE, blacklist.BanState.TEMP])
+@pytest.mark.parametrize("naive", [False, True])
+def test_expired_record_never_creates_kick_or_ban(monkeypatch, fake_blacklist_guard, state, naive):
+    expires = datetime.now(timezone.utc) - timedelta(seconds=1)
+    if naive:
+        expires = expires.replace(tzinfo=None)
+    record = SimpleNamespace(expires_at=expires)
+    server = Mock()
+    monkeypatch.setattr(blacklist, "get_ban_state_from_record", lambda _: state)
+    assert blacklist.apply_blacklist_punishment(server, record, player_id="synthetic") is blacklist._BLACKLIST_ACTION_EXPIRED
+    server.kick.assert_not_called()
+    server.temp_ban.assert_not_called()
+    server.perma_ban.assert_not_called()
+    assert fake_blacklist_guard == {}
+
+
+def test_record_expiring_during_reservation_does_not_send(monkeypatch, fake_blacklist_guard):
+    record = SimpleNamespace(expires_at=datetime.now(timezone.utc) + timedelta(hours=1))
+    server = Mock()
+    monkeypatch.setattr(blacklist, "get_ban_state_from_record", lambda _: blacklist.BanState.TEMP)
+    original_reserve = blacklist.action_guard.reserve
+
+    def expire_during_reservation(*args, **kwargs):
+        token = original_reserve(*args, **kwargs)
+        record.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        return token
+
+    monkeypatch.setattr(blacklist.action_guard, "reserve", expire_during_reservation)
+    assert blacklist.apply_blacklist_punishment(server, record, player_id="synthetic") is blacklist._BLACKLIST_ACTION_EXPIRED
+    server.kick.assert_not_called()
+    server.temp_ban.assert_not_called()
+    server.perma_ban.assert_not_called()
+    assert fake_blacklist_guard == {}
+
+
 @pytest.mark.parametrize('result', [None, TimeoutError('synthetic lost response')])
 def test_uncertain_blacklist_action_blocks_later_attempts(monkeypatch, fake_blacklist_guard, result):
     record = SimpleNamespace(admin_name='tester', expires_at=None, get_formatted_reason=lambda: 'reason')
@@ -356,5 +391,6 @@ def test_blacklist_receiver_passes_readiness_probe_to_durable_journal(monkeypatc
     monkeypatch.setattr(blacklist_sync_journal, 'process_one', process)
     receiver.run(stop)
     process.assert_called_once_with(blacklist.SERVER_NUMBER, receiver.dispatch,
-                                    is_ready=receiver._game_server_ready)
+                                    is_ready=receiver._game_server_ready,
+                                    prepare=receiver._prepare_delivery)
     receiver.pubsub.close.assert_called_once()
