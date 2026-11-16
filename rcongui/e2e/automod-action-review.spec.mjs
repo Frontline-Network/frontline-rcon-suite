@@ -54,4 +54,18 @@ for (const sample of [
     await expect(panel).toHaveCount(0);
     expect(errors).toEqual([]);
   });
+  test(`uncertain name kicks can be reviewed in ${sample.language}`, async ({ page }) => {
+    const errors = collectRuntimeErrors(page);
+    const main = await openDemoPage(page, "/records/players", {
+      language: sample.language, query: { demo_automod_action_review: 1, name_kick_hold: 1, global_hold: 1 },
+    });
+    const panel = main.getByTestId("automod-action-review");
+    const label = { de: "Namensfilter", en: "Name filter", fr: "Filtre des noms" }[sample.language];
+    await expect(panel.getByText(new RegExp(label))).toBeVisible();
+    await expect(panel.getByText(sample.all)).toBeVisible();
+    page.on("dialog", async (dialog) => dialog.accept(dialog.type() === "prompt" ? "Verified server logs" : undefined));
+    await panel.getByRole("button", { name: sample.release }).click();
+    await expect(panel).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
 }

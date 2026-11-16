@@ -4,13 +4,16 @@ import re
 from pydantic import HttpUrl
 
 from rcon.api_commands import RconAPI
+from rcon.automods import action_guard
 from rcon.discord import send_to_discord_audit
 from rcon.hooks import inject_player_ids
 from rcon.logs.loop import on_connected
 from rcon.player_history import get_player_profile, player_has_flag
 from rcon.user_config.name_kicks import NameKickUserConfig
+from rcon.utils import get_server_number
 
 logger = logging.getLogger(__name__)
+NAME_KICK_GUARD_RULE = "NameKick"
 
 
 def apply_name_kick(
@@ -53,15 +56,37 @@ def apply_name_kick(
     for pattern in config.regular_expressions:
         if re.match(pattern, name):
             logger.info("%s matched player %s", pattern, name)
-            accepted = rcon.kick(
-                player_name=name,
-                reason=config.kick_reason,
-                by="NAME_KICK",
-                player_id=player_id,
-            )
+            server_number = int(get_server_number())
+            try:
+                token = action_guard.reserve(server_number, player_id, [NAME_KICK_GUARD_RULE], "kick")
+            except Exception:
+                logger.exception("Skipping nickname kick: durable reservation unavailable")
+                return False
+            if token is None:
+                logger.warning("Skipping nickname kick: previous result awaits review")
+                return False
+            try:
+                accepted = rcon.kick(
+                    player_name=name,
+                    reason=config.kick_reason,
+                    by="NAME_KICK",
+                    player_id=player_id,
+                )
+            except Exception:
+                logger.exception("Nickname kick result uncertain; reservation retained")
+                return False
             if accepted is not True:
+                if accepted is False:
+                    try:
+                        action_guard.finish(server_number, player_id, token, "rejected", expected=1)
+                    except Exception:
+                        logger.exception("Could not record rejected nickname kick; reservation retained")
                 logger.warning("Game server did not confirm nickname kick for %s", player_id)
                 return False
+            try:
+                action_guard.finish(server_number, player_id, token, "confirmed", expected=1)
+            except Exception:
+                logger.exception("Could not record confirmed nickname kick; reservation retained")
             try:
                 webhookurls: list[HttpUrl | None] | None
                 if config.discord_webhook_url is None:

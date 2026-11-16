@@ -10,6 +10,27 @@ from rcon.user_config.name_kicks import NameKickUserConfig
 UNREADABLE_NAME_PATTERN = r"(^[^a-zA-Z0-9äöüÄÖÜß\[\]]+$)"
 
 
+@pytest.fixture(autouse=True)
+def isolated_name_kick_guard(monkeypatch):
+    pending = {}
+
+    def reserve(server, player, rules, action):
+        if player in pending or '*' in pending:
+            return None
+        pending[player] = 'test-token'
+        return 'test-token'
+
+    def finish(server, player, token, result, *, expected):
+        assert pending[player] == token and result in {'confirmed', 'rejected'}
+        del pending[player]
+        return 1
+
+    monkeypatch.setattr('rcon.auto_kick.get_server_number', lambda: 3)
+    monkeypatch.setattr('rcon.auto_kick.action_guard.reserve', reserve)
+    monkeypatch.setattr('rcon.auto_kick.action_guard.finish', finish)
+    return pending
+
+
 def test_roster_scan_kicks_existing_matching_player_without_profile_lookup():
     rcon = Mock()
     rcon.kick.return_value = True
@@ -105,6 +126,50 @@ def test_roster_scan_continues_after_unavailable_exemption_profile():
         assert scan_current_players(rcon, config=config) == 1
     assert rcon.kick.call_args.kwargs['player_id'] == 'two'
     rcon.kick.assert_called_once()
+
+
+@pytest.mark.parametrize('result', [None, TimeoutError('lost response')])
+def test_uncertain_kick_blocks_later_scans(isolated_name_kick_guard, result):
+    rcon = Mock()
+    rcon.get_player_ids.return_value = [('invalid', 'synthetic-player')]
+    if isinstance(result, Exception):
+        rcon.kick.side_effect = result
+    else:
+        rcon.kick.return_value = result
+    config = NameKickUserConfig(regular_expressions=['invalid'])
+    assert scan_current_players(rcon, config) == 0
+    assert scan_current_players(rcon, config) == 0
+    rcon.kick.assert_called_once()
+    assert isolated_name_kick_guard == {'synthetic-player': 'test-token'}
+
+
+def test_explicit_rejection_allows_later_attempt(isolated_name_kick_guard):
+    rcon = Mock()
+    rcon.kick.return_value = False
+    config = NameKickUserConfig(regular_expressions=['invalid'])
+    assert apply_name_kick(rcon, 'invalid', 'synthetic-player', config) is False
+    assert isolated_name_kick_guard == {}
+    assert apply_name_kick(rcon, 'invalid', 'synthetic-player', config) is False
+    assert rcon.kick.call_count == 2
+
+
+def test_reservation_failure_never_sends_kick(monkeypatch):
+    rcon = Mock()
+    monkeypatch.setattr('rcon.auto_kick.action_guard.reserve', Mock(side_effect=RuntimeError('unavailable')))
+    assert apply_name_kick(rcon, 'invalid', 'synthetic-player', NameKickUserConfig(regular_expressions=['invalid'])) is False
+    rcon.kick.assert_not_called()
+
+
+def test_failed_finalization_does_not_retry_the_kick(monkeypatch, isolated_name_kick_guard):
+    rcon = Mock()
+    rcon.kick.return_value = True
+    monkeypatch.setattr('rcon.auto_kick.action_guard.finish', Mock(side_effect=RuntimeError('unavailable')))
+    config = NameKickUserConfig(regular_expressions=['invalid'])
+    with patch('rcon.auto_kick.send_to_discord_audit'):
+        assert apply_name_kick(rcon, 'invalid', 'synthetic-player', config) is True
+        assert apply_name_kick(rcon, 'invalid', 'synthetic-player', config) is False
+    rcon.kick.assert_called_once()
+    assert isolated_name_kick_guard == {'synthetic-player': 'test-token'}
 
 
 def test_available_player_flags_are_counted_and_sorted_for_form_suggestions():
