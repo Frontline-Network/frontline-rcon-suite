@@ -121,6 +121,39 @@ def test_melee_rewards_follow_active_game_reference(game, name, expected):
         assert len(e.claims) == 1
 
 
+def test_challenge_progress_prunes_old_periods_without_losing_current_or_fixed():
+    cfg = config(challenges=[
+        {"id": "daily", "name": "Daily", "enabled": True, "weapons": ["M3 KNIFE"], "kills": 100, "period": "day"},
+        {"id": "weekly", "name": "Weekly", "enabled": True, "weapons": ["M3 KNIFE"], "kills": 100, "period": "week"},
+        {"id": "fixed", "name": "Fixed", "enabled": True, "weapons": ["M3 KNIFE"], "kills": 100, "period": "fixed", "start": "2026-11-01T00:00:00Z", "end": "2027-02-01T00:00:00Z"},
+    ])
+    e = engine(cfg)
+    for offset in range(30):
+        now = NOW + offset * 86400
+        e.snapshot(now, PLAYERS, COUNTS, THRESHOLDS)
+        kill = event()
+        kill.update(time=now + 1, key=f"kill-{offset}")
+        e.event(kill, now + 1)
+    progress = e.player("a")["challenges"]
+    day, week = periods(NOW + 29 * 86400, cfg.timezone)
+    assert progress[f"daily:{day}"] == 1
+    assert progress[f"weekly:{week}"] >= 1
+    assert progress["fixed:fixed"] == 30
+    assert len([key for key in progress if key.startswith("daily:")]) == 15
+    assert len([key for key in progress if key.startswith("weekly:")]) <= 3
+
+
+def test_removed_challenge_progress_is_pruned_but_completed_grants_remain():
+    cfg = config(challenges=[{"id": "keep", "name": "Keep", "enabled": False}])
+    e = engine(cfg)
+    p = e.player("a")
+    p["challenges"] = {"keep:fixed": 4, "removed:fixed": 3, "unknown-format": 2}
+    p["completed"] = {"challenge:removed:fixed": NOW - 100 * 86400}
+    e.snapshot(NOW + 30, PLAYERS, COUNTS, THRESHOLDS)
+    assert p["challenges"] == {"keep:fixed": 4, "unknown-format": 2}
+    assert "challenge:removed:fixed" in p["completed"]
+
+
 def test_opponent_guard_shared_between_melee_and_challenges():
     e = engine(
         config(

@@ -1,6 +1,6 @@
 """Pure reward policy; all timestamps are UTC epoch seconds, all state is JSON."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from hllrcon import HLLVWeapon, WeaponType as ReferenceWeaponType
@@ -38,6 +38,31 @@ def day_segments(start, end, zone):
         stop = min(end, midnight)
         yield date.isoformat(), stop - start
         start = stop
+
+
+def retained_challenge_progress(progress, challenges, now, zone):
+    """Keep active and recently ended periods; completed grants are separate."""
+    known_ids = {challenge.id for challenge in challenges}
+    cutoff = datetime.fromtimestamp(now, ZoneInfo(zone)).date() - timedelta(days=14)
+    retained = {}
+    for key, value in progress.items():
+        challenge_id, separator, period = key.rpartition(":")
+        if not separator:
+            # Preserve unknown formats rather than guessing how to migrate them.
+            retained[key] = value
+        elif challenge_id not in known_ids:
+            continue
+        elif period == "fixed":
+            retained[key] = value
+        else:
+            try:
+                period_date = date.fromisoformat(period)
+            except ValueError:
+                retained[key] = value
+            else:
+                if period_date >= cutoff:
+                    retained[key] = value
+    return retained
 
 
 def gate(state, cfg, now):
@@ -152,6 +177,9 @@ class Engine:
         if valid_interval and s.get("round_known", True):
             s["round_seconds"] += delta
         for pid, p in s["players"].items():
+            p["challenges"] = retained_challenge_progress(
+                p.get("challenges", {}), c.challenges, now, c.timezone
+            )
             p["completed"] = {
                 k: t
                 for k, t in p["completed"].items()
