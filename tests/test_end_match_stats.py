@@ -47,6 +47,37 @@ def test_duplicate_or_disabled_does_not_send(setup_match, monkeypatch):
     rcon.message_all_players.assert_not_called()
 
 
+@pytest.mark.parametrize("history,match_start,expected", [
+    ([{"start": 100, "guessed": False}], 100, True),
+    ([{"start": 101, "guessed": False}], 100, False),
+    ([{"start": 100, "guessed": True}], 100, False),
+    ([], 100, False),
+    ([{"start": 100, "guessed": False}], None, False),
+])
+def test_delayed_squad_ranking_requires_same_known_match(monkeypatch, history, match_start, expected):
+    from rcon import rcon as rcon_module
+    sender = MagicMock()
+    monkeypatch.setattr(stats.time, "time", lambda: 1000)
+    monkeypatch.setattr(stats, "MapsHistory", lambda: history)
+    monkeypatch.setattr(stats.EndMatchStatsUserConfig, "load_from_db", classmethod(
+        lambda cls, **kwargs: cls(enabled=True, include_squads=True)))
+    monkeypatch.setattr(rcon_module, "get_rcon", lambda: sender)
+    stats.send_delayed_squad_message("Squad ranking", 990, match_start)
+    assert sender.message_all_players.call_count == int(expected)
+
+
+def test_delayed_squad_job_records_match_identity(setup_match, monkeypatch):
+    rcon, redis, log = setup_match
+    rcon.get_team_view.return_value["allies"]["squads"]["Able"]["kills"] = 15
+    monkeypatch.setattr(stats.EndMatchStatsUserConfig, "load_from_db", classmethod(
+        lambda cls, **kwargs: cls(enabled=True, include_players=True, include_squads=True)))
+    schedule = MagicMock()
+    monkeypatch.setattr(stats, "schedule_squad_message", schedule)
+    stats.send_end_match_stats(rcon, log)
+    assert schedule.call_count == 1
+    assert schedule.call_args.args[1:] == (1000, 15, 100)
+
+
 @pytest.mark.parametrize("case", ["old", "wrong_map", "incomplete", "new_match"])
 def test_unsafe_snapshot_is_not_sent(setup_match, monkeypatch, case):
     rcon, redis, log = setup_match
