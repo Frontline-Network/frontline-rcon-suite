@@ -33,7 +33,6 @@ def review_api(monkeypatch):
     with root.begin() as connection:
         connection.execute(text(f'CREATE SCHEMA "{schema}"'))
     engine = create_engine(dsn, connect_args={"options": f"-csearch_path={schema}"})
-    monkeypatch.setattr(PlayerSession.__table__.c.end, "nullable", True)
     for model in (PlayerID, PlayerSession, PendingPlayerConnect, PendingPlayerDisconnect, SessionEventResolution, UnidentifiedSessionEvent):
         model.__table__.create(engine)
     maker = sessionmaker(engine, expire_on_commit=False)

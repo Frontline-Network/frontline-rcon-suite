@@ -19,7 +19,6 @@ from rcon.session_event_journal import SessionEventJournal
 @pytest.fixture
 def database(monkeypatch):
     engine = create_engine("sqlite://")
-    monkeypatch.setattr(PlayerSession.__table__.c.end, "nullable", True)
     PlayerID.__table__.create(engine)
     PlayerSession.__table__.create(engine)
     LogLine.__table__.create(engine)

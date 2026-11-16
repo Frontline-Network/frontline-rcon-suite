@@ -27,7 +27,6 @@ def database(monkeypatch):
     with root.begin() as connection:
         connection.execute(text(f'CREATE SCHEMA "{schema}"'))
     engine = create_engine(dsn, connect_args={"options": f"-csearch_path={schema}"}, pool_size=8)
-    monkeypatch.setattr(PlayerSession.__table__.c.end, "nullable", True)
     PlayerID.__table__.create(engine)
     PlayerSession.__table__.create(engine)
     LogLine.__table__.create(engine)

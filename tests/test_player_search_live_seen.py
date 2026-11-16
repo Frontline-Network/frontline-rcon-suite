@@ -26,7 +26,6 @@ def sqlite_jsonb(_element, _compiler, **_kwargs):
 @pytest.fixture
 def database(monkeypatch):
     engine = create_engine("sqlite://")
-    monkeypatch.setattr(PlayerSession.__table__.c.end, "nullable", True)
     for model in (PlayerID, PlayerName, PlayerSession, PlayerAccount, PlayerVIP, SteamInfo):
         model.__table__.create(engine)
     @contextmanager
@@ -122,7 +121,6 @@ def test_postgres_filters_order_and_console_ids_with_utc_offsets(monkeypatch):
     with base.begin() as connection:
         connection.execute(CreateSchema(schema))
     engine = base.execution_options(schema_translate_map={None: schema})
-    monkeypatch.setattr(PlayerSession.__table__.c.end, "nullable", True)
     try:
         for model in (PlayerID, PlayerName, PlayerSession, PlayerAccount, PlayerVIP, SteamInfo):
             model.__table__.create(engine)

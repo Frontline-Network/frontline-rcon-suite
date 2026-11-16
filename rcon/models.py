@@ -861,13 +861,13 @@ class PlayerSession(Base):
     player_id_id: Mapped[int] = mapped_column(
         "playersteamid_id", ForeignKey("steam_id_64.id"), nullable=False, index=True
     )
-    start: Mapped[datetime] = mapped_column()
-    end: Mapped[datetime] = mapped_column()
+    start: Mapped[datetime | None] = mapped_column()
+    end: Mapped[datetime | None] = mapped_column()
     start_event_us: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     end_event_us: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    created: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    server_number: Mapped[int] = mapped_column()
-    server_name: Mapped[str] = mapped_column()
+    created: Mapped[datetime | None] = mapped_column(default=datetime.utcnow)
+    server_number: Mapped[int | None] = mapped_column()
+    server_name: Mapped[str | None] = mapped_column()
 
     player: Mapped[PlayerID] = relationship(back_populates="sessions")
 

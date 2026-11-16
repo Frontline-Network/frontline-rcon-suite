@@ -127,11 +127,6 @@ def live_profile_database(monkeypatch):
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    # The deployed migration permits open sessions; ORM nullability is a
-    # separately tracked compatibility issue (#299).
-    end_column = PlayerSession.__table__.c.end
-    original_nullable = end_column.nullable
-    end_column.nullable = True
     for model in (
         PlayerID,
         PlayerFlag,
@@ -143,7 +138,6 @@ def live_profile_database(monkeypatch):
         BlacklistRecord,
     ):
         model.__table__.create(engine)
-    end_column.nullable = original_nullable
 
     sessions = sessionmaker(engine, expire_on_commit=False)
 
