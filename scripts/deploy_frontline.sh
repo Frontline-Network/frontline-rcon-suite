@@ -285,7 +285,7 @@ extra_backend_services=()
 for service in "${deployment_services[@]}"; do
   if [[ "$service" =~ ^backend_([1-9][0-9]*)$ ]]; then
     number="${BASH_REMATCH[1]}"
-    if (( number > 4 && number <= 32 )); then
+    if [[ "$number" != [1234] ]]; then
       extra_backend_services+=("$service")
     fi
   fi
