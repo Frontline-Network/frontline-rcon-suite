@@ -19,7 +19,7 @@ class WarningConfirmationMixin:
     """Keep a planned warning pending until the game server confirms it."""
 
     def progress_key(self, aplayer):
-        return aplayer.name
+        return aplayer.player_id
 
     def player_warning_succeeded(self, aplayer):
         with self.watch_state(aplayer.team, aplayer.squad) as status:

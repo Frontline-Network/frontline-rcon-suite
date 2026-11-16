@@ -61,6 +61,9 @@ class LevelThresholdsAutomod(WarningConfirmationMixin):
         """
         p: PunitionsToApply = PunitionsToApply()
 
+        if not isinstance(player_id, str) or not player_id.strip():
+            return p
+
         min_level = self.config.min_level
         max_level = self.config.max_level
 
@@ -177,7 +180,7 @@ class LevelThresholdsAutomod(WarningConfirmationMixin):
         """
         Observe and actualize the current moderation step
         """
-        redis_key = f"level_thresholds_automod{team.lower()}{str(squad_name).lower()}"
+        redis_key = f"level_thresholds_automod_id_v2{team.lower()}{str(squad_name).lower()}"
         watch_status = self.red.get(redis_key)
         if watch_status:
             watch_status = upgrade_legacy_warning_state(pickle.loads(watch_status))
@@ -213,12 +216,12 @@ class LevelThresholdsAutomod(WarningConfirmationMixin):
         }
 
         if method == ActionMethod.MESSAGE:
-            data["received_warnings"] = len(watch_status.warned.get(aplayer.name))
+            data["received_warnings"] = len(watch_status.warned.get(self.progress_key(aplayer)))
             data["max_warnings"] = self.config.number_of_warnings
             data["next_check_seconds"] = self.config.warning_interval_seconds
 
         if method == ActionMethod.PUNISH:
-            data["received_punishes"] = len(watch_status.punished.get(aplayer.name))
+            data["received_punishes"] = len(watch_status.punished.get(self.progress_key(aplayer)))
             data["max_punishes"] = self.config.number_of_punishments
             data["next_check_seconds"] = self.config.punish_interval_seconds
 
@@ -253,7 +256,7 @@ class LevelThresholdsAutomod(WarningConfirmationMixin):
         """
         with self.watch_state(aplayer.team, aplayer.squad) as watch_status:
             try:
-                if punishes := watch_status.punished.get(aplayer.name):
+                if punishes := watch_status.punished.get(self.progress_key(aplayer)):
                     del punishes[-1]
             except Exception:
                 self.logger.exception("tried to cleanup punished time but failed")
@@ -297,6 +300,9 @@ class LevelThresholdsAutomod(WarningConfirmationMixin):
             author = AUTOMOD_USERNAME + ("-DryRun" if self.config.dry_run else "")
 
             for player in squad["players"]:
+                if not isinstance(player.get("player_id"), str) or not player["player_id"].strip():
+                    self.logger.warning("Skipping automod check for player without a stable ID")
+                    continue
                 profile = player.get("profile", {})
                 aplayer = PunishPlayer(
                     player_id=player["player_id"],
@@ -489,7 +495,7 @@ class LevelThresholdsAutomod(WarningConfirmationMixin):
         # immune_roles
         # immune_player_level
 
-        warnings = watch_status.warned.setdefault(aplayer.name, [])
+        warnings = watch_status.warned.setdefault(self.progress_key(aplayer), [])
 
         # warning_interval_seconds
         if not is_time(warnings, self.config.warning_interval_seconds):
@@ -562,7 +568,7 @@ class LevelThresholdsAutomod(WarningConfirmationMixin):
             self.logger.debug("Server below min player count for punish")
             return PunishStepState.WAIT
 
-        punishes = watch_status.punished.setdefault(aplayer.name, [])
+        punishes = watch_status.punished.setdefault(self.progress_key(aplayer), [])
 
         # punish_interval_seconds
         if not is_time(punishes, self.config.punish_interval_seconds):
@@ -648,7 +654,7 @@ class LevelThresholdsAutomod(WarningConfirmationMixin):
             return PunishStepState.WAIT
 
         try:
-            last_time = watch_status.punished.get(aplayer.name, [])[-1]
+            last_time = watch_status.punished.get(self.progress_key(aplayer), [])[-1]
         except IndexError:
             self.logger.error("Trying to kick player without prior punishes")
             return PunishStepState.DISABLED

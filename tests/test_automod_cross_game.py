@@ -55,8 +55,8 @@ def test_hll_and_vietnam_role_limits_and_punishment_cap(
             waiting = mod.punitions_to_apply(view, "able", team, squad, {})
             assert not waiting.punish and not waiting.kick
             if punishment_limit > 0:
-                assert len(watch.punished[player["name"]]) <= punishment_limit
-            watch.punished[player["name"]][-1] -= timedelta(seconds=61)
+                assert len(watch.punished[player["player_id"]]) <= punishment_limit
+            watch.punished[player["player_id"]][-1] -= timedelta(seconds=61)
 
     player["level"] = 50
     result = mod.punitions_to_apply(view, "able", team, squad, {})
