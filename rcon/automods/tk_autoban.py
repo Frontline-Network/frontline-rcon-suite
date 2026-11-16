@@ -46,16 +46,47 @@ def auto_ban_if_tks_right_after_connection(
     if not player_id:
         logger.warning("Skipping teamkill rule because the player ID is missing")
         return
-    player_profile = None
-    vips = {}
-    try:
-        player_profile = get_player_profile(player_id, 0)
-    except:
-        logger.exception("Unable to get player profile")
-    try:
-        vips = set(v["player_id"] for v in rcon.get_vip_ids())
-    except:
-        logger.exception("Unable to get VIPS")
+    whitelist_players = config.whitelist_players
+    if whitelist_players.is_vip:
+        try:
+            rows = rcon.get_vip_ids()
+            if not isinstance(rows, list) or any(
+                not isinstance(row, dict) or not row.get("player_id") for row in rows
+            ):
+                raise ValueError("Incomplete VIP list")
+            if str(player_id) in {str(row["player_id"]) for row in rows}:
+                logger.debug("Not checking player because they are VIP")
+                return
+        except Exception:
+            logger.exception("Unable to verify VIP exemption; skipping teamkill ban")
+            return
+
+    if whitelist_players.has_at_least_n_sessions or whitelist_players.has_flag:
+        try:
+            player_profile = get_player_profile(player_id, 0)
+            if player_profile is not None:
+                if not isinstance(player_profile, dict):
+                    raise ValueError("Invalid player profile")
+                if whitelist_players.has_at_least_n_sessions:
+                    count = player_profile.get("sessions_count")
+                    if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+                        raise ValueError("Invalid player session count")
+                    if count >= whitelist_players.has_at_least_n_sessions:
+                        logger.debug("Not checking player because they have %s sessions", count)
+                        return
+                if whitelist_players.has_flag:
+                    flags = player_profile.get("flags")
+                    if not isinstance(flags, list) or any(
+                        not isinstance(flag, dict) or not isinstance(flag.get("flag"), str)
+                        for flag in flags
+                    ):
+                        raise ValueError("Incomplete player flags")
+                    if any(player_has_flag(player_profile, flag) for flag in whitelist_players.has_flag):
+                        logger.debug("Not checking player due to a whitelist flag")
+                        return
+        except Exception:
+            logger.exception("Unable to verify player exemptions; skipping teamkill ban")
+            return
 
     # Names are not unique and can change within a session. Match event
     # identities after reading the same bounded history instead of filtering by name.
@@ -69,29 +100,7 @@ def auto_ban_if_tks_right_after_connection(
     excluded_weapons = [w.lower() for w in config.excluded_weapons]
     ignore_after_kill = config.ignore_tk_after_n_kills
     ignore_after_death = config.ignore_tk_after_n_deaths
-    whitelist_players = config.whitelist_players
     tk_tolerance_count = config.teamkill_tolerance_count
-
-    if player_profile:
-        if whitelist_players.is_vip and player_id in vips:
-            logger.debug("Not checking player because he's VIP")
-            return
-
-        if (
-                whitelist_players.has_at_least_n_sessions != 0
-                and player_profile["sessions_count"]
-                >= whitelist_players.has_at_least_n_sessions
-        ):
-            logger.debug(
-                "Not checking player because he has %s sessions",
-                player_profile["sessions_count"],
-            )
-            return
-
-        for f in whitelist_players.has_flag:
-            if player_has_flag(player_profile, f):
-                logger.debug("Not checking player because he has flag %s", f)
-                return
 
     last_action_is_connect = False
     last_connect_time = None

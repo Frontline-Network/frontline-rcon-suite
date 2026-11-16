@@ -64,7 +64,7 @@ def test_ban_excluded_weapon(*args):
             "rcon.automods.tk_autoban.get_recent_logs", return_value={"logs": logs}
         ) as get,
     ):
-        rcon.get_vips_ids = mock.MagicMock(return_value=[])
+        rcon.get_vip_ids = mock.MagicMock(return_value=[])
         auto_ban_if_tks_right_after_connection(rcon, tk_log)
         rcon.perma_ban.assert_not_called()
 
@@ -126,7 +126,7 @@ def test_ban_success(*args):
             "rcon.automods.tk_autoban.get_recent_logs", return_value={"logs": logs}
         ),
     ):
-        rcon.get_vips_ids = mock.MagicMock(return_value=[])
+        rcon.get_vip_ids = mock.MagicMock(return_value=[])
         result = auto_ban_if_tks_right_after_connection(rcon, tk_log, config)
         assert result
 
@@ -189,7 +189,7 @@ def test_ban_success_temp_ban(*args):
             "rcon.automods.tk_autoban.get_recent_logs", return_value={"logs": logs}
         ),
     ):
-        rcon.get_vips_ids = mock.MagicMock(return_value=[])
+        rcon.get_vip_ids = mock.MagicMock(return_value=[])
         result = auto_ban_if_tks_right_after_connection(rcon, tk_log, config)
         assert result and result["expires_at"]
 
@@ -257,7 +257,7 @@ def test_ban_ignored_kill(*args):
             "rcon.automods.tk_autoban.get_recent_logs", return_value={"logs": logs}
         ),
     ):
-        rcon.get_vips_ids = mock.MagicMock(return_value=[])
+        rcon.get_vip_ids = mock.MagicMock(return_value=[])
         auto_ban_if_tks_right_after_connection(rcon, tk_log, config)
         rcon.perma_ban.assert_not_called()
 
@@ -332,7 +332,7 @@ def test_ban_count_one_death(*args):
             "rcon.automods.tk_autoban.get_recent_logs", return_value={"logs": logs}
         ),
     ):
-        rcon.get_vips_ids = mock.MagicMock(return_value=[])
+        rcon.get_vip_ids = mock.MagicMock(return_value=[])
         result = auto_ban_if_tks_right_after_connection(rcon, tk_log, config)
         assert result
 
@@ -414,6 +414,6 @@ def test_ban_ignored_2_death(*args):
             "rcon.automods.tk_autoban.get_recent_logs", return_value={"logs": logs}
         ),
     ):
-        rcon.get_vips_ids = mock.MagicMock(return_value=[])
+        rcon.get_vip_ids = mock.MagicMock(return_value=[])
         auto_ban_if_tks_right_after_connection(rcon, tk_log, config)
         rcon.perma_ban.assert_not_called()
