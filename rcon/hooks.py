@@ -660,13 +660,25 @@ def update_player_steaminfo_on_connect(
 def windows_store_player_check(rcon: Rcon, _, name: str, player_id: str):
     config = RconServerSettingsUserConfig.load_from_db().windows_store_players
 
-    if not config.enabled or steam_utils.is_steam_id_64(player_id):
+    if not config.enabled or not isinstance(player_id, str) or not player_id.strip():
+        return
+    if steam_utils.is_steam_id_64(player_id):
         return
 
-    # HLL Vietnam supplies EOS IDs for multiple platforms. A non-Steam ID
-    # therefore cannot establish that a player uses the Windows Store.
-    if rcon.config.game == GameEnum.HLL_VIETNAM:
-        logger.warning("Skipping Windows Store rule: HLL Vietnam IDs do not identify the platform")
+    # Non-Steam / EOS IDs occur on PC and consoles. Only the explicit PC
+    # Windows-GDK platform can justify this rule. Unknown formats, mismatched
+    # identities and unavailable player information must never be punished.
+    try:
+        # The detailed-player helper is cached; a rapid reconnect on another
+        # platform must not inherit a previous session's PC classification.
+        details = rcon._get_adapted_player_info(player_id)
+        if (not isinstance(details, dict) or str(details.get("iD") or "") != str(player_id)
+                or not isinstance(details.get("platform"), str)
+                or details["platform"].strip().lower().rsplit("::", 1)[-1] != "pc_wingdk"):
+            logger.warning("Skipping Windows Store rule: player platform is not confirmed as PC WinGDK")
+            return
+    except Exception:
+        logger.exception("Skipping Windows Store rule: player platform could not be verified")
         return
 
     action = config.action
@@ -680,38 +692,28 @@ def windows_store_player_check(rcon: Rcon, _, name: str, player_id: str):
     )
 
     try:
-        send_to_discord_audit(
-            message=config.audit_message.format_map(
-                DefaultStringFormat(name=name, player_id=player_id, action=action_value)
-            ),
-            command_name=str(action_value),
-        )
-    except Exception:
-        logger.exception(
-            "Unable to send %s %s (%s) to audit", action_value, name, player_id
-        )
-
-    try:
         if action == WindowsStoreIdActionType.kick:
-            rcon.kick(
-                name,
+            accepted = rcon.kick(
+                player_id=player_id,
+                player_name=name,
                 reason=config.player_message,
                 by=config.audit_message_author,
-                player_id=player_id,
             )
         elif action == WindowsStoreIdActionType.temp_ban:
-            rcon.temp_ban(
+            accepted = rcon.temp_ban(
                 player_id=player_id,
                 duration_hours=config.temp_ban_length_hours,
                 reason=config.player_message,
                 by=config.audit_message_author,
             )
         elif action == WindowsStoreIdActionType.perma_ban:
-            rcon.perma_ban(
+            accepted = rcon.perma_ban(
                 player_id=player_id,
                 reason=config.player_message,
                 by=config.audit_message_author,
             )
+        else:
+            return
     except Exception as e:
         logger.error(
             "Could not %s whitespace name player %s/%s: %s",
@@ -720,6 +722,19 @@ def windows_store_player_check(rcon: Rcon, _, name: str, player_id: str):
             player_id,
             e,
         )
+        return
+    if accepted is not True:
+        logger.warning("Windows Store action was rejected or not confirmed; no success audit sent")
+        return
+    try:
+        send_to_discord_audit(
+            message=config.audit_message.format_map(
+                DefaultStringFormat(name=name, player_id=player_id, action=action_value)
+            ),
+            command_name=str(action_value),
+        )
+    except Exception:
+        logger.exception("Unable to send %s %s (%s) to audit", action_value, name, player_id)
 
 
 def _set_real_vips(rcon: Rcon, struct_log):

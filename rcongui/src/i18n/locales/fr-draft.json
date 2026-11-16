@@ -2865,7 +2865,7 @@
           },
           "windowsStore": {
             "title": "Les joueurs de Windows Store",
-            "description": "Détection et réponse pour Windows Store IDs"
+            "description": "Les actions exigent la plateforme PC WinGDK confirmée ; les plateformes inconnues sont ignorées."
           },
           "messages": {
             "title": "Présentation des messages",
@@ -2907,7 +2907,7 @@
           },
           "windows_store_players": {
             "label": "Windows Store règle du joueur",
-            "help": "Configure la détection, l'action et les messages pour les joueurs utilisant un magasin Windows ID."
+            "help": "Les actions exigent la plateforme PC WinGDK confirmée. Les plateformes inconnues ou ambiguës sont ignorées ; certains serveurs ne fournissent pas cette distinction."
           },
           "message_enhancements": {
             "label": "Présentation des messages",

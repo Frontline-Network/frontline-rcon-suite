@@ -3998,7 +3998,7 @@ const en = {
           },
           windowsStore: {
             title: "Windows Store players",
-            description: "Detection and response for Windows Store IDs",
+            description: "Actions require a confirmed PC WinGDK platform; unknown platforms are skipped.",
           },
           messages: {
             title: "Message framing",
@@ -4040,7 +4040,7 @@ const en = {
           },
           windows_store_players: {
             label: "Windows Store player rule",
-            help: "Configures detection, action, and messages for players using a Windows Store ID.",
+            help: "Actions require a confirmed PC WinGDK platform. Players with unknown or ambiguous platforms are skipped; some servers may not provide this distinction.",
           },
           message_enhancements: {
             label: "Message framing",

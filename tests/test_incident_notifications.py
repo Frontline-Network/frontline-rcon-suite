@@ -7,6 +7,7 @@ from rcon.incident_notifications import notify_incident_reporter
 class IncidentReporterNotificationTests(TestCase):
     def test_status_message_is_sent_to_reporter_not_report_subject(self):
         rcon_api = MagicMock()
+        rcon_api.message_player.return_value = True
         incident = {
             "reporter_id": "reporter-player-id",
             "reporter_name": "Reporter",
@@ -45,3 +46,21 @@ class IncidentReporterNotificationTests(TestCase):
             )
         )
         rcon_api.message_player.assert_not_called()
+
+    def test_rejected_and_unknown_results_do_not_claim_delivery_or_retry(self):
+        for result in (False, None):
+            with self.subTest(result=result):
+                rcon_api = MagicMock()
+                rcon_api.message_player.return_value = result
+                outcome = notify_incident_reporter(
+                    rcon_api, {"reporter_id": "synthetic"}, message="test"
+                )
+                self.assertIs(outcome, result)
+                rcon_api.message_player.assert_called_once()
+
+    def test_timeout_propagates_without_retry(self):
+        rcon_api = MagicMock()
+        rcon_api.message_player.side_effect = TimeoutError('response lost')
+        with self.assertRaises(TimeoutError):
+            notify_incident_reporter(rcon_api, {"reporter_id": "synthetic"}, message="test")
+        rcon_api.message_player.assert_called_once()
