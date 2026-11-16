@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from functools import cmp_to_key
 
 from dateutil import parser
-from sqlalchemy import and_, func, literal, or_, text
+from sqlalchemy import and_, case, func, literal, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, contains_eager, joinedload, selectinload
 from sqlalchemy.sql.functions import ReturnTypeFromArgs
@@ -307,8 +307,8 @@ def get_profiles(player_ids, nb_sessions=1):
         ]
 
 
-def _current_session_summary(sess, player_database_ids):
-    """Return session count and latest session without hydrating history rows."""
+def _current_session_summary(sess, player_database_ids, server_number):
+    """Return global session count and latest local session in one query."""
     if not player_database_ids:
         return {}
 
@@ -319,13 +319,17 @@ def _current_session_summary(sess, player_database_ids):
             PlayerSession.end.label("end"),
             PlayerSession.start_event_us.label("start_event_us"),
             PlayerSession.created.label("created"),
+            PlayerSession.server_number.label("server_number"),
             func.count(PlayerSession.id)
             .over(partition_by=PlayerSession.player_id_id)
             .label("sessions_count"),
             func.row_number()
             .over(
                 partition_by=PlayerSession.player_id_id,
-                order_by=(PlayerSession.created.desc(), PlayerSession.id.desc()),
+                order_by=(
+                    case((PlayerSession.server_number == server_number, 0), else_=1),
+                    PlayerSession.created.desc(), PlayerSession.id.desc(),
+                ),
             )
             .label("session_rank"),
         )
@@ -408,7 +412,8 @@ def get_live_profiles(
             return []
 
         database_ids = [player.id for player in players]
-        session_summaries = _current_session_summary(sess, database_ids)
+        this_server = int(get_server_number())
+        session_summaries = _current_session_summary(sess, database_ids, this_server)
 
         actions_by_player: dict[int, list[dict]] = {}
         action_cutoff = datetime.datetime.utcnow() - datetime.timedelta(
@@ -449,7 +454,6 @@ def get_live_profiles(
                 )
             )
 
-        this_server = int(get_server_number())
         profiles: list[LivePlayerProfileType] = []
         for player in players:
             summary = session_summaries.get(player.id)
@@ -464,7 +468,9 @@ def get_live_profiles(
                 {
                     "player_id": player.player_id,
                     "sessions_count": summary.sessions_count if summary else 0,
-                    "current_playtime_seconds": _current_playtime_seconds(summary),
+                    "current_playtime_seconds": _current_playtime_seconds(
+                        summary if summary and summary.server_number == this_server else None
+                    ),
                     "received_actions": actions_by_player.get(player.id, []),
                     "blacklists": blacklists,
                     "is_blacklisted": is_blacklisted,
