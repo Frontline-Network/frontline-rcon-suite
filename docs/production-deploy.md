@@ -29,10 +29,27 @@ PostgreSQL custom-format backup, tags the currently running images for rollback,
 builds commit-addressed images, starts the stack, waits for health checks, and
 prints the migration state.
 
+For the first update from an older checkout, run the deploy helper from the
+release being fetched. Running the old checkout's helper would miss newer
+preflight checks during that first update. From the repository root:
+
 ```sh
-./scripts/deploy_frontline.sh --check-only
-./scripts/deploy_frontline.sh --deploy
+(
+  set -eu
+  git fetch --prune --tags frontline master
+  helper=$(mktemp)
+  trap 'rm -f "$helper"' EXIT
+  git show FETCH_HEAD:scripts/deploy_frontline.sh > "$helper"
+  bash "$helper" --check-only
+  bash "$helper" --deploy
+)
 ```
+
+The fetched helper still checks the checkout, refetches and validates the target,
+and refuses non-fast-forward deployments. Adapt the remote and branch names here
+and with `FRONTLINE_REMOTE` and `FRONTLINE_BRANCH` if your installation uses
+different names. For subsequent updates, repeat the bootstrap above, or use the
+helper in the checkout when it already contains the required preflight checks.
 
 The deployed commit tag is stored as `CRCON_IMAGE_TAG` in the ignored `.env`.
 Backups and deployment metadata are written below `.deploy-backups/` and
@@ -46,8 +63,10 @@ helper checks that each target backend image contains the probe and health endpo
 before stopping workers; an incompatible image stops the deployment for review. The
 check reflects readiness; it does not prevent a brief interruption while a backend
 container is replaced. A deployment started by an older helper can update backends
-1–4 immediately; additional instances receive this override on a later deployment
-run by the updated helper, or when their generated Compose file is updated.
+1–4 immediately; additional instances need a later deployment run by the updated
+helper, or an explicitly reviewed update to their generated Compose file. Running
+`--deploy` again at the same revision is a no-op and does not repair them. Use the
+bootstrap procedure above before the first update to avoid this gap.
 
 ## Preserve password recovery on every rollout
 
