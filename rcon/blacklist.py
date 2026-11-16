@@ -493,8 +493,10 @@ def apply_blacklist_punishment(
             case BanState.TEMP:
                 hours = round_timedelta_to_hours(record.expires_at)
                 logger.info(
-                    "Attempting to ban player %s until %s due to blacklist, reason: %s",
+                    "Attempting to ban player %s for %s hour(s) due to blacklist "
+                    "(blacklist expires at %s), reason: %s",
                     player_name,
+                    hours,
                     record.expires_at,
                     reason,
                 )
