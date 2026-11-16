@@ -60,6 +60,20 @@ void main() {
     expect(find.text('Temporary ban'), findsOneWidget);
   });
 
+  testWidgets('renders French administrative vocabulary and placeholders', (
+    tester,
+  ) async {
+    await tester.pumpWidget(localizedHarness(const Locale('fr')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Boîte des incidents'), findsOneWidget);
+    expect(find.text('Recherche de joueurs'), findsOneWidget);
+    expect(find.text('Annuler'), findsOneWidget);
+    expect(find.text('Serveur 2'), findsOneWidget);
+    expect(find.text('Sanctionner'), findsOneWidget);
+    expect(find.text('Bannissement temporaire'), findsOneWidget);
+  });
+
   testWidgets('applies the central Frontline theme', (tester) async {
     await tester.pumpWidget(localizedHarness(const Locale('de')));
     await tester.pumpAndSettle();

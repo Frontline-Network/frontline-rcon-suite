@@ -1,0 +1,111 @@
+{
+  "@@locale": "fr",
+  "appTitle": "Administration Frontline CRCON",
+  "connections": "Connexions CRCON",
+  "pairCrcon": "Associer CRCON",
+  "pairFirst": "Associez votre première installation CRCON.",
+  "incidentNotifications": "Notifications d’incidents",
+  "revokeDeviceTitle": "Révoquer cet appareil ?",
+  "revokeDeviceBody": "CRCON invalidera immédiatement ses jetons d’accès et de renouvellement.",
+  "cancel": "Annuler",
+  "revoke": "Révoquer",
+  "pairInstructions": "Dans CRCON, ouvrez « Configurer les applications », créez un code QR, puis scannez-le ici.",
+  "compareCode": "Comparez ce code avec CRCON",
+  "approvePhone": "Approuvez le téléphone dans le navigateur CRCON pour terminer l’association.",
+  "createIncident": "Créer un incident",
+  "gameServer": "Serveur de jeu",
+  "reason": "Raison",
+  "create": "Créer",
+  "serverNumber": "Serveur {number}",
+  "@serverNumber": {
+    "placeholders": {
+      "number": {
+        "type": "Object"
+      }
+    }
+  },
+  "newIncident": "Nouvel incident",
+  "incidentInbox": "Boîte des incidents",
+  "noIncidents": "Pas d'incident.",
+  "playerSearch": "Recherche de joueurs",
+  "pairConnectionFirst": "Associez d’abord une connexion CRCON.",
+  "crconConnection": "Connexion CRCON",
+  "nameOrPlayerId": "Nom ou identifiant du joueur",
+  "unknown": "Inconnu",
+  "playerProfile": "Profil du joueur",
+  "unknownPlayer": "Joueur inconnu",
+  "offline": "Hors ligne",
+  "onlineNow": "En ligne maintenant",
+  "sessions": "Sessions",
+  "bans": "Bannissements",
+  "adminComments": "Commentaires d’administration",
+  "flags": "Drapeaux",
+  "recentComments": "Commentaires récents",
+  "incident": "Incident",
+  "incidentUnavailable": "Incident non disponible",
+  "reporter": "Auteur du signalement : {name}",
+  "@reporter": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "target": "Cible : {name}",
+  "@target": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "assigned": "Attribué à : {name}",
+  "@assigned": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "notSet": "non défini",
+  "notLinked": "non associé",
+  "nobody": "personne",
+  "claim": "Prendre en charge",
+  "release": "Libérer",
+  "reassign": "Réattribuer",
+  "resolve": "Résoudre",
+  "dismiss": "Rejeter",
+  "reopen": "Rouvrir",
+  "addNote": "Ajouter une note",
+  "linkPlayer": "Associer le joueur",
+  "playerActions": "Actions du joueur",
+  "linkPlayerFirst": "Associez un joueur identifié de manière unique dans CRCON avant d’utiliser les actions sur le joueur.",
+  "message": "Message",
+  "punish": "Sanctionner",
+  "comment": "Commentaire",
+  "kick": "Expulser",
+  "tempBan": "Bannissement temporaire",
+  "timeline": "Chronologie",
+  "addPrivateNote": "Ajouter une note privée d’administration",
+  "note": "Note",
+  "save": "Enregistrer",
+  "linkTargetPlayer": "Associer le joueur ciblé",
+  "playerName": "Nom du joueur",
+  "playerId": "Identifiant du joueur",
+  "link": "Lien",
+  "reassignIncident": "Réattribuer l’incident",
+  "crconUsername": "Nom d'utilisateur CRCON",
+  "confirm": "Confirmer",
+  "adminComment": "Commentaire d’administration",
+  "requiredReason": "Justification requise",
+  "inbox": "Boîte de réception",
+  "players": "Joueurs",
+  "connectionsShort": "Connexions",
+  "language": "Langue",
+  "german": "Deutsch",
+  "english": "Anglais",
+  "cachedMayBeStale": "En cache — les données peuvent être anciennes",
+  "manual": "manuel",
+  "event": "événement",
+  "system": "système"
+}
