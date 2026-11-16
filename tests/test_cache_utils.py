@@ -25,6 +25,9 @@ class MockRedis:
 
 
 class MockRedisDeleteUnavailable(MockRedis):
+    def set(self, *_args, **_kwargs):
+        raise redis.exceptions.RedisError
+
     def delete(self, *_keys):
         raise redis.exceptions.RedisError
 
@@ -150,11 +153,8 @@ def test_cold_lock_contention_does_not_sleep_before_fallback_execution():
 
 
 def test_method_cache_reuses_identical_arguments_and_isolates_variants():
-    values = {}
-    red = mock.Mock()
-    red.get.side_effect = lambda key: values.get(key)
-    red.set.return_value = True
-    red.setex.side_effect = lambda key, _ttl, value: values.__setitem__(key, value)
+    from fakeredis import FakeStrictRedis
+    red = FakeStrictRedis()
     function = mock.Mock(
         side_effect=lambda _instance, compact=False: {"compact": compact}
     )
