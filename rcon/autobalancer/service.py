@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from statistics import median
 from typing import Any
 
+from rcon.automods import action_guard
 from rcon.user_config.autobalancer import AutobalancerUserConfig
 from rcon.utils import get_server_number
 
@@ -33,6 +34,7 @@ from .telemetry import persist_snapshot, prune_snapshots
 logger = logging.getLogger(__name__)
 COUNTS_MISMATCH = "Teamzählungen stimmen nicht überein"
 DATA_PAUSE_MAX_SECONDS = 15
+SWITCH_GUARD_RULE = 'AutobalancerSwitch'
 
 
 class AutobalancerService:
@@ -48,6 +50,7 @@ class AutobalancerService:
         self.server_number = int(get_server_number())
         self.store = store or AutobalancerStore(server_number=self.server_number)
         self.repository = repository or DecisionRepository(self.server_number)
+        self.action_guard = action_guard
         self.token = new_instance_token()
         self._is_leader = False
 
@@ -498,9 +501,13 @@ class AutobalancerService:
         round_started_at = datetime.fromtimestamp(
             int(snapshot.round_id.split(":", 1)[0] or 0), timezone.utc
         ).replace(tzinfo=None)
-        return self.repository.cooldown_player_ids(
+        cooldown = self.repository.cooldown_player_ids(
             config.cooldown_maps, round_started_at
         )
+        pending = self.action_guard.pending_players(self.server_number, SWITCH_GUARD_RULE)
+        if '*' in pending:
+            return cooldown | {player.player_id for player in snapshot.players}
+        return cooldown | pending
 
     def _plan(
         self,
@@ -756,20 +763,43 @@ class AutobalancerService:
                 self._abort_state(state, reason)
                 self.store.arm_player(None)
                 return self._restart_observation(snapshot, now)
-            self.repository.update(state["decision_id"], status="executing")
+            try:
+                guard_token = self.action_guard.reserve(
+                    self.server_number, candidate['player_id'], [SWITCH_GUARD_RULE], 'switch'
+                )
+            except Exception:
+                logger.exception('Autobalancer switch not sent: durable reservation unavailable')
+                self._abort_state(state, 'Teamwechsel-Sicherung nicht verfügbar')
+                self.store.arm_player(None)
+                return self._restart_observation(snapshot, now)
+            if guard_token is None:
+                self._abort_state(state, 'Vorheriger Teamwechsel wartet auf Prüfung')
+                self.store.arm_player(None)
+                return self._restart_observation(snapshot, now)
+            if self.repository.update(state["decision_id"], status="executing") is None:
+                logger.error('Autobalancer switch not sent: decision is unavailable')
+                self.store.arm_player(None)
+                return self._restart_observation(snapshot, now)
             try:
                 switch = (self.rcon.switch_volunteer_now if candidate.get("volunteer")
                           else self.rcon.switch_player_now)
                 switched = switch(candidate["player_id"])
             except Exception as exc:
                 logger.exception("Autobalancer RCON team switch failed")
-                switched = False
+                switched = None
                 error = str(exc)
             else:
-                error = "RCON hat den Teamwechsel abgelehnt"
+                error = ("RCON hat den Teamwechsel abgelehnt" if switched is False
+                         else "RCON hat den Teamwechsel nicht eindeutig bestätigt")
         finally:
             self.store.release_execution(execution_token)
-        if not switched:
+        if switched is not True:
+            if switched is False:
+                try:
+                    self.action_guard.finish(self.server_number, candidate['player_id'],
+                                             guard_token, 'rejected', expected=1)
+                except Exception:
+                    logger.exception('Could not record rejected switch; reservation retained')
             self.repository.update(
                 state["decision_id"],
                 status="error",
@@ -783,6 +813,7 @@ class AutobalancerService:
             self._notify_ended(state, "Teamwechsel wurde nicht bestätigt")
             return self._restart_observation(snapshot, now)
         state["phase"] = Phase.VERIFYING
+        state['switch_guard_token'] = guard_token
         state["pre_switch_difference"] = before
         state["confirmation_expires_at"] = (
             now.timestamp() + config.switch_confirmation_timeout_seconds
@@ -799,12 +830,21 @@ class AutobalancerService:
         now: datetime,
     ) -> dict[str, Any]:
         candidate = state["candidate"]
-        self.repository.update(
+        decision = self.repository.update(
             state["decision_id"],
             status="executed",
             executed_at=now.replace(tzinfo=None),
             after_snapshot=snapshot.audit_dict(),
         )
+        guard_token = state.get('switch_guard_token')
+        if guard_token and decision is not None:
+            try:
+                self.action_guard.finish(self.server_number, candidate['player_id'],
+                                         guard_token, 'confirmed', expected=1)
+            except Exception:
+                logger.exception('Could not record confirmed switch; reservation retained')
+        elif guard_token:
+            logger.error('Confirmed switch decision is unavailable; reservation retained')
         self.store.arm_player(None)
         send_message(
             self.rcon,

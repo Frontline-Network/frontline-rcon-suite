@@ -28,7 +28,7 @@ action_guard = Table(
     Column("reviewed_by", String(150), nullable=True),
     Column("review_reason", Text, nullable=True),
     CheckConstraint("server_number BETWEEN 1 AND 32", name="ck_automod_guard_server"),
-    CheckConstraint("action IN ('message', 'punish', 'kick')", name="ck_automod_guard_action"),
+    CheckConstraint("action IN ('message', 'punish', 'kick', 'switch')", name="ck_automod_guard_action"),
     CheckConstraint("state IN ('pending', 'confirmed', 'rejected', 'reviewed')", name="ck_automod_guard_state"),
 )
 action_guard_history = Table(
@@ -83,7 +83,7 @@ def reserve(server_number: int, player_id: str, rules: list[str], action: str,
     if (not 1 <= server_number <= 32 or not player_id or len(player_id) > 100
             or (player_id == "*") != legacy_global
             or not rules or any(not rule or len(rule) > 150 for rule in rules)
-            or action not in {"message", "punish", "kick"}):
+            or action not in {"message", "punish", "kick", "switch"}):
         raise ValueError("Invalid automated action reservation")
     if event is not None:
         event_ms, event_key = event
@@ -146,6 +146,18 @@ def reserve(server_number: int, player_id: str, rules: list[str], action: str,
             reason=(f"event:{event_key}" if event is not None else
                     "Legacy actions may have unresolved outcomes" if legacy_global else None)))
     return token
+
+
+def pending_players(server_number: int, rule: str) -> set[str]:
+    """Return every unresolved player for a rule, including a global hold."""
+    if not 1 <= server_number <= 32 or not rule or len(rule) > 150:
+        raise ValueError("Invalid server or rule")
+    with get_session_maker()() as session:
+        return set(session.execute(select(action_guard.c.player_id).where(
+            action_guard.c.server_number == server_number,
+            action_guard.c.rule == rule,
+            action_guard.c.state == 'pending',
+        )).scalars())
 
 
 def finish(server_number: int, player_id: str, token: str, result: str, *, expected: int | None = None,

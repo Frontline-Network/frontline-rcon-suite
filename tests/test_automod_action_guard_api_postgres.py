@@ -96,3 +96,21 @@ def test_event_action_review_blocks_replay_but_allows_new_event(guard_api):
     assert action_guard.reserve(3, 'synthetic', ['AutoMod_SeedingRules'], 'punish', event=event) is None
     next_event = event_guard.identity({'timestamp_ms': now, 'line_without_time': 'KILL: another'})
     assert action_guard.reserve(3, 'synthetic', ['AutoMod_SeedingRules'], 'punish', event=next_event)
+
+
+def test_uncertain_autobalancer_switch_requires_audited_review(guard_api):
+    token = action_guard.reserve(3, 'synthetic', ['AutobalancerSwitch'], 'switch')
+    response = invoke('get_pending_automod_actions', 'GET', {'api.can_view_player_profile'})
+    rows = json.loads(response.content)['result']['results']
+    assert any(row['token'] == token and row['actions'][0]['action'] == 'switch' for row in rows)
+    body = {'player_id': 'synthetic', 'token': token, 'reason': 'checked server logs'}
+    assert invoke('review_pending_automod_action', 'POST', {'api.can_view_player_profile'}, body).status_code == 403
+    response = invoke('review_pending_automod_action', 'POST',
+                      {'api.can_view_player_profile', 'api.can_run_raw_commands'}, body)
+    assert response.status_code == 200 and json.loads(response.content)['result'] is True
+    assert action_guard.pending_players(3, 'AutobalancerSwitch') == set()
+    with guard_api() as session:
+        events = session.execute(select(action_guard.action_guard_history).where(
+            action_guard.action_guard_history.c.token == token)).mappings().all()
+    assert any(row['event'] == 'reviewed' and row['actor'] == 'Operator' and
+               row['reason'] == 'checked server logs' for row in events)

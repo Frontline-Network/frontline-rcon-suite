@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 import { collectRuntimeErrors, openDemoPage } from "./helpers.mjs";
 
 for (const sample of [
-  { language: "de", title: "Unbestätigte Automod-Aktionen", release: "Nach Prüfung freigeben", all: "Alle Spieler dieser Regel", rule: "Squad ohne Anführer", warning: "Warnung", teamkill: "Teamkill nach Verbindung", ban: "Sperre" },
-  { language: "en", title: "Unconfirmed automod actions", release: "Release after review", all: "All players for this rule", rule: "Squad without leader", warning: "Warning", teamkill: "Teamkill after connection", ban: "Ban" },
-  { language: "fr", title: "Actions Automod non confirmées", release: "Débloquer après vérification", all: "Tous les joueurs concernés par cette règle", rule: "Escouade sans chef", warning: "Avertissement", teamkill: "Élimination alliée après connexion", ban: "Bannissement" },
+  { language: "de", title: "Unbestätigte automatische Aktionen", release: "Nach Prüfung freigeben", all: "Alle Spieler dieser Regel", rule: "Squad ohne Anführer", warning: "Warnung", teamkill: "Teamkill nach Verbindung", ban: "Sperre", switchRule: "Autobalancer-Teamwechsel", switchAction: "Teamwechsel" },
+  { language: "en", title: "Unconfirmed automatic actions", release: "Release after review", all: "All players for this rule", rule: "Squad without leader", warning: "Warning", teamkill: "Teamkill after connection", ban: "Ban", switchRule: "Autobalancer team switch", switchAction: "Team switch" },
+  { language: "fr", title: "Actions automatiques non confirmées", release: "Débloquer après vérification", all: "Tous les joueurs concernés par cette règle", rule: "Escouade sans chef", warning: "Avertissement", teamkill: "Élimination alliée après connexion", ban: "Bannissement", switchRule: "Changement d’équipe par l’équilibrage", switchAction: "Changement d’équipe" },
 ]) {
   test(`uncertain automod actions can be reviewed in ${sample.language}`, async ({ page }) => {
     const errors = collectRuntimeErrors(page);
@@ -37,6 +37,18 @@ for (const sample of [
     });
     const panel = main.getByTestId("automod-action-review");
     await expect(panel.getByText(new RegExp(`${sample.teamkill}.*${sample.ban}`))).toBeVisible();
+    page.on("dialog", async (dialog) => dialog.accept(dialog.type() === "prompt" ? "Verified server logs" : undefined));
+    await panel.getByRole("button", { name: sample.release }).click();
+    await expect(panel).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+  test(`uncertain team switches can be reviewed in ${sample.language}`, async ({ page }) => {
+    const errors = collectRuntimeErrors(page);
+    const main = await openDemoPage(page, "/records/players", {
+      language: sample.language, query: { demo_automod_action_review: 1, switch_hold: 1 },
+    });
+    const panel = main.getByTestId("automod-action-review");
+    await expect(panel.getByText(new RegExp(`${sample.switchRule}.*${sample.switchAction}`))).toBeVisible();
     page.on("dialog", async (dialog) => dialog.accept(dialog.type() === "prompt" ? "Verified server logs" : undefined));
     await panel.getByRole("button", { name: sample.release }).click();
     await expect(panel).toHaveCount(0);

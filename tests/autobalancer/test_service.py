@@ -85,6 +85,30 @@ class FakeRepository:
         return set()
 
 
+class FakeActionGuard:
+    def __init__(self):
+        self.pending = {}
+
+    def reserve(self, server, player_id, rules, action):
+        assert rules == ['AutobalancerSwitch'] and action == 'switch'
+        if player_id in self.pending or '*' in self.pending:
+            return None
+        token = f'token-{player_id}'
+        self.pending[player_id] = token
+        return token
+
+    def finish(self, server, player_id, token, result, *, expected):
+        assert expected == 1 and result in {'confirmed', 'rejected'}
+        if self.pending.get(player_id) != token:
+            raise RuntimeError('Unknown reservation')
+        del self.pending[player_id]
+        return 1
+
+    def pending_players(self, server, rule):
+        assert rule == 'AutobalancerSwitch'
+        return set(self.pending)
+
+
 def make_snapshot(now, allies=50, axis=44):
     players = [
         PlayerSnapshot(
@@ -127,6 +151,7 @@ def service():
     instance.server_number = 1
     instance.store = FakeStore()
     instance.repository = FakeRepository()
+    instance.action_guard = FakeActionGuard()
     instance.token = "test-token"
     return instance
 
@@ -254,6 +279,115 @@ def test_rejected_rcon_switch_is_recorded_and_disarmed():
     assert result["phase"] == Phase.OBSERVING
     assert instance.store.armed is None
     assert instance.repository.updated[-1][1]["status"] == "error"
+    assert instance.action_guard.pending == {}
+
+
+def test_uncertain_switch_is_excluded_from_later_plans_and_survives_restart(monkeypatch):
+    instance = service()
+    monkeypatch.setattr('rcon.autobalancer.service.load_history', lambda *args, **kwargs: {})
+    monkeypatch.setattr('rcon.autobalancer.service.read_seeding_active', lambda *args: False)
+    calls = []
+
+    def lost_reply(player_id):
+        calls.append(player_id)
+        raise TimeoutError('synthetic lost reply')
+
+    instance.rcon.switch_player_now = lost_reply
+    config = AutobalancerUserConfig(mode='auto', minimum_players=0, cooldown_maps=0,
+        stable_difference_seconds=45, volunteer_phase_seconds=0,
+        map_start_grace_minutes=0, map_end_guard_minutes=0)
+    now = datetime.fromtimestamp(3000, timezone.utc)
+    state = {'phase': Phase.ARMED, 'decision_id': 'first', 'source_team': 'allies',
+             'target_team': 'axis', 'candidate': {'player_id': 'a0', 'base_tier': 0}}
+    state = instance._execute_after_death(state, make_snapshot(now), config,
+        {'timestamp_ms': 2999000, 'player_id': 'a0'}, now)
+    assert calls == ['a0']
+    assert instance.action_guard.pending == {'a0': 'token-a0'}
+
+    restarted = service()
+    restarted.action_guard = instance.action_guard
+    later = datetime.fromtimestamp(3046, timezone.utc)
+    state = restarted._advance(state, make_snapshot(later), config, [], later)
+    assert state['phase'] == Phase.ARMED
+    assert state['candidate']['player_id'] != 'a0'
+
+
+def test_global_transition_hold_excludes_every_candidate():
+    instance = service()
+    instance.action_guard.pending['*'] = 'transition'
+    now = datetime.fromtimestamp(3000, timezone.utc)
+    snapshot = make_snapshot(now)
+    assert instance._cooldown_ids(snapshot, AutobalancerUserConfig(cooldown_maps=0)) == {
+        player.player_id for player in snapshot.players
+    }
+
+
+def test_accepted_switch_stays_reserved_until_observed_confirmation():
+    instance = service()
+    now = datetime.fromtimestamp(3000, timezone.utc)
+    config = AutobalancerUserConfig(mode='auto')
+    state = {'phase': Phase.ARMED, 'decision_id': 'first', 'source_team': 'allies',
+             'target_team': 'axis', 'candidate': {'player_id': 'a0', 'base_tier': 0}}
+    state = instance._execute_after_death(state, make_snapshot(now), config,
+        {'timestamp_ms': 2999000, 'player_id': 'a0'}, now)
+    assert state['phase'] == Phase.VERIFYING
+    assert instance.action_guard.pending == {'a0': 'token-a0'}
+    state['team_switch_seen'] = True
+    later = datetime.fromtimestamp(3001, timezone.utc)
+    snapshot = make_snapshot(later, allies=49, axis=45)
+    snapshot.players[0].team = 'axis'
+    instance._advance(state, snapshot, config, [], later)
+    assert instance.action_guard.pending == {}
+
+
+def test_confirmation_timeout_and_ambiguous_response_keep_reservation():
+    instance = service()
+    now = datetime.fromtimestamp(3000, timezone.utc)
+    config = AutobalancerUserConfig(mode='auto')
+    state = {'phase': Phase.ARMED, 'decision_id': 'first', 'source_team': 'allies',
+             'target_team': 'axis', 'candidate': {'player_id': 'a0', 'base_tier': 0}}
+    state = instance._execute_after_death(state, make_snapshot(now), config,
+        {'timestamp_ms': 2999000, 'player_id': 'a0'}, now)
+    later = datetime.fromtimestamp(state['confirmation_expires_at'] + 1, timezone.utc)
+    instance._advance(state, make_snapshot(later), config, [], later)
+    assert instance.action_guard.pending == {'a0': 'token-a0'}
+
+    other = service()
+    other.rcon.switch_player_now = lambda player_id: None
+    state = {'phase': Phase.ARMED, 'decision_id': 'second', 'source_team': 'allies',
+             'target_team': 'axis', 'candidate': {'player_id': 'a0', 'base_tier': 0}}
+    other._execute_after_death(state, make_snapshot(now), config,
+        {'timestamp_ms': 2999000, 'player_id': 'a0'}, now)
+    assert other.action_guard.pending == {'a0': 'token-a0'}
+
+
+def test_missing_decision_never_sends_a_switch():
+    instance = service()
+    instance.repository.update = lambda *args, **kwargs: None
+    now = datetime.fromtimestamp(3000, timezone.utc)
+    state = {'phase': Phase.ARMED, 'decision_id': 'missing', 'source_team': 'allies',
+             'target_team': 'axis', 'candidate': {'player_id': 'a0', 'base_tier': 0}}
+    instance._execute_after_death(state, make_snapshot(now), AutobalancerUserConfig(mode='auto'),
+        {'timestamp_ms': 2999000, 'player_id': 'a0'}, now)
+    assert instance.rcon.switches == []
+    assert instance.action_guard.pending == {'a0': 'token-a0'}
+
+
+def test_confirmed_switch_with_missing_decision_retains_reservation():
+    instance = service()
+    now = datetime.fromtimestamp(3000, timezone.utc)
+    config = AutobalancerUserConfig(mode='auto')
+    state = {'phase': Phase.ARMED, 'decision_id': 'first', 'source_team': 'allies',
+             'target_team': 'axis', 'candidate': {'player_id': 'a0', 'base_tier': 0}}
+    state = instance._execute_after_death(state, make_snapshot(now), config,
+        {'timestamp_ms': 2999000, 'player_id': 'a0'}, now)
+    instance.repository.update = lambda *args, **kwargs: None
+    state['team_switch_seen'] = True
+    later = datetime.fromtimestamp(3001, timezone.utc)
+    snapshot = make_snapshot(later, allies=49, axis=45)
+    snapshot.players[0].team = 'axis'
+    instance._advance(state, snapshot, config, [], later)
+    assert instance.action_guard.pending == {'a0': 'token-a0'}
 
 
 def test_volunteer_request_reaches_all_eligible_players():
