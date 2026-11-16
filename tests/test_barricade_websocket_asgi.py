@@ -83,3 +83,46 @@ def test_websocket_unban_checks_real_postgres_list_and_queues_deletion(database,
         assert session.get(BlacklistRecord, record_id) is None
         deliveries = session.scalars(select(BlacklistSyncDelivery)).all()
         assert len(deliveries) == 1 and deliveries[0].server_number == 1
+
+
+def test_websocket_ban_uses_requested_list_and_retry_reuses_record(database, existing_blacklist, monkeypatch):
+    record_id, first, second = existing_blacklist
+
+    @contextmanager
+    def session_scope():
+        with database() as session:
+            yield session
+
+    monkeypatch.setattr(barricade.models, 'enter_session', session_scope)
+
+    async def run():
+        app = auth.APITokenAuthMiddleware(barricade.BarricadeConsumer.as_asgi(), perms=('synthetic',))
+        scope = {'type': 'websocket', 'path': '/ws/barricade',
+                 'headers': [(b'authorization', b'Bearer synthetic-test-key')],
+                 'query_string': b'', 'subprotocols': []}
+        with patch.object(auth, 'get_user', AsyncMock(return_value=(object(), None))), \
+             patch.object(auth, 'has_perms', AsyncMock(return_value=True)), \
+             patch('channels.consumer.get_channel_layer', return_value=InMemoryChannelLayer()), \
+             patch.object(barricade, 'get_most_recent_session_date', AsyncMock(return_value=datetime.utcnow())):
+            socket = ApplicationCommunicator(app, scope)
+            await socket.send_input({'type': 'websocket.connect'})
+            assert (await socket.receive_output(timeout=5))['type'] == 'websocket.accept'
+            returned = []
+            for request_id in (10, 11):
+                request = {'id': request_id, 'request': 'ban_players',
+                           'payload': {'player_ids': {'synthetic-player': None},
+                                       'config': {'banlist_id': str(second), 'reason': 'synthetic'}}}
+                await socket.send_input({'type': 'websocket.receive', 'text': json.dumps(request)})
+                response = json.loads((await socket.receive_output(timeout=10))['text'])
+                assert response['id'] == request_id and response['failed'] is False
+                returned.append(int(response['response']['ban_ids']['synthetic-player']))
+            assert returned[0] == returned[1] and returned[0] != record_id
+            await socket.send_input({'type': 'websocket.disconnect', 'code': 1000})
+            await socket.wait(timeout=5)
+        return returned[0]
+    created = asyncio.run(run())
+    with database() as session:
+        assert session.get(BlacklistRecord, record_id).blacklist_id == first
+        assert session.get(BlacklistRecord, created).blacklist_id == second
+        deliveries = session.scalars(select(BlacklistSyncDelivery)).all()
+        assert len(deliveries) == 1 and deliveries[0].server_number == 2
