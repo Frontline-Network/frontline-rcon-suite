@@ -274,7 +274,10 @@ def remind_vote_map(_, struct_log):
     if vm.enabled:
         logger.info("Match ended reminding to vote map. %s", struct_log)
         vm.apply_results()
-        vm.send_reminder(force=vm.config.remind_on_match_end)
+        if vm.config.remind_on_match_end:
+            vm.send_reminder(force=True, scope=f"event:end:{struct_log['timestamp_ms']}")
+        else:
+            vm.send_reminder(force=False)
 
 
 @on_match_start
@@ -360,7 +363,10 @@ def handle_new_match_start(rcon: Rcon, struct_log):
                     flatten=False,
                 )
             vm.restart()
-            vm.send_reminder(force=vm.config.remind_on_match_start)
+            if vm.config.remind_on_match_start:
+                vm.send_reminder(force=True, scope=f"event:start:{struct_log['timestamp_ms']}")
+            else:
+                vm.send_reminder(force=False)
     except Exception:
         logger.exception("Unable to update map vote after recording match start")
 

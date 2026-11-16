@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum, IntFlag
 import functools
+import hashlib
 import logging
 import random
 import re
@@ -45,7 +46,7 @@ from rcon.user_config.vote_map import (
     DefaultMethods,
     VoteMapUserConfig,
 )
-from rcon.utils import MapsHistory
+from rcon.utils import MapsHistory, get_server_number
 
 from .exceptions import (
     InvalidMapParam,
@@ -93,6 +94,9 @@ class ActionOutcome(Enum):
     PAUSED = "paused"
     INVALID_CONFIG = "invalid_config"
     RECIPIENTS_UNAVAILABLE = "recipients_unavailable"
+    DELIVERY_UNAVAILABLE = "delivery_unavailable"
+    PARTIAL = "partial"
+    ROUND_UNAVAILABLE = "round_unavailable"
 
 
 @dataclass(frozen=True)
@@ -654,7 +658,7 @@ class VoteMap:
         return optin_players
 
     @require_enabled
-    def send_reminder(self, force: bool = False) -> ActionResult:
+    def send_reminder(self, force: bool = False, *, scope: str | None = None) -> ActionResult:
         """
         Send vote reminder to all players except the ones
         who opted out of reminders.\n
@@ -664,21 +668,43 @@ class VoteMap:
         config = self.config
         instructions = config.instruction_text
 
-        if not self.is_time_for_reminder() and not force:
-            return ActionResult(
-                ok=False,
-                outcome=ActionOutcome.ON_COOLDOWN,
-                message="Cooldown not elapsed and reminder not forced.",
-            )
+        from rcon.user_config.vote_map import validate_instruction_text
+        from rcon.vote_map import reminder_delivery as journal
+
+        def round_signature():
+            try:
+                current = self._maps_history[0]
+                start, name = current["start"], current["name"]
+                if start is None or not name:
+                    return None
+                # The layer name can be refined after the start log; the
+                # persisted start timestamp identifies this round stably.
+                return hashlib.sha256(str(start).encode()).hexdigest()
+            except (IndexError, KeyError, TypeError):
+                return None
+
+        signature = round_signature()
+        if signature is None:
+            return ActionResult(False, ActionOutcome.ROUND_UNAVAILABLE, "Current round is unavailable; no reminder was sent.")
+        server = int(get_server_number())
+        try:
+            pending = journal.open_batches(server)
+            for batch in pending:
+                if batch["signature"] != signature:
+                    journal.abandon_batch(server, batch["batch_id"],
+                                          is_current=lambda: round_signature() == signature)
+            pending = [batch for batch in pending if batch["signature"] == signature]
+        except Exception:
+            logger.exception("Unable to load reminder delivery journal")
+            return ActionResult(False, ActionOutcome.DELIVERY_UNAVAILABLE, "Reminder delivery journal unavailable; no reminder was sent.")
 
         if self.paused and not force:
-            return ActionResult(
-                ok=False,
-                outcome=ActionOutcome.PAUSED,
-                message="Votemap is paused as admin set the next map and reminder not forced.",
-            )
+            pending = [batch for batch in pending if batch["scope"] != "periodic"]
+            if not pending:
+                return ActionResult(False, ActionOutcome.PAUSED, "Votemap is paused as admin set the next map and reminder not forced.")
+        if not force and not pending and not self.is_time_for_reminder():
+            return ActionResult(False, ActionOutcome.ON_COOLDOWN, "Cooldown not elapsed and reminder not forced.")
 
-        from rcon.user_config.vote_map import validate_instruction_text
         try:
             validate_instruction_text(instructions)
         except ValueError as exc:
@@ -711,23 +737,51 @@ class VoteMap:
                 player_choice=self.get_player_choice(),
             )
             reminder_message = instructions.format(map_selection=map_selection)
-        for name, player_id in players_to_remind:
-            try:
-                self._rcon.message_player(
-                    player_id=player_id,
-                    message=reminder_message,
+        eligible = {pid for _, pid in players_to_remind}
+        try:
+            if force or not pending:
+                batch_scope = scope if force and scope else "manual" if force else "periodic"
+                batch_id = journal.open_batch(
+                    server, batch_scope, signature, reminder_message, eligible,
+                    min_interval=config.reminder_frequency_minutes * 60,
+                    force=force, once=batch_scope.startswith("event:"),
+                    is_current=lambda: round_signature() == signature,
                 )
-            except (HLLCommandFailedError, HLLCommandError) as exc:
-                # A player may have disconnected between collecting the player
-                # list and sending the reminder. Continue with every remaining
-                # recipient instead of aborting the complete reminder run.
-                logger.warning("Unable to message %s: %s", name, exc)
+                if batch_id is None:
+                    if round_signature() != signature:
+                        return ActionResult(False, ActionOutcome.ROUND_UNAVAILABLE, "Round changed; no reminder was sent.")
+                    return ActionResult(False, ActionOutcome.ON_COOLDOWN, "Reminder already sent or cooldown not elapsed.")
+                batches = [batch_id]
+            else:
+                batches = [batch["batch_id"] for batch in pending]
 
-        self.set_last_reminder_time()
-        return ActionResult(
-            ok=True,
-            outcome=ActionOutcome.SUCCESS,
-        )
+            def send(pid, message):
+                with self._rcon.without_retries():
+                    return self._rcon.message_player(player_id=pid, message=message)
+
+            counts = Counter()
+            incomplete = False
+            for batch_id in batches:
+                result = journal.dispatch(server, batch_id, eligible, send,
+                                          lambda: round_signature() == signature)
+                counts.update(result["counts"])
+                incomplete |= not result["complete"] or result["stale"]
+            if not incomplete and (counts.get("sent", 0) or counts.get("unknown", 0) or not counts.get("rejected", 0)):
+                try:
+                    self.set_last_reminder_time()
+                except Exception:
+                    logger.exception("Unable to update legacy reminder cooldown")
+            if incomplete or counts.get("rejected", 0) or counts.get("unknown", 0):
+                logger.warning("Votemap reminder incomplete: accepted=%d rejected=%d uncertain=%d pending=%s",
+                               counts.get("sent", 0), counts.get("rejected", 0), counts.get("unknown", 0), incomplete)
+                return ActionResult(False, ActionOutcome.PARTIAL,
+                    f"Reminder incomplete: {counts.get('sent', 0)} accepted, "
+                    f"{counts.get('rejected', 0)} rejected, {counts.get('unknown', 0)} uncertain.")
+            return ActionResult(True, ActionOutcome.SUCCESS)
+        except Exception:
+            logger.exception("Votemap reminder delivery failed safely")
+            return ActionResult(False, ActionOutcome.DELIVERY_UNAVAILABLE,
+                                "Reminder delivery could not be completed; see the server logs.")
 
     def has_player_voted(self, player_id: str) -> bool:
         return True if self._state.get_vote(player_id) else False
