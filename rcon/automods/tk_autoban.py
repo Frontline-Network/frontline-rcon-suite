@@ -150,6 +150,10 @@ def auto_ban_if_tks_right_after_connection(
                     by=author,
                     webhookurls=webhookurls,
                 )
+                # The rest of this history can contain additional qualifying
+                # teamkills from the same connection. One scan must not issue
+                # another ban for the same player.
+                return result
         elif is_player_death(player_name, log):
             death_counter += 1
             if death_counter >= ignore_after_death:
