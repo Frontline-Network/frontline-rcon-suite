@@ -60,7 +60,12 @@ export default function BlacklistSyncReview() {
             <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" gap={1}>
               <Box sx={{ minWidth: 0 }}>
                 <Typography variant="body2"><strong>{t("blacklistSyncReview.operation")}:</strong> {row.command} · {new Date(row.updated_at).toLocaleString(i18n.resolvedLanguage)}</Typography>
-                <Typography variant="body2">{row.reason?.startsWith("overlapping") ? t("blacklistSyncReview.overlap") : t("blacklistSyncReview.uncertain")}</Typography>
+                <Typography variant="body2">{t(
+                  row.review_kind === "hllv_ownership" ? "blacklistSyncReview.hllvOwnership" :
+                    row.review_kind === "hllv_identity" ? "blacklistSyncReview.hllvIdentity" :
+                      row.reason?.startsWith("overlapping") ? "blacklistSyncReview.overlap" :
+                        "blacklistSyncReview.uncertain"
+                )}</Typography>
                 <details><summary>{t("blacklistSyncReview.details")}</summary><Box component="pre" sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify(row.payload, null, 2)}</Box></details>
               </Box>
               {canReview && <Button variant="outlined" size="small" disabled={busy} onClick={() => acknowledge(row)}>{t("blacklistSyncReview.confirm")}</Button>}

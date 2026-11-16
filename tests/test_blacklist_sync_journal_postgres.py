@@ -273,6 +273,19 @@ def test_review_list_is_server_scoped_and_decodes_event(database):
         journal.list_reviews(1, limit=101)
 
 
+@pytest.mark.parametrize('error,kind', [
+    (blacklist.HLLVSteamBanOwnershipUnverified('synthetic'), 'hllv_ownership'),
+    (blacklist.HLLVSteamIdentityUnverified('synthetic'), 'hllv_identity'),
+    (TimeoutError('synthetic'), None),
+])
+def test_review_kind_distinguishes_no_action_from_uncertain_action(database, error, kind):
+    queue(database, b'first', 1)
+    def fail(_command):
+        raise error
+    assert journal.process_one(1, fail) == 'review'
+    assert journal.list_reviews(1)['results'][0]['review_kind'] == kind
+
+
 def test_concurrent_workers_do_not_execute_one_command_twice(database):
     queue(database, b"first", 1)
     entered, release = Event(), Event()
