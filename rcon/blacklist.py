@@ -57,6 +57,15 @@ SERVER_NUMBER = int(get_server_number())
 BLACKLIST_ACTION_GUARD_RULE = "BlacklistEnforcement"
 
 
+class HLLVSteamBanOwnershipUnverified(RuntimeError):
+    """An existing EOS game ban cannot safely be attributed to this record."""
+
+
+def _is_hllv_steam_id(rcon, player_id):
+    return (getattr(getattr(rcon, 'game_profile', None), 'game', None) == GameEnum.HLL_VIETNAM
+            and isinstance(player_id, str) and is_steam_id_64(player_id))
+
+
 @contextmanager
 def blacklist_change_session():
     """A mutation must fail if either its database change or journal fails."""
@@ -1131,11 +1140,15 @@ class BlacklistCommandHandler:
             # Leave malformed entries to normal dispatch, which moves them to
             # review instead of deferring them forever as a failed live read.
             return None
-        if (cmd.command == BlacklistCommandType.CREATE_RECORD
-                and getattr(getattr(self.rcon, 'game_profile', None), 'game', None) == GameEnum.HLL_VIETNAM
-                and isinstance(cmd.payload.get('player_id'), str)
-                and is_steam_id_64(cmd.payload['player_id'])):
-            return prepare_online_steam_identity(self.rcon, cmd.payload['player_id'])
+        if cmd.command == BlacklistCommandType.CREATE_RECORD:
+            player_id = cmd.payload.get('player_id')
+        elif cmd.command in (BlacklistCommandType.EDIT_RECORD, BlacklistCommandType.DELETE_RECORD):
+            player_id = cmd.payload.get('old_record', {}).get('player_id')
+        else:
+            player_id = None
+        if (getattr(getattr(self.rcon, 'game_profile', None), 'game', None) == GameEnum.HLL_VIETNAM
+                and isinstance(player_id, str) and is_steam_id_64(player_id)):
+            return prepare_online_steam_identity(self.rcon, player_id)
         return None
 
     def dispatch(self, data: bytes, prepared=None):
@@ -1159,7 +1172,8 @@ class BlacklistCommandHandler:
         schema, handler = handlers[cmd.command]
         logger.info("Handling %s command", cmd.command.name)
         payload = schema.model_validate(cmd.payload)
-        if cmd.command == BlacklistCommandType.CREATE_RECORD:
+        if cmd.command in (BlacklistCommandType.CREATE_RECORD, BlacklistCommandType.EDIT_RECORD,
+                           BlacklistCommandType.DELETE_RECORD):
             handler(payload, prepared=prepared)
         else:
             handler(payload)
@@ -1185,28 +1199,8 @@ class BlacklistCommandHandler:
                 )
                 return
 
-            if (getattr(getattr(self.rcon, 'game_profile', None), 'game', None) == GameEnum.HLL_VIETNAM
-                    and is_steam_id_64(payload.player_id)):
-                if not isinstance(prepared, dict) or prepared.get('steam_id') != payload.player_id:
-                    raise RuntimeError('HLLV Steam identity was not prepared')
-                eos_id = prepared.get('eos_id')
-                if eos_id is None:
-                    if top_record.blacklist.sync == BlacklistSyncMethod.BAN_IMMEDIATELY:
-                        raise RuntimeError('No verified online EOS identity for immediate ban')
-                    logger.info('Steam restriction retained for the next verified HLLV connection')
-                    return
-                eos_record = is_player_blacklisted(sess, player_id=eos_id)
-                if eos_record is not None and get_highest_priority_record([top_record, eos_record]).id != top_record.id:
-                    logger.info('Existing EOS restriction has higher priority')
-                    return
-                with self.rcon.without_retries():
-                    details = self.rcon.get_detailed_player_info(player_id=eos_id)
-                if verified_steam_id(self.rcon, eos_id, details) != payload.player_id:
-                    raise RuntimeError('HLLV Steam-to-EOS association changed before action')
-                result = apply_blacklist_punishment(self.rcon, top_record, player_id=eos_id,
-                                                    player_name=details.get('name'))
-                if result is not True and result is not _BLACKLIST_ACTION_EXPIRED:
-                    raise RuntimeError('Could not confirm HLLV blacklist action')
+            if _is_hllv_steam_id(self.rcon, payload.player_id):
+                self._apply_hllv_steam_record(sess, payload.player_id, top_record, prepared)
                 return
 
             old_record = is_player_blacklisted(
@@ -1220,7 +1214,41 @@ class BlacklistCommandHandler:
                 old_state=get_ban_state_from_record(old_record),
             )
 
-    def handle_edit_record(self, payload: BlacklistEditRecordCommand):
+    def _apply_hllv_steam_record(self, sess, steam_id, top_record, prepared):
+        if not isinstance(prepared, dict) or prepared.get('steam_id') != steam_id:
+            raise RuntimeError('HLLV Steam identity was not prepared')
+        eos_id = prepared.get('eos_id')
+        if eos_id is None:
+            if top_record.blacklist.sync == BlacklistSyncMethod.BAN_IMMEDIATELY:
+                raise RuntimeError('No verified online EOS identity for immediate ban')
+            logger.info('Steam restriction retained for the next verified HLLV connection')
+            return
+        eos_record = is_player_blacklisted(sess, player_id=eos_id)
+        if eos_record is not None and get_highest_priority_record([top_record, eos_record]).id != top_record.id:
+            logger.info('Existing EOS restriction has higher priority')
+            return
+        with self.rcon.without_retries():
+            details = self.rcon.get_detailed_player_info(player_id=eos_id)
+        if verified_steam_id(self.rcon, eos_id, details) != steam_id:
+            raise RuntimeError('HLLV Steam-to-EOS association changed before action')
+        result = apply_blacklist_punishment(self.rcon, top_record, player_id=eos_id,
+                                            player_name=details.get('name'))
+        if result is not True and result is not _BLACKLIST_ACTION_EXPIRED:
+            raise RuntimeError('Could not confirm HLLV blacklist action')
+
+    def _handle_hllv_steam_record_change(self, sess, old_record, new_record, prepared):
+        old_applies = (old_record['blacklist']['servers'] is None
+                       or SERVER_NUMBER in old_record['blacklist']['servers'])
+        if old_applies and old_record['blacklist']['sync'] != BlacklistSyncMethod.KICK_ONLY:
+            # The game server does not expose an ownership marker proving an
+            # existing EOS ban came from this record. Never remove or replace
+            # a possibly independent ban based on a Steam-only identifier.
+            raise HLLVSteamBanOwnershipUnverified('Existing EOS game-ban ownership needs review')
+        if new_record is None or new_record.blacklist.sync == BlacklistSyncMethod.KICK_ONLY:
+            return
+        self._apply_hllv_steam_record(sess, old_record['player_id'], new_record, prepared)
+
+    def handle_edit_record(self, payload: BlacklistEditRecordCommand, prepared=None):
         """Handle a record being edited.
 
         This simply will synchronize the player's ban if either the old
@@ -1233,6 +1261,9 @@ class BlacklistCommandHandler:
         old_record = payload.old_record
         with blacklist_change_session() as sess:
             new_record = is_player_blacklisted(sess, player_id=old_record["player_id"])
+            if _is_hllv_steam_id(self.rcon, old_record['player_id']):
+                self._handle_hllv_steam_record_change(sess, old_record, new_record, prepared)
+                return
             old_applies = (
                 old_record["blacklist"]["servers"] is None
                 or SERVER_NUMBER in old_record["blacklist"]["servers"]
@@ -1263,7 +1294,7 @@ class BlacklistCommandHandler:
                     old_state=get_ban_state_from_record(old_record) if old_applies else BanState.NONE,
                 )
 
-    def handle_delete_record(self, payload: BlacklistDeleteRecordCommand):
+    def handle_delete_record(self, payload: BlacklistDeleteRecordCommand, prepared=None):
         """Handle a record being deleted.
 
         This assumes that the record has not expired and is active on the current
@@ -1272,6 +1303,9 @@ class BlacklistCommandHandler:
         old_record = payload.old_record
         with blacklist_change_session() as sess:
             new_record = is_player_blacklisted(sess, player_id=old_record["player_id"])
+            if _is_hllv_steam_id(self.rcon, old_record['player_id']):
+                self._handle_hllv_steam_record_change(sess, old_record, new_record, prepared)
+                return
 
             if (
                 # Check whether the removed record had a higher priority
@@ -1318,7 +1352,11 @@ class BlacklistCommandHandler:
             return
 
         with blacklist_change_session() as sess:
-            records = get_active_blacklist_records(sess, new_blacklist["id"])
+            records = list(get_active_blacklist_records(sess, new_blacklist["id"]))
+            if any(_is_hllv_steam_id(self.rcon, record.player.player_id) for record in records):
+                # Do not process other entries first and then discover that a
+                # Steam-ID item needs an EOS/ownership reconciliation.
+                raise HLLVSteamBanOwnershipUnverified('Steam list changes need EOS ownership review')
             for record in records:
                 player_id = record.player.player_id
                 if enable_immediate:
@@ -1365,6 +1403,9 @@ class BlacklistCommandHandler:
         if not payload.banned_players:
             return
 
+        if any(_is_hllv_steam_id(self.rcon, player_id) for player_id in payload.banned_players):
+            raise HLLVSteamBanOwnershipUnverified('Steam list deletion needs EOS ownership review')
+
         failures = 0
         with blacklist_change_session() as sess:
             for player_id, (created_at, expires_at) in payload.banned_players.items():
@@ -1398,6 +1439,8 @@ class BlacklistCommandHandler:
             raise RuntimeError(f"Could not confirm {failures} blacklist synchronization(s)")
 
     def handle_expire_all(self, payload: BlacklistExpireAllCommand):
+        if _is_hllv_steam_id(self.rcon, payload.player_id):
+            raise HLLVSteamBanOwnershipUnverified('Steam expiry needs EOS ownership review')
         with lock(f"blacklist-sync:{SERVER_NUMBER}"):
             _require_blacklist_action_review_clear(payload.player_id)
             self._handle_expire_all(payload)

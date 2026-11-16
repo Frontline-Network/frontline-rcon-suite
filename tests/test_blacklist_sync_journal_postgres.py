@@ -467,6 +467,76 @@ def test_hllv_online_uncertain_kick_is_never_replayed(database, existing_blackli
                                prepare=receiver._prepare_delivery) == 'review'
     assert api.kick.call_count == 1
     assert action_guard.pending_players(3, 'BlacklistEnforcement') == {eos}
+
+
+@pytest.mark.parametrize('sync,expected', [
+    (BlacklistSyncMethod.KICK_ONLY, 'done'),
+    (BlacklistSyncMethod.BAN_IMMEDIATELY, 'review'),
+])
+def test_hllv_steam_deletion_preserves_unowned_game_bans(database, existing_blacklist, monkeypatch, sync, expected):
+    from contextlib import nullcontext
+    from rcon.types import GameEnum
+
+    record_id, _, _ = existing_blacklist
+    steam, eos = '76561198036685843', '0123456789abcdef0123456789abcdef'
+    with database() as session, session.begin():
+        record = session.get(BlacklistRecord, record_id)
+        record.player.player_id = steam
+        record.blacklist.servers = 4
+        record.blacklist.sync = sync
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    assert blacklist.remove_record_from_blacklist(record_id)
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    api.without_retries.return_value = nullcontext()
+    api.get_all_player_info.return_value = [{'iD': eos, 'eosId': eos, 'steamId': steam,
+                                             'platform': 'EPlatformFamily::Steam'}]
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == expected
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
+    api.kick.assert_not_called()
+    if expected == 'review':
+        with database() as session:
+            row = session.scalar(select(journal.BlacklistSyncDelivery))
+            assert 'HLLVSteamBanOwnershipUnverified' in row.reason
+
+
+def test_hllv_list_move_from_kick_to_ban_targets_verified_eos(database, existing_blacklist, monkeypatch):
+    from contextlib import nullcontext
+    from rcon.types import GameEnum
+
+    record_id, first, second = existing_blacklist
+    steam, eos = '76561198036685843', '0123456789abcdef0123456789abcdef'
+    with database() as session, session.begin():
+        record = session.get(BlacklistRecord, record_id)
+        record.player.player_id = steam
+        record.blacklist.servers = 4
+        record.blacklist.sync = BlacklistSyncMethod.KICK_ONLY
+        destination = session.get(Blacklist, second)
+        destination.servers = 4
+        destination.sync = BlacklistSyncMethod.BAN_IMMEDIATELY
+        session.add(PlayerID(player_id=eos))
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', mock.Mock())
+    assert blacklist.edit_record_from_blacklist(record_id, blacklist_id=second)
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    api.without_retries.return_value = nullcontext()
+    api.get_all_player_info.return_value = [{'iD': eos, 'eosId': eos, 'steamId': steam,
+                                             'platform': 'EPlatformFamily::Steam'}]
+    api.get_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
+                                                 'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
+    api.perma_ban.return_value = True
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'done'
+    assert api.perma_ban.call_args.kwargs['player_id'] == eos
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
 def test_edit_commits_both_target_deliveries_with_record(database, existing_blacklist):
     record_id, _first, second = existing_blacklist
     result = blacklist.edit_record_from_blacklist(record_id, blacklist_id=second, reason="new")
