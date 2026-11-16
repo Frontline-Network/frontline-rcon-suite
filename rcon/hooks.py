@@ -510,7 +510,7 @@ def ban_if_has_vac_bans(rcon: Rcon, player_id: str, name: str):
                 )
             else:
                 expires_at = None
-            blacklist_or_ban(
+            result = blacklist_or_ban(
                 rcon=rcon,
                 blacklist_id=config.blacklist_id,
                 player_id=player_id,
@@ -518,11 +518,12 @@ def ban_if_has_vac_bans(rcon: Rcon, player_id: str, name: str):
                 expires_at=expires_at,
                 admin_name="VAC BOT",
             )
-            logger.info(
-                "Player %s was banned due VAC history, last ban: %s days ago",
-                str(player),
-                bans.get("DaysSinceLastBan"),
-            )
+            if config.blacklist_id is not None and isinstance(result, dict) and result.get("id"):
+                logger.info("VAC blacklist record created for player %s; game-server synchronization pending", player_id)
+            elif config.blacklist_id is None and result is True:
+                logger.info("VAC ban confirmed by game server for player %s", player_id)
+            else:
+                logger.warning("VAC action was not confirmed for player %s", player_id)
 
 
 def inject_player_ids(func):
