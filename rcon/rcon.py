@@ -1412,13 +1412,28 @@ class Rcon(ServerCtl):
 
             maps.append(self.game_profile.parse_layer(map_))
 
-        next_map_index = map_sequence["current_index"] + 1
-        if next_map_index >= len(map_sequence["maps"]):
-            next_map_index = 0
+        # Sequence indices address the sequence, not the rotation. A repeated
+        # layer cannot be mapped reliably between differently ordered lists.
+        rotation_ids = [name.rsplit("/", 1)[-1] for name in map_rotation_list]
+        sequence_ids = [name.rsplit("/", 1)[-1] for name in map_sequence["maps"]]
+        sequence_current = map_sequence["current_index"]
+        current_map_index = next_map_index = None
+        if isinstance(sequence_current, int) and 0 <= sequence_current < len(sequence_ids):
+            sequence_next = (sequence_current + 1) % len(sequence_ids)
+
+            def rotation_index(sequence_index):
+                if rotation_ids == sequence_ids:
+                    return sequence_index
+                matches = [i for i, name in enumerate(rotation_ids)
+                           if name == sequence_ids[sequence_index]]
+                return matches[0] if len(matches) == 1 else None
+
+            current_map_index = rotation_index(sequence_current)
+            next_map_index = rotation_index(sequence_next)
 
         return {
             "maps": maps,
-            "current_index": map_sequence["current_index"],
+            "current_index": current_map_index,
             "next_index": next_map_index,
         }
 

@@ -255,7 +255,7 @@ export function MapListBuilder({
                   isDisabled={isSaveDisabled}
                   isSaving={isSaving}
                   actions={actions}
-                  params={params}
+                  params={{ ...params, rotationDraftChanged: hasChanges }}
                   {...selectedMapListProps}
                 />
               </BuilderPanel>

@@ -111,17 +111,8 @@ export function SortableRotationList({
               strategy={verticalListSortingStrategy}
             >
               {maps.map((item, index) => {
-                let isNext = false;
-                if (showNext && maps.length === 1) {
-                  isNext = true;
-                } else if (
-                  showNext &&
-                  params.currentMapIndex === params.nextMapIndex
-                ) {
-                  isNext = index + 1 === params.nextMapIndex;
-                } else if (showNext) {
-                  isNext = index === params.nextMapIndex;
-                }
+                const isNext = showNext && !params.rotationDraftChanged &&
+                  Number.isInteger(params.nextMapIndex) && index === params.nextMapIndex;
 
                 return (
                   <SortableRotationItem

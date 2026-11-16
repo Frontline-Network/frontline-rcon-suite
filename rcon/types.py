@@ -1186,8 +1186,8 @@ class MapRotationResponse(TypedDict):
 
 class GetMapRotation(TypedDict):
     maps: list["Layer"]
-    current_index: int
-    next_index: int
+    current_index: int | None
+    next_index: int | None
 
 
 class ScoreDataType(TypedDict):
