@@ -3,6 +3,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from threading import Event
+from unittest import mock
 from uuid import uuid4
 
 import pytest
@@ -74,6 +75,53 @@ def test_failed_target_does_not_block_another_target(database):
     assert journal.process_one(2, seen.append) == "done"
     assert seen == [b"first"]
     assert journal.process_one(1, lambda _: pytest.fail("must not retry")) == "review"
+
+
+@pytest.mark.parametrize("readiness", [False, None, OSError("unavailable")])
+def test_offline_target_defers_queued_delivery_without_losing_or_attempting_it(database, readiness):
+    queue(database, b"first", 1)
+    dispatch = mock.Mock()
+
+    def probe():
+        if isinstance(readiness, Exception):
+            raise readiness
+        return readiness
+
+    assert journal.process_one(1, dispatch, is_ready=probe) == "deferred"
+    dispatch.assert_not_called()
+    with database() as session:
+        assert session.scalar(select(journal.BlacklistSyncDelivery.status)) == "queued"
+    assert journal.process_one(1, dispatch, is_ready=lambda: True) == "done"
+    dispatch.assert_called_once_with(b"first")
+
+
+def test_offline_probe_does_not_hide_an_uncertain_inflight_action(database):
+    queue(database, b"first", 1)
+    with database() as session, session.begin():
+        row = session.scalar(select(journal.BlacklistSyncDelivery))
+        row.status = "sending"
+    assert journal.process_one(1, lambda _: pytest.fail("must not retry"),
+                               is_ready=lambda: False) == "review"
+
+
+def test_offline_server_does_not_block_an_online_server(database):
+    queue(database, b"first", (1 << 2) | (1 << 3))
+    offline = mock.Mock()
+    online = mock.Mock()
+    assert journal.process_one(4, offline, is_ready=lambda: False) == "deferred"
+    assert journal.process_one(3, online, is_ready=lambda: True) == "done"
+    offline.assert_not_called()
+    online.assert_called_once_with(b"first")
+    assert journal.process_one(4, offline, is_ready=lambda: True) == "done"
+    offline.assert_called_once_with(b"first")
+
+
+def test_empty_queue_does_not_probe_or_dispatch(database):
+    probe = mock.Mock()
+    dispatch = mock.Mock()
+    assert journal.process_one(1, dispatch, is_ready=probe) == "empty"
+    probe.assert_not_called()
+    dispatch.assert_not_called()
 
 
 @pytest.mark.parametrize("failure", [False, TimeoutError("response lost")])
@@ -335,11 +383,36 @@ def test_receiver_catches_up_after_being_offline_without_duplicate_action(databa
     server.perma_ban.return_value = True
     receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
     receiver.rcon = server
-    assert journal.process_one(1, receiver.dispatch) == "done"
+    assert journal.process_one(1, receiver.dispatch, is_ready=lambda: False) == "deferred"
+    server.perma_ban.assert_not_called()
+    assert journal.process_one(1, receiver.dispatch, is_ready=lambda: True) == "done"
     server.perma_ban.assert_called_once()
     # A restarted receiver sees the acknowledged event and does not repeat it.
     assert journal.process_one(1, receiver.dispatch) == "empty"
     server.perma_ban.assert_called_once()
+
+
+def test_expired_queued_create_is_not_banned_after_reconnect(database, existing_blacklist, monkeypatch):
+    record_id, _first, _second = existing_blacklist
+    monkeypatch.setattr(blacklist, "SERVER_NUMBER", 1)
+    with database() as session:
+        record = session.get(BlacklistRecord, record_id)
+        command = blacklist.BlacklistCommand(
+            command=blacklist.BlacklistCommandType.CREATE_RECORD,
+            server_mask=1,
+            payload={"record_id": record_id, "player_id": record.player.player_id},
+        )
+        journal.enqueue(session, command.encode(), 1)
+        session.commit()
+    server = mock.Mock()
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = server
+    assert journal.process_one(1, receiver.dispatch, is_ready=lambda: False) == "deferred"
+    with database() as session, session.begin():
+        session.get(BlacklistRecord, record_id).expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    assert journal.process_one(1, receiver.dispatch, is_ready=lambda: True) == "done"
+    server.perma_ban.assert_not_called()
+    server.temp_ban.assert_not_called()
 
 
 def test_rejected_game_server_action_is_not_acknowledged(database, existing_blacklist, monkeypatch):

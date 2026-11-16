@@ -329,3 +329,32 @@ def test_moving_record_notifies_both_server_masks(monkeypatch):
     monkeypatch.setattr(blacklist, "commit_blacklist_change", commit)
     blacklist.edit_record_from_blacklist(record_id, blacklist_id=second_id)
     assert send.call_args.args[0].server_mask == 3
+
+def test_blacklist_receiver_probes_game_server_without_taking_actions():
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = Mock()
+    receiver.rcon.get_gamestate.side_effect = [ConnectionRefusedError(), None, {}, {"current_map": {}}]
+    assert receiver._game_server_ready() is False
+    assert receiver._game_server_ready() is False
+    assert receiver._game_server_ready() is False
+    assert receiver._game_server_ready() is True
+    receiver.rcon.kick.assert_not_called()
+    receiver.rcon.temp_ban.assert_not_called()
+    receiver.rcon.perma_ban.assert_not_called()
+
+
+def test_blacklist_receiver_passes_readiness_probe_to_durable_journal(monkeypatch):
+    from threading import Event
+    from rcon import blacklist_sync_journal
+
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = Mock()
+    receiver.pubsub = Mock()
+    stop = Event()
+    receiver.pubsub.get_message.side_effect = lambda **_: stop.set()
+    process = Mock()
+    monkeypatch.setattr(blacklist_sync_journal, 'process_one', process)
+    receiver.run(stop)
+    process.assert_called_once_with(blacklist.SERVER_NUMBER, receiver.dispatch,
+                                    is_ready=receiver._game_server_ready)
+    receiver.pubsub.close.assert_called_once()
