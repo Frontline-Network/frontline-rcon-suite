@@ -4,7 +4,7 @@ SQLite replaces PostgreSQL; process locks and the game/Redis boundaries are loca
 fakes. These tests do not claim to verify network protocol or concurrent workers.
 """
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from copy import deepcopy
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
 
-from rcon.models import SeedVipGrant, VipRewardEvent, VipRewardGrant, VipRewardState
+from rcon.models import SeedVipGrant, VipRewardEvent, VipRewardGrant, VipRewardNotice, VipRewardState
 from rcon.user_config.autobalancer import AutobalancerUserConfig
 from rcon.user_config.seed_vip import SeedVIPUserConfig
 from rcon.user_config.vip_rewards import VipRewardsUserConfig
@@ -69,6 +69,10 @@ class TestServer:
 
     def message_player(self, **data):
         self.messages.append(deepcopy(data))
+        return True
+
+    def without_retries(self):
+        return nullcontext()
 
     def tick(self, seconds=0):
         self.now += seconds
@@ -102,7 +106,7 @@ def world(request, monkeypatch, tmp_path):
     monkeypatch.setattr(socket.socket, "connect", deny_network)
     monkeypatch.setenv("SERVER_NUMBER", "99")
     db = create_engine("sqlite:///" + (tmp_path / "vip-simulation.sqlite").as_posix())
-    for model in (VipRewardEvent, VipRewardGrant, VipRewardState, SeedVipGrant):
+    for model in (VipRewardEvent, VipRewardGrant, VipRewardNotice, VipRewardState, SeedVipGrant):
         model.__table__.create(db)
     sessions = sessionmaker(db)
 
@@ -117,6 +121,7 @@ def world(request, monkeypatch, tmp_path):
 
     server = TestServer(request.param)
     monkeypatch.setattr(service, "enter_session", session)
+    monkeypatch.setattr(service, "get_session_maker", lambda: sessions)
     monkeypatch.setattr(service, "lock", local_lock)
     monkeypatch.setattr(service, "vip_lock", local_lock)
     monkeypatch.setattr(service, "server", lambda: 99)
