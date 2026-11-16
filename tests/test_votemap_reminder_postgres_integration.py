@@ -62,3 +62,36 @@ def test_concurrent_workers_send_each_recipient_once(monkeypatch):
         with base.begin() as connection:
             connection.execute(DropSchema(schema, cascade=True))
         base.dispose()
+
+
+@pytest.mark.skipif(not os.environ.get("RCON_VOTEMAP_TEST_DATABASE"), reason="requires isolated PostgreSQL")
+def test_restart_keeps_sent_and_unknown_recipients_from_being_replayed(monkeypatch):
+    base = create_engine(os.environ["RCON_VOTEMAP_TEST_DATABASE"])
+    schema = "votemap_restart_" + uuid.uuid4().hex
+    with base.begin() as connection:
+        connection.execute(CreateSchema(schema))
+    engine = base.execution_options(schema_translate_map={None: schema})
+    try:
+        journal.metadata.create_all(engine)
+        sessions = sessionmaker(engine)
+        monkeypatch.setattr(journal, "get_session_maker", lambda: sessions)
+        batch = journal.open_batch(3, "periodic", "round", "message", ["a", "b", "c"], now=100)
+        a = journal.reserve(3, batch, "a", now=100)
+        b = journal.reserve(3, batch, "b", now=100)
+        assert journal.reserve(3, batch, "c", now=100)
+        assert journal.finish(3, batch, "a", a, "sent", now=100)
+        assert journal.finish(3, batch, "b", b, "rejected", now=100)
+        base.dispose()  # A later worker opens new database connections.
+        assert journal.open_batch(3, "periodic", "round", "ignored", ["a", "b", "c"], now=130) == batch
+        calls = []
+        first = journal.dispatch(3, batch, ["a", "b", "c"], lambda pid, _: calls.append(pid) or True,
+                                 lambda: True, now=130)
+        assert not first["complete"] and calls == ["b"]
+        second = journal.dispatch(3, batch, ["a", "b", "c"], lambda pid, _: calls.append(pid) or True,
+                                  lambda: True, now=401)
+        assert second["complete"] and second["counts"] == {"sent": 2, "unknown": 1}
+        assert calls == ["b"]
+    finally:
+        with base.begin() as connection:
+            connection.execute(DropSchema(schema, cascade=True))
+        base.dispose()
