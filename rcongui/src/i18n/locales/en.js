@@ -3073,7 +3073,7 @@ const en = {
           weapons: {
             title: "Limit weapons",
             description:
-              "Punishes selected weapon use directly without escalating to kick.",
+              "Punishes selected weapon use directly. After the first violation observed during the safety transition, weapon punishments are held for at least one minute; unconfirmed actions are not repeated.",
             empty:
               "No weapon is blocked yet. Choose one from the catalogue or enter a game identifier that is not known yet.",
           },

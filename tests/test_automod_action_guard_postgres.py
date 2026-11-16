@@ -29,8 +29,10 @@ def database(monkeypatch):
         connection.execute(text(f'CREATE SCHEMA "{schema}"'))
     engine = create_engine(dsn, connect_args={"options": f"-csearch_path={schema}"}, pool_size=8)
     action_guard.metadata.create_all(engine)
+    action_guard.event_guard.metadata.create_all(engine)
     maker = sessionmaker(engine, expire_on_commit=False)
     monkeypatch.setattr(action_guard, "get_session_maker", lambda: maker)
+    monkeypatch.setattr(action_guard.event_guard, "get_session_maker", lambda: maker)
     try:
         yield maker
     finally:

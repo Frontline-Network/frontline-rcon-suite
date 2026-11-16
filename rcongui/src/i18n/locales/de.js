@@ -3102,7 +3102,7 @@ const de = {
           weapons: {
             title: "Waffen begrenzen",
             description:
-              "Bestraft den Einsatz ausgewählter Waffen unmittelbar, ohne bis zur Kick-Stufe zu eskalieren.",
+              "Bestraft ausgewählte Waffen direkt. Beim ersten erfassten Verstoß nach der Schutzumstellung werden Waffenstrafen mindestens eine Minute zurückgehalten; ungeklärte Aktionen werden nicht wiederholt.",
             empty:
               "Noch keine Waffe gesperrt. Wähle eine Waffe aus dem Katalog oder gib einen noch unbekannten Spielnamen ein.",
           },
