@@ -740,6 +740,7 @@
       "title": "Fiches des joueurs",
       "eyebrow": "Modération",
       "subtitle": "Rechercher, sélectionner et gérer les joueurs sur les serveurs.",
+      "liveSnapshotUnavailable": "Le statut actuel des joueurs est indisponible. Les dates de dernière présence peuvent être incomplètes.",
       "results": "{{count}} résultats",
       "selected": "Sélectionné: {{count}}",
       "created": "Créé",

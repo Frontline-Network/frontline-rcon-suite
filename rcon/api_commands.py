@@ -3,7 +3,7 @@ import inspect
 import re
 import unicodedata
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import Any, Dict, Iterable, Literal, Optional, Sequence, Type
 
@@ -556,6 +556,22 @@ class RconAPI(Rcon):
         flags: str | list[str] | None = None,
         country: str | None = None,
     ):
+        try:
+            with self.without_retries():
+                pairs = self.get_player_ids()
+            if not isinstance(pairs, list) or any(
+                not isinstance(pair, tuple) or len(pair) != 2 or not isinstance(pair[1], str)
+                or not pair[1].strip() or len(pair[1]) > 100
+                for pair in pairs
+            ):
+                raise ValueError("Invalid player snapshot")
+            online_now_ids = {player_id for _, player_id in pairs}
+            if len(online_now_ids) != len(pairs):
+                raise ValueError("Duplicate player identity in snapshot")
+            observed_at = datetime.now(timezone.utc)
+        except Exception as error:
+            logger.warning("Unable to verify online players for history search: %s", type(error).__name__)
+            online_now_ids, observed_at = None, None
         return get_players_by_appearance(
             page=page,
             page_size=page_size,
@@ -569,6 +585,8 @@ class RconAPI(Rcon):
             ignore_accent=ignore_accent,
             flags=flags,
             country=country,
+            online_now_ids=online_now_ids,
+            observed_at=observed_at,
         )
 
     def flag_player(

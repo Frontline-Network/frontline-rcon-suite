@@ -8,6 +8,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
+  Alert,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
@@ -132,6 +133,7 @@ export const loader = async ({ request }) => {
         ? Math.ceil(Number(playersRecords.result.total) / page_size)
         : 1,
     total: Number(playersRecords.result.total),
+    localOnlineSnapshotAvailable: playersRecords.result.local_online_snapshot_available,
     page: Number(page),
     fields,
   };
@@ -146,6 +148,7 @@ export default function PlayersRecords() {
     total_pages,
     total,
     page,
+    localOnlineSnapshotAvailable,
   } = useLoaderData();
   const navigation = useNavigation();
   const isCompactViewport = useMediaQuery((theme) =>
@@ -298,6 +301,9 @@ export default function PlayersRecords() {
         title={t("records.players.title")}
         subtitle={t("records.players.subtitle")}
       />
+      {localOnlineSnapshotAvailable === false && (
+        <Alert severity="warning">{t("records.players.liveSnapshotUnavailable")}</Alert>
+      )}
       <SessionEventReview />
       <AutomodActionReview />
       {selectedPlayerIds.size > 0 ? (

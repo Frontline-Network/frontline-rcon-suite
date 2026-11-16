@@ -635,6 +635,7 @@ const en = {
       title: "Player records",
       eyebrow: "Moderation",
       subtitle: "Search, select and manage players across servers.",
+      liveSnapshotUnavailable: "Current player status is unavailable. Last-seen times may be incomplete.",
       results: "{{count}} results",
       selected: "Selected: {{count}}",
       created: "Created",

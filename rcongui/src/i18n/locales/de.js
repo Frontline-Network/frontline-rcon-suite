@@ -598,6 +598,7 @@ const de = {
       title: "Spielerakten",
       eyebrow: "Moderation",
       subtitle: "Spieler suchen, auswählen und serverübergreifend verwalten.",
+      liveSnapshotUnavailable: "Der aktuelle Spielerstatus ist nicht verfügbar. Die zuletzt gesehenen Zeiten können unvollständig sein.",
       results: "{{count}} Ergebnisse",
       selected: "Ausgewählt: {{count}}",
       created: "Erstellt",

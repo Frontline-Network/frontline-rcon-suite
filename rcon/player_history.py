@@ -533,6 +533,8 @@ def get_players_by_appearance(
     ignore_accent: bool = True,
     flags: str | list[str] | None = None,
     country: str | None = None,
+    online_now_ids: set[str] | None = None,
+    observed_at: datetime.datetime | None = None,
 ):
     page = int(page)
     page_size = int(page_size)
@@ -542,6 +544,20 @@ def get_players_by_appearance(
 
     if isinstance(last_seen_till, str):
         last_seen_till = parser.parse(last_seen_till)
+
+    local_online_snapshot_available = online_now_ids is not None
+    online_now_ids = set(online_now_ids or ())
+    observed_at = observed_at or datetime.datetime.now(datetime.timezone.utc)
+    observed_local = observed_at.astimezone().replace(tzinfo=None)
+    observed_ms = int(observed_at.timestamp() * 1000)
+
+    def live_matches(bound, *, after):
+        # Naive filters retain the legacy local-time interpretation. Offset
+        # filters are compared as real instants; stored historical values keep
+        # their existing database semantics until their timezone is resolved.
+        current = observed_at.astimezone(datetime.timezone.utc) if bound.tzinfo else observed_local
+        threshold = bound.astimezone(datetime.timezone.utc) if bound.tzinfo else bound
+        return current >= threshold if after else current <= threshold
 
     blacklisted = strtobool(blacklisted)
     is_watched = strtobool(is_watched)
@@ -567,7 +583,12 @@ def get_players_by_appearance(
             .group_by(PlayerSession.player_id_id)
             .subquery()
         )
-        query = sess.query(PlayerID, sub.c.first, sub.c.last).outerjoin(
+        is_online = PlayerID.player_id.in_(online_now_ids) if online_now_ids else None
+        effective_last = (
+            case((is_online, literal(observed_local)), else_=sub.c.last)
+            if online_now_ids else sub.c.last
+        )
+        query = sess.query(PlayerID, sub.c.first, effective_last).outerjoin(
             sub, sub.c.player_id_id == PlayerID.id
         )
 
@@ -631,14 +652,22 @@ def get_players_by_appearance(
             )
 
         if last_seen_from:
-            query = query.filter(sub.c.last >= last_seen_from)
+            historical = sub.c.last >= last_seen_from
+            if is_online is not None:
+                historical = (or_(is_online, historical) if live_matches(last_seen_from, after=True)
+                              else and_(~is_online, historical))
+            query = query.filter(historical)
         if last_seen_till:
-            query = query.filter(sub.c.last <= last_seen_till)
+            historical = sub.c.last <= last_seen_till
+            if is_online is not None:
+                historical = (or_(is_online, historical) if live_matches(last_seen_till, after=False)
+                              else and_(~is_online, historical))
+            query = query.filter(historical)
 
         total = query.count()
         page = min(max(math.ceil(total / page_size), 1), page)
         players = (
-            query.order_by(func.coalesce(sub.c.last, PlayerID.created).desc())
+            query.order_by(func.coalesce(effective_last, PlayerID.created).desc())
             .limit(page_size)
             .offset((page - 1) * page_size)
             # All relations used in PlayerID.to_dict should be loaded here to avoid lazyloading in the for loop below
@@ -679,6 +708,7 @@ def get_players_by_appearance(
 
         return {
             "total": total,
+            "local_online_snapshot_available": local_online_snapshot_available,
             "players": [
                 {
                     **p[0].to_dict(limit_sessions=0),
@@ -690,6 +720,7 @@ def get_players_by_appearance(
                         int(p[1].timestamp() * 1000) if p[1] else None
                     ),
                     "last_seen_timestamp_ms": (
+                        observed_ms if p[0].player_id in online_now_ids else
                         int(p[2].timestamp() * 1000) if p[2] else None
                     ),
                     "vip_expiration": p[0].vip.expiration if p[0].vip else None,
