@@ -1232,7 +1232,7 @@ class BlacklistCommandHandler:
             logger.info('Existing EOS restriction has higher priority')
             return
         with self.rcon.without_retries():
-            details = self.rcon.get_detailed_player_info(player_id=eos_id)
+            details = self.rcon.get_uncached_detailed_player_info(player_id=eos_id)
         if verified_steam_id(self.rcon, eos_id, details) != steam_id:
             raise HLLVSteamIdentityUnverified('HLLV Steam-to-EOS association changed before action')
         result = apply_blacklist_punishment(self.rcon, top_record, player_id=eos_id,
