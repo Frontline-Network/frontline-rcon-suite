@@ -1,14 +1,18 @@
 """The experimental consumer route is opt-in and needs an authenticated binding."""
 import asyncio
 import os
-from unittest.mock import AsyncMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import django
 import pytest
+from asgiref.testing import ApplicationCommunicator
+from channels.layers import InMemoryChannelLayer
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rconweb.rconweb.test_settings')
 django.setup()
 from api.barricade import BarricadeConsumer
+from api import auth
 
 
 @pytest.mark.parametrize(('flag', 'namespace', 'credential', 'expected'), [
@@ -49,4 +53,46 @@ def test_durable_failure_never_falls_back_to_legacy_scanner(monkeypatch):
             await consumer._durable_scan_loop()
         consumer._durable_scan_once.assert_awaited_once()
         consumer._scan_players_loop.assert_not_awaited()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('query', [b'frontline_integration=bad', b'frontline%5Fintegration=',
+                                  b'x=1&frontline_integration=one&frontline_integration=two',
+                                  b'\xff', b'x=' + b'a' * 2049])
+def test_requested_unregistered_integration_is_rejected_instead_of_legacy(monkeypatch, query):
+    monkeypatch.setenv('HLL_BARRICADE_DURABLE_SCANS', '1')
+    async def run():
+        consumer = BarricadeConsumer()
+        consumer.scope = {'query_string': query, 'barricade_scan_namespace': None,
+                          'barricade_credential_id': 1}
+        consumer.accept = AsyncMock()
+        consumer.close = AsyncMock()
+        consumer._scan_players_loop = AsyncMock()
+        consumer._durable_scan_loop = AsyncMock()
+        await consumer.connect()
+        consumer.close.assert_awaited_once_with(code=4403)
+        consumer.accept.assert_not_awaited()
+        consumer._scan_players_loop.assert_not_called()
+        consumer._durable_scan_loop.assert_not_called()
+    asyncio.run(run())
+
+
+def test_authenticated_websocket_rejects_unregistered_requested_integration(monkeypatch):
+    monkeypatch.setenv('HLL_BARRICADE_DURABLE_SCANS', '1')
+    async def run():
+        app = auth.APITokenAuthMiddleware(BarricadeConsumer.as_asgi(), perms=('synthetic',))
+        scope = {'type': 'websocket', 'path': '/ws/barricade', 'subprotocols': [],
+                 'query_string': b'frontline_integration=unregistered',
+                 'headers': [(b'authorization', b'Bearer synthetic')]}
+        with patch.object(auth, 'get_user', AsyncMock(return_value=(SimpleNamespace(pk=7), None))), \
+             patch.object(auth, 'has_perms', AsyncMock(return_value=True)), \
+             patch.object(auth, 'get_barricade_api_key_id', AsyncMock(return_value=1)), \
+             patch.object(auth, 'get_barricade_scan_namespace', AsyncMock(return_value=None)), \
+             patch('channels.consumer.get_channel_layer', return_value=InMemoryChannelLayer()):
+            socket = ApplicationCommunicator(app, scope)
+            await socket.send_input({'type': 'websocket.connect'})
+            output = await socket.receive_output(timeout=5)
+            assert output['type'] == 'websocket.close' and output['code'] == 4403
+            await socket.send_input({'type': 'websocket.disconnect', 'code': 4403})
+            await socket.wait(timeout=5)
     asyncio.run(run())
