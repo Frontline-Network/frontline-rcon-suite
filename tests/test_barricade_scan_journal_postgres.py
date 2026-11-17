@@ -401,7 +401,8 @@ def test_scan_traverses_past_unverified_sessions_without_sending_them(database, 
             player = PlayerID(player_id=player_id)
             session.add(player)
             session.flush()
-            session.add(PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2026, 1, 1)))
+            session.add(PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2026, 1, 1),
+                                      start_event_us=(int(time.time()) + 2) * 1_000_000))
     async def run():
         seen = []
         async def present(session_id, player_id):
@@ -424,8 +425,9 @@ def test_scan_does_not_confuse_old_and_current_session_of_same_player(database, 
         player = PlayerID(player_id='synthetic-eos')
         session.add(player)
         session.flush()
-        old = PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2026, 1, 1))
-        current = PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2026, 1, 2))
+        event_time = (int(time.time()) + 2) * 1_000_000
+        old = PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2026, 1, 1), start_event_us=event_time)
+        current = PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2026, 1, 2), start_event_us=event_time)
         session.add_all([old, current])
         session.flush()
         current_id = current.id
@@ -441,6 +443,37 @@ def test_scan_does_not_confuse_old_and_current_session_of_same_player(database, 
     with database() as session:
         rows = session.scalars(select(journal.BarricadeScanDelivery)).all()
         assert len(rows) == 1 and rows[0].player_session_id == current_id
+
+
+def test_scan_activation_never_automatically_resends_old_or_ambiguous_sessions(database, monkeypatch):
+    prepare_adapter(database, monkeypatch)
+    peer = '01234567-89ab-4def-8012-0123456789ab'
+    namespace = f'integration:{peer}'
+    with database() as session:
+        boundary = session.get(journal.BarricadeScanIntegration, (3, peer)).registered_at_us
+    engine = database.kw['bind']
+    PlayerID.__table__.create(engine)
+    PlayerSession.__table__.create(engine)
+    floor = (boundary // 1_000_000) * 1_000_000
+    with database.begin() as session:
+        for pid, event_us in [('legacy', None), ('old', floor - 1_000_000),
+                              ('ambiguous', floor), ('new', floor + 1_000_000)]:
+            player = PlayerID(player_id=pid)
+            session.add(player)
+            session.flush()
+            session.add(PlayerSession(player_id_id=player.id, server_number=3,
+                                      start=datetime(2026, 1, 1), start_event_us=event_us))
+    async def run():
+        sent = []
+        async def sender(player_id, game):
+            sent.append((player_id, game))
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, page_size=1)
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, page_size=1)
+        assert sent == [('new', 'HLLV')]
+        assert await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=2) == 'unauthorized'
+    asyncio.run(run())
+    with database() as session:
+        assert session.scalars(select(journal.BarricadeScanDelivery.player_id)).all() == ['new']
 
 
 def test_async_dispatch_cancellation_before_lock_does_not_send(database, monkeypatch):

@@ -242,8 +242,26 @@ def credential_is_registered(server_number: int, namespace: str, credential_id: 
         return row is not None and row.credential_id == credential_id
 
 
+def registration_boundary(server_number: int, namespace: str, credential_id: int) -> int | None:
+    """Read the registered activation boundary for the authenticated key."""
+    if (type(server_number) is not int or not 1 <= server_number <= 32 or
+            not isinstance(namespace, str) or not namespace.startswith('integration:') or
+            type(credential_id) is not int or credential_id <= 0):
+        return None
+    ident = namespace.removeprefix('integration:')
+    try:
+        if str(UUID(ident)) != ident:
+            return None
+    except (ValueError, TypeError, AttributeError):
+        return None
+    with get_session_maker()() as session:
+        row = session.get(BarricadeScanIntegration, (server_number, ident))
+        return row.registered_at_us if row is not None and row.credential_id == credential_id else None
+
+
 def find_unreserved_open_sessions(server_number: int, integration_id: str, *, after_id: int = 0,
-                                  limit: int = 100, after_event_us: int | None = None):
+                                  limit: int = 100, after_event_us: int | None = None,
+                                  include_start: bool = False):
     """Find candidates without a high-water mark; an open row is not proof of presence.
 
     The page position is valid only within one traversal; restart from zero
@@ -255,7 +273,7 @@ def find_unreserved_open_sessions(server_number: int, integration_id: str, *, af
             after_id < 0 or not 1 <= limit <= 1000 or
             (after_event_us is not None and (type(after_event_us) is not int or after_event_us < 0))):
         raise ValueError('Invalid Barricade scan query')
-    stmt = (select(PlayerSession.id, PlayerID.player_id)
+    stmt = (select(PlayerSession.id, PlayerID.player_id, PlayerSession.start_event_us)
             .join(PlayerID, PlayerID.id == PlayerSession.player_id_id)
             .outerjoin(BarricadeScanDelivery, and_(
                 BarricadeScanDelivery.player_session_id == PlayerSession.id,
@@ -269,7 +287,8 @@ def find_unreserved_open_sessions(server_number: int, integration_id: str, *, af
         # Unknown starts are not assumed to be newer than the boundary.
         stmt = stmt.where(PlayerSession.start_event_us > after_event_us)
     with get_session_maker()() as session:
-        return [(row.id, row.player_id) for row in session.execute(stmt)]
+        return [(row.id, row.player_id, row.start_event_us) if include_start else (row.id, row.player_id)
+                for row in session.execute(stmt)]
 
 
 def reserve(server_number: int, integration_id: str, session_id: int, player_id: str, game: str) -> int | None:
