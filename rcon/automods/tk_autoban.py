@@ -177,7 +177,16 @@ def auto_ban_if_tks_right_after_connection(
                 except Exception:
                     logger.exception("Teamkill ban outcome uncertain; reservation requires review")
                     return
-                confirmed = result is True or (isinstance(result, dict) and bool(result))
+                confirmed = (
+                    config.blacklist_id is None and result is True
+                ) or (
+                    config.blacklist_id is not None
+                    and isinstance(result, dict)
+                    and type(result.get('id')) is int and result['id'] > 0
+                    and result.get('player_id') == str(player_id)
+                    and isinstance(result.get('blacklist'), dict)
+                    and result['blacklist'].get('id') == config.blacklist_id
+                )
                 if confirmed or result is False:
                     try:
                         state = 'confirmed' if confirmed else 'rejected'
