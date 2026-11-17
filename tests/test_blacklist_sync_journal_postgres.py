@@ -683,6 +683,29 @@ def test_hllv_deleted_kick_list_with_remaining_steam_restriction_uses_priority(
     api.remove_perma_ban.assert_not_called()
 
 
+def test_hllv_list_mode_change_surfaces_ownership_review(database, existing_blacklist, monkeypatch):
+    from rcon.types import GameEnum
+
+    record_id, list_id, _ = existing_blacklist
+    with database() as session, session.begin():
+        entry = session.get(BlacklistRecord, record_id)
+        entry.player.player_id = '76561198036685843'
+        entry.blacklist.servers = 4
+        entry.blacklist.sync = BlacklistSyncMethod.BAN_IMMEDIATELY
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    blacklist.edit_blacklist(list_id, sync=BlacklistSyncMethod.BAN_ON_CONNECT)
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'review'
+    result = journal.list_reviews(3)
+    assert result['total'] == 1 and result['results'][0]['review_kind'] == 'hllv_ownership'
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
+
+
 @pytest.mark.parametrize('missing', ['name', 'steamId', 'platform'])
 def test_hllv_malformed_roster_defers_then_recovers_without_losing_delivery(database, existing_blacklist, monkeypatch, missing):
     from contextlib import nullcontext
