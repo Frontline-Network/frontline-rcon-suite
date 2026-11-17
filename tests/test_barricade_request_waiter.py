@@ -1,13 +1,15 @@
 """Exercise outbound Barricade requests without a network or real actions."""
 import asyncio
 import os
-from unittest.mock import AsyncMock
+from datetime import datetime
+from unittest.mock import AsyncMock, patch
 
 import django
 import pytest
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rconweb.rconweb.test_settings')
 django.setup()
+from api import barricade
 from api.barricade import BarricadeConsumer
 from rcon.barricade import BarricadeRequestError, ResponseBody, ServerRequestType
 
@@ -95,5 +97,37 @@ def test_cancelled_request_cleans_up_waiter():
         with pytest.raises(asyncio.CancelledError):
             await task
         assert consumer._waiters == {}
+
+    asyncio.run(run())
+
+
+def test_scan_starts_with_valid_cursor_when_session_history_is_empty():
+    async def run():
+        consumer = BarricadeConsumer()
+        read = AsyncMock(return_value=[])
+        with patch.object(barricade, 'get_most_recent_session_date', AsyncMock(return_value=None)), \
+             patch.object(barricade, 'get_joined_players_since', read), \
+             patch.object(barricade.asyncio, 'sleep', AsyncMock(side_effect=[None, asyncio.CancelledError])):
+            with pytest.raises(asyncio.CancelledError):
+                await consumer._scan_players_loop()
+        assert isinstance(read.await_args.args[0], datetime)
+
+    asyncio.run(run())
+
+
+def test_scan_recovers_from_initial_database_error():
+    async def run():
+        consumer = BarricadeConsumer()
+        before = datetime.now()
+        initial = AsyncMock(side_effect=[OSError('synthetic database outage'), datetime(2026, 1, 1)])
+        read = AsyncMock(return_value=[])
+        with patch.object(barricade, 'get_most_recent_session_date', initial), \
+             patch.object(barricade, 'get_joined_players_since', read), \
+             patch.object(barricade.asyncio, 'sleep', AsyncMock(side_effect=[None, None, asyncio.CancelledError])):
+            with pytest.raises(asyncio.CancelledError):
+                await consumer._scan_players_loop()
+        assert initial.await_count == 2
+        assert read.await_count == 1
+        assert before <= read.await_args.args[0] <= datetime.now()
 
     asyncio.run(run())
