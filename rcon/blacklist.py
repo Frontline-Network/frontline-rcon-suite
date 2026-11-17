@@ -468,11 +468,11 @@ def _synchronize_ban(
     ):
         try:
             if old_state == BanState.TEMP:
-                if rcon.remove_temp_ban(player_id) is False:
-                    raise RuntimeError("Game server rejected temporary ban removal")
+                if rcon.remove_temp_ban(player_id) is not True:
+                    raise RuntimeError("Game server did not confirm temporary ban removal")
             elif old_state == BanState.PERMA:
-                if rcon.remove_perma_ban(player_id) is False:
-                    raise RuntimeError("Game server rejected permanent ban removal")
+                if rcon.remove_perma_ban(player_id) is not True:
+                    raise RuntimeError("Game server did not confirm permanent ban removal")
         except HLLCommandFailedError as exc:
             raise RuntimeError("Could not confirm blacklist ban removal") from exc
 
@@ -1612,8 +1612,8 @@ class BlacklistCommandHandler:
             False,
         ):
             # Remove their temp-ban
-            if self.rcon.remove_temp_ban(payload.player_id) is False:
-                raise RuntimeError("Game server rejected temporary ban removal")
+            if self.rcon.remove_temp_ban(payload.player_id) is not True:
+                raise RuntimeError("Game server did not confirm temporary ban removal")
 
         # Check if the player is perma-banned
         if next(
@@ -1625,8 +1625,8 @@ class BlacklistCommandHandler:
             False,
         ):
             # Remove their perma-ban
-            if self.rcon.remove_perma_ban(payload.player_id) is False:
-                raise RuntimeError("Game server rejected permanent ban removal")
+            if self.rcon.remove_perma_ban(payload.player_id) is not True:
+                raise RuntimeError("Game server did not confirm permanent ban removal")
 
     def handle_barricade_warn_online(
         self, payload: BlacklistBarricadeWarnOnlineCommand

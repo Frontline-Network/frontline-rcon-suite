@@ -227,6 +227,27 @@ def test_unconfirmed_action_requires_review_and_blocks_later_work(database, fail
     assert calls == [b"first"]
 
 
+def test_unconfirmed_unban_is_reviewed_without_replay(database, monkeypatch):
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 1)
+    monkeypatch.setattr(blacklist, 'lock', lambda _key: nullcontext())
+    server = mock.Mock()
+    server.get_temp_bans.return_value = [{'player_id': 'synthetic'}]
+    server.get_perma_bans.return_value = [{'player_id': 'synthetic'}]
+    server.remove_temp_ban.return_value = None
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = server
+    queue(database, b'first', 1)
+    dispatch = lambda _command: receiver.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+    assert journal.process_one(1, dispatch) == 'review'
+    assert journal.process_one(1, dispatch) == 'review'
+    server.remove_temp_ban.assert_called_once_with('synthetic')
+    server.get_perma_bans.assert_not_called()
+    server.remove_perma_ban.assert_not_called()
+
+
 def test_interrupted_action_is_not_replayed(database):
     queue(database, b"first", 1)
     def interrupted(_command):

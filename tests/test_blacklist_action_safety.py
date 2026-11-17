@@ -174,6 +174,53 @@ def test_expire_all_proceeds_for_an_unrelated_player(fake_blacklist_guard):
     server.remove_perma_ban.assert_called_once_with('synthetic')
 
 
+@pytest.mark.parametrize('result', [None, '', 1, False])
+def test_expire_all_stops_after_unconfirmed_temporary_unban(result):
+    server = Mock()
+    server.get_temp_bans.return_value = [{'player_id': 'synthetic'}]
+    server.get_perma_bans.return_value = [{'player_id': 'synthetic'}]
+    server.remove_temp_ban.return_value = result
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = server
+    with pytest.raises(RuntimeError):
+        handler.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+    server.remove_temp_ban.assert_called_once_with('synthetic')
+    server.get_perma_bans.assert_not_called()
+    server.remove_perma_ban.assert_not_called()
+
+
+@pytest.mark.parametrize('result', [None, '', 1, False])
+def test_expire_all_does_not_confirm_unconfirmed_permanent_unban(result):
+    server = Mock()
+    server.get_temp_bans.return_value = []
+    server.get_perma_bans.return_value = [{'player_id': 'synthetic'}]
+    server.remove_perma_ban.return_value = result
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = server
+    with pytest.raises(RuntimeError):
+        handler.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+    server.remove_perma_ban.assert_called_once_with('synthetic')
+
+
+@pytest.mark.parametrize('old_state,method', [
+    (blacklist.BanState.TEMP, 'remove_temp_ban'),
+    (blacklist.BanState.PERMA, 'remove_perma_ban'),
+])
+@pytest.mark.parametrize('result', [None, '', 1, False])
+def test_sync_does_not_continue_after_unconfirmed_unban(monkeypatch, old_state, method, result):
+    server = Mock()
+    getattr(server, method).return_value = result
+    record = SimpleNamespace(blacklist=SimpleNamespace(sync=BlacklistSyncMethod.BAN_IMMEDIATELY))
+    monkeypatch.setattr(blacklist, 'get_ban_state_from_record', lambda _: blacklist.BanState.NONE)
+    with pytest.raises(RuntimeError):
+        blacklist.synchronize_ban(server, 'synthetic', record, old_state)
+    getattr(server, method).assert_called_once_with('synthetic')
+    server.get_detailed_player_info.assert_not_called()
+    server.kick.assert_not_called()
+    server.temp_ban.assert_not_called()
+    server.perma_ban.assert_not_called()
+
+
 def test_confirmed_action_with_failed_finalization_is_not_resent(monkeypatch, fake_blacklist_guard):
     record = SimpleNamespace(admin_name='tester', expires_at=None, get_formatted_reason=lambda: 'reason')
     server = Mock()
