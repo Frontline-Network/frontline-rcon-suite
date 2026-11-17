@@ -375,11 +375,17 @@ class PlayerID(Base):
 
         return int(total)
 
-    def get_current_playtime_seconds(self) -> int:
+    def get_current_session(self):
         server = int(get_server_number())
         local = (s for s in self.sessions if s.server_number == server)
         session = max(local, key=self._session_order_key, default=None)
         if session is None or session.end is not None or session.end_event_us is not None:
+            return None
+        return session
+
+    def get_current_playtime_seconds(self) -> int:
+        session = self.get_current_session()
+        if session is None:
             return 0
         if session.start_event_us is not None:
             return max(0, int(datetime.now(timezone.utc).timestamp() - session.start_event_us / 1_000_000))
@@ -409,6 +415,7 @@ class PlayerID(Base):
         vip_rows = self.vips if preloaded_vips is None else preloaded_vips
         vips = [v.to_dict() for v in vip_rows]
         is_vip = any(vip["server_number"] == this_server for vip in vips)
+        current_session = self.get_current_session()
         return {
             "id": self.id,
             PLAYER_ID: self.player_id,
@@ -419,6 +426,8 @@ class PlayerID(Base):
                 :limit_sessions
             ],
             "sessions_count": len(self.sessions),
+            "current_session_start": (current_session.to_dict()["start"]
+                                      if current_session else None),
             "total_playtime_seconds": self.get_total_playtime_seconds(),
             "current_playtime_seconds": self.get_current_playtime_seconds(),
             "received_actions": [action.to_dict() for action in self.received_actions],

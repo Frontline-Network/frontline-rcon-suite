@@ -799,6 +799,7 @@ class PlayerAccountType(TypedDict):
 class PlayerProfileType(BasicPlayerProfileType):
     sessions: list[PlayerSessionType]
     sessions_count: int
+    current_session_start: Optional[datetime.datetime]
     total_playtime_seconds: int
     current_playtime_seconds: int
     received_actions: list[PlayerActionType]
