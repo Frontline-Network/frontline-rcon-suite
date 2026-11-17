@@ -368,7 +368,7 @@ class PlayerID(Base):
                 total += max(0, (s.end_event_us - s.start_event_us) / 1_000_000)
             elif s.start_event_us is not None and s.end is None and s is latest:
                 total += max(0, datetime.now(timezone.utc).timestamp() - s.start_event_us / 1_000_000)
-            elif not s.end and s.start and s is latest:
+            elif not s.end and s.end_event_us is None and s.start and s is latest:
                 total += (datetime.now() - s.start).total_seconds()
             elif s.end and s.start:
                 total += (s.end - s.start).total_seconds()

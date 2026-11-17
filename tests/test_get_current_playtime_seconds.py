@@ -71,3 +71,13 @@ def test_remote_or_unidentified_session_is_not_treated_as_local(monkeypatch):
         PlayerSession(start=now.replace(tzinfo=None), end=None, server_number=None),
     ]
     assert player.get_current_playtime_seconds() == 0
+
+
+def test_legacy_start_with_absolute_disconnect_does_not_accumulate_active_time(monkeypatch):
+    monkeypatch.setenv('SERVER_NUMBER', '1')
+    now = datetime.now(timezone.utc)
+    player = PlayerID()
+    player.sessions = [PlayerSession(start=(now - timedelta(hours=1)).replace(tzinfo=None), end=None,
+        start_event_us=None, end_event_us=int((now - timedelta(minutes=30)).timestamp() * 1_000_000), server_number=1)]
+    assert player.get_current_playtime_seconds() == 0
+    assert player.get_total_playtime_seconds() == 0

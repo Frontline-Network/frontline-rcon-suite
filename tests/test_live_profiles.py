@@ -155,6 +155,20 @@ def live_profile_database(monkeypatch):
     engine.dispose()
 
 
+def test_absolute_disconnect_closes_live_profile_even_without_legacy_end(live_profile_database):
+    _engine, sessions = live_profile_database
+    now = datetime.now(timezone.utc)
+    with sessions.begin() as session:
+        player = PlayerID(player_id='synthetic-ended-absolute', steam_id=None, created=now.replace(tzinfo=None))
+        session.add(player)
+        session.flush()
+        session.add(PlayerSession(player_id_id=player.id, server_number=1,
+            start=(now - timedelta(minutes=10)).replace(tzinfo=None), end=None,
+            start_event_us=int((now - timedelta(minutes=10)).timestamp() * 1_000_000),
+            end_event_us=int((now - timedelta(minutes=1)).timestamp() * 1_000_000)))
+    assert get_live_profiles(['synthetic-ended-absolute'])[0]['current_playtime_seconds'] == 0
+
+
 def test_live_profile_current_session_is_local_but_count_remains_global(live_profile_database, monkeypatch):
     _engine, sessions = live_profile_database
     now = datetime.now(timezone.utc).replace(tzinfo=None)
