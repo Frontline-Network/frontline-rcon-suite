@@ -16,6 +16,7 @@ TABLE = 'automod_action_guard'
 CONSTRAINT = 'ck_automod_guard_action'
 OLD = {'message', 'punish', 'kick', 'switch'}
 NEW = OLD | {'ban'}
+LATER = NEW | {'vip'}
 
 
 def _set_allowed(target):
@@ -26,6 +27,8 @@ def _set_allowed(target):
         raise RuntimeError('Automatic action guard constraint is missing or ambiguous')
     values = set(re.findall(r"'([^']+)'", matches[0]['sqltext']))
     if values == target:
+        return
+    if target == NEW and values == LATER:
         return
     if values not in (OLD, NEW):
         raise RuntimeError('Unexpected automatic action guard constraint')

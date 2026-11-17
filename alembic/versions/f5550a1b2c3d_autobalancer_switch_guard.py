@@ -18,6 +18,7 @@ CONSTRAINT = 'ck_automod_guard_action'
 OLD = {'message', 'punish', 'kick'}
 NEW = OLD | {'switch'}
 LATER = NEW | {'ban'}
+LATEST = LATER | {'vip'}
 
 
 def _set_allowed(target):
@@ -31,7 +32,7 @@ def _set_allowed(target):
         return
     # A later migration may have been staged without advancing the shared
     # Alembic revision. Never narrow it while replaying this upgrade.
-    if target == NEW and values == LATER:
+    if target == NEW and values in (LATER, LATEST):
         return
     if values not in (OLD, NEW):
         raise RuntimeError('Unexpected automatic action guard constraint')

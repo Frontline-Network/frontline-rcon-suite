@@ -110,4 +110,17 @@ for (const sample of [
     await expect(panel).toHaveCount(0);
     expect(errors).toEqual([]);
   });
+  test(`uncertain Vietnam VIP restores can be reviewed in ${sample.language}`, async ({ page }) => {
+    const errors = collectRuntimeErrors(page);
+    const main = await openDemoPage(page, "/records/players", {
+      language: sample.language, query: { demo_automod_action_review: 1, vip_restore_hold: 1 },
+    });
+    const panel = main.getByTestId("automod-action-review");
+    const label = { de: "Vietnam-VIP-Wiederherstellung", en: "Vietnam VIP restoration", fr: "Rétablissement VIP Vietnam" }[sample.language];
+    await expect(panel.getByText(new RegExp(label))).toBeVisible();
+    page.on("dialog", async dialog => dialog.accept(dialog.type() === "prompt" ? "Verified VIP state" : undefined));
+    await panel.getByRole("button", { name: sample.release }).click();
+    await expect(panel).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
 }
