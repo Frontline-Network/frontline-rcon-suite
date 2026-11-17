@@ -18,7 +18,8 @@ def key_is_live(credential_id):
     return current_credential_is_authorized(credential_id)
 
 
-async def scan_once(server_number, integration_id, game, sender, is_present, *, credential_id, page_size=100):
+async def scan_once(server_number, integration_id, game, sender, is_present, *, credential_id,
+                    is_observed=None, page_size=100):
     """Traverse once; ambiguous activation or presence is deferred, not sent.
 
     This is experimental: a boundary compares two clocks and cannot prove that
@@ -46,7 +47,11 @@ async def scan_once(server_number, integration_id, game, sender, is_present, *, 
             after_id = session_id
             classification = journal.classify_activation_start(boundary, start_event_us)
             if delivery_status != 'queued' and classification in ('before', 'ambiguous', 'unknown'):
-                await record_review(session_id, player_id, 'activation_' + classification)
+                # Historical open rows alone do not mean the player is online.
+                # Do not flood the review queue with stale records. Unknown
+                # roster state is retried on the next traversal.
+                if is_observed is not None and await is_observed(session_id, player_id) is True:
+                    await record_review(session_id, player_id, 'activation_' + classification)
                 continue
             if delivery_status != 'queued' and classification != 'after':
                 continue

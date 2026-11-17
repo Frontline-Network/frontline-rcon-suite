@@ -14,6 +14,28 @@ from rcon.report_admin import session_token
 from rcon.session_journal_observation import read as read_journal_observation
 
 
+def observed_players(red, *, scope: str, server_number: int):
+    """Bounded roster evidence for operator review, not session identity."""
+    if type(server_number) is not int or not 1 <= server_number <= 32:
+        return None
+    try:
+        if abs(redis_time(red) - time.time()) > 2:
+            return None
+        sightings, available = read_observations(red, scope=scope, server_numbers=[server_number])
+        if server_number not in available:
+            return None
+        return frozenset(sightings)
+    except Exception:
+        return None
+
+
+def player_is_currently_observed(red, *, scope: str, server_number: int, player_id: str):
+    if not isinstance(player_id, str) or not player_id or len(player_id) > 100:
+        return None
+    players = observed_players(red, scope=scope, server_number=server_number)
+    return player_id in players if players is not None else None
+
+
 def session_has_bounded_evidence(red, *, scope: str, server_number: int, session_id: int, player_id: str):
     """True means observed evidence is consistent, not that unseen logs cannot exist.
 

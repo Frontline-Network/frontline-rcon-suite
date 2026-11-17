@@ -45,6 +45,9 @@ def test_bounded_synthetic_pipeline(database, monkeypatch, tmp_path, backlog):
         api = SimpleNamespace(without_retries=lambda: nullcontext(),
                               get_player_ids=lambda: [('synthetic', 'synthetic-eos')])
         assert capture_observation(red, api, scope=scope, server_number=3)
+        assert presence.player_is_currently_observed(red, scope=scope, server_number=3, player_id='synthetic-eos') is True
+        assert presence.player_is_currently_observed(red, scope=scope, server_number=3, player_id='offline') is False
+        assert presence.player_is_currently_observed(red, scope=scope, server_number=4, player_id='synthetic-eos') is None
         local = SessionEventJournal(tmp_path / 'session.sqlite')
         if backlog:
             local.remember(3, 'synthetic-eos', 'disconnect', int(time.time() * 1_000_000))
