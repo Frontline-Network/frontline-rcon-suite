@@ -37,7 +37,8 @@ def record(sync=BlacklistSyncMethod.KICK_ONLY, expires=None, created=None, recor
 
 
 def test_preparation_uses_fresh_verified_steam_eos_and_ignores_console():
-    api = api_with_players([row(platform='EPlatformFamily::Xbox', steam=None), row()])
+    console = 'fedcba9876543210fedcba9876543210'
+    api = api_with_players([row(console, platform='EPlatformFamily::Xbox', steam=None), row()])
     assert prepare_online_steam_identity(api, STEAM) == {'steam_id': STEAM, 'eos_id': EOS}
     api.get_all_player_info.assert_called_once_with(strict=True, fresh=True)
 
@@ -75,6 +76,36 @@ def test_regular_roster_consumers_keep_skipping_invalid_rows():
 def test_duplicate_online_eos_links_fail_without_guessing():
     api = api_with_players([row(), row('fedcba9876543210fedcba9876543210')])
     with pytest.raises(ValueError, match='Multiple online EOS'):
+        prepare_online_steam_identity(api, STEAM)
+
+
+def test_contradictory_platforms_for_same_eos_never_prove_identity():
+    api = api_with_players([row(platform='EPlatformFamily::Xbox', steam=None), row()])
+    with pytest.raises(ValueError):
+        prepare_online_steam_identity(api, STEAM)
+
+
+def test_observed_epic_family_does_not_block_verified_steam_matching():
+    epic = 'fedcba9876543210fedcba9876543210'
+    api = api_with_players([row(epic, platform='EPlatformFamily::EGS', steam=None), row()])
+    assert prepare_online_steam_identity(api, STEAM) == {'steam_id': STEAM, 'eos_id': EOS}
+    assert prepare_online_identity_snapshot(api)[epic]['steam_id'] is None
+
+
+@pytest.mark.parametrize('invalid', [
+    {**row(platform='EPlatformFamily::EGS', steam=None), 'eosId': 'different'},
+    row('invalid', platform='EPlatformFamily::EGS', steam=None),
+    row(platform='EPlatformFamily::EGS', steam='76561198036685844'),
+])
+def test_malformed_epic_identity_cannot_prove_steam_account_offline(invalid):
+    with pytest.raises(ValueError):
+        prepare_online_steam_identity(api_with_players([invalid]), STEAM)
+
+
+def test_duplicate_unrelated_steam_ids_invalidate_whole_snapshot():
+    other = '76561198036685844'
+    api = api_with_players([row(steam=other), row('fedcba9876543210fedcba9876543210', steam=other)])
+    with pytest.raises(ValueError):
         prepare_online_steam_identity(api, STEAM)
 
 
