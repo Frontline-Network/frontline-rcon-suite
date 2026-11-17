@@ -38,6 +38,13 @@ def test_only_consistent_bounded_evidence_accepts_current_session(database, monk
         return candidate.session_has_bounded_evidence(object(), scope='synthetic', server_number=3,
                                                        session_id=session_id, player_id='synthetic-eos')
     assert check() is True
+    roster.side_effect = [(seen, {3}), ({}, {3})]
+    assert check() is None
+    roster.side_effect = [(seen, {3}), ({'synthetic-eos': PresenceWindow(now - 2, now - 1)}, {3})]
+    assert check() is None
+    roster.side_effect = [(seen, {3}), OSError('synthetic redis outage')]
+    assert check() is None
+    roster.side_effect = None
     status.side_effect = [JournalObservation(now - 8, now - 7, now - 6, now - 5, 0, 0),
                           JournalObservation(now - 4, now - 3, now - 2, now - 1, 1, 0)]
     assert check() is None
