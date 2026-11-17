@@ -328,6 +328,7 @@ def _current_session_summary(sess, player_database_ids, server_number):
             PlayerSession.start.label("start"),
             PlayerSession.end.label("end"),
             PlayerSession.start_event_us.label("start_event_us"),
+            PlayerSession.end_event_us.label("end_event_us"),
             PlayerSession.created.label("created"),
             PlayerSession.server_number.label("server_number"),
             func.count(PlayerSession.id)
@@ -351,7 +352,7 @@ def _current_session_summary(sess, player_database_ids, server_number):
 
 
 def _current_playtime_seconds(session_summary, *, now=None) -> int:
-    if session_summary is None or session_summary.end:
+    if session_summary is None or session_summary.end or getattr(session_summary, "end_event_us", None) is not None:
         return 0
     start_event_us = getattr(session_summary, "start_event_us", None)
     if start_event_us is not None:
