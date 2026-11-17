@@ -58,7 +58,7 @@ export default function RouteError() {
   if (
     isRouteErrorResponse(error) &&
     error.status >= 400 &&
-    error.status < 500
+    (error.status < 500 || error.status === 503)
   ) {
     const errorData = error.data;
     const errorMessage =

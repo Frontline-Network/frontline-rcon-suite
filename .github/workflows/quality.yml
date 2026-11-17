@@ -155,6 +155,7 @@ jobs:
           PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 npx playwright test \
             e2e/command-rail-navigation.spec.mjs \
             --grep "filters protected destinations unless locked links are explicit"
+      - run: npm run test:offline
       - run: npm run build
       - run: npm run check:bundle
       - name: upload admin UI test report

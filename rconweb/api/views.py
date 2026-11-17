@@ -20,6 +20,7 @@ from django_ratelimit.decorators import ratelimit
 from discord.utils import escape_markdown
 from rcon.api_commands import get_rcon_api
 from rcon.commands import HLLCommandFailedError
+from rcon.connection import HLLServerError
 from rcon.discord import send_to_discord_audit
 from rcon.operational_health import rcon_latency_tracker
 from rcon.system_usage import system_usage_sampler
@@ -107,9 +108,23 @@ def get_public_info(request):
         match_time = cached_cur_map["match_time"]
 
     config = RconServerSettingsUserConfig.load_from_db()
-    gamestate = rcon_api.get_gamestate()
-    slots = rcon_api.get_slots()
-    server_config = rcon_api.get_server_config()
+    try:
+        # Public polling should report an unavailable game server without
+        # exposing transport details or fabricating live match information.
+        with rcon_api.without_retries():
+            gamestate = rcon_api.get_gamestate()
+            slots = rcon_api.get_slots()
+            server_config = rcon_api.get_server_config()
+            vote_status = rcon_api.get_votemap_status()
+            server_name = rcon_api.get_name()
+    except (OSError, UnicodeDecodeError, HLLServerError, HLLCommandFailedError):
+        logger.info("Public server overview unavailable: game server did not respond")
+        return api_response(
+            failed=True,
+            error="game_server_unavailable",
+            command="get_public_info",
+            status_code=503,
+        )
     current_players = slots["current_players"]
     max_players = slots["max_players"]
 
@@ -131,12 +146,10 @@ def get_public_info(request):
         "allied": gamestate["num_allied_players"],
         "axis": gamestate["num_axis_players"],
     }
-    vote_status = rcon_api.get_votemap_status()
-
     public_stats_port = os.getenv("PUBLIC_STATS_PORT", None)
     public_stats_port_https = os.getenv("PUBLIC_STATS_PORT_HTTPS", None)
     name: PublicInfoNameType = {
-        "name": rcon_api.get_name(),
+        "name": server_name,
         "short_name": config.short_name,
         "public_stats_port": int(public_stats_port) if public_stats_port else None,
         "public_stats_port_https": (

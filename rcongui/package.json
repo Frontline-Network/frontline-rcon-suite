@@ -18,6 +18,7 @@
     "preview:debug": "DEBUG=true vite build && vite preview",
     "test": "playwright test",
     "test:e2e": "playwright test",
+    "test:offline": "playwright test --config offline-test/playwright.config.mjs",
     "test:e2e:update": "playwright test --update-snapshots",
     "test:e2e:headed": "playwright test --headed",
     "check:bundle": "node scripts/check-initial-bundle-budget.mjs",
