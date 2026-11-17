@@ -1,5 +1,6 @@
 import asyncio
 import itertools
+import os
 from datetime import datetime
 from logging import getLogger
 
@@ -119,13 +120,47 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
 
         if self._scan_players_task and not self._scan_players_task.done():
             self._scan_players_task.cancel()
-        self._scan_players_task = asyncio.create_task(self._scan_players_loop())
+        durable = (os.getenv('HLL_BARRICADE_DURABLE_SCANS') == '1'
+                   and self.scope.get('barricade_scan_namespace')
+                   and self.scope.get('barricade_credential_id'))
+        self._scan_players_task = asyncio.create_task(
+            self._durable_scan_loop() if durable else self._scan_players_loop())
 
     async def disconnect(self, code):
         logger.info("Closed connection with Barricade client")
 
         if self._scan_players_task and not self._scan_players_task.done():
             self._scan_players_task.cancel()
+
+    async def _durable_scan_once(self):
+        """Experimental only: missing evidence defers a scan, never invents it."""
+        from rcon import barricade_scan_dispatch, barricade_scan_presence
+        from rcon.cache_utils import get_redis_client
+        from rcon.player_presence import database_scope
+
+        server_number = int(get_server_number())
+        scope = database_scope(os.environ['HLL_DB_URL'])
+        redis = get_redis_client(global_pool=True)
+
+        async def verify_session(session_id, player_id):
+            return await asyncio.to_thread(barricade_scan_presence.session_has_bounded_evidence,
+                redis, scope=scope, server_number=server_number, session_id=session_id, player_id=player_id)
+
+        async def send_scan(player_id, game):
+            return await self.send_request(ServerRequestType.SCAN_PLAYERS,
+                ScanPlayersRequestPayload(player_ids=[player_id], game=game).model_dump())
+
+        return await barricade_scan_dispatch.scan_once(server_number,
+            self.scope['barricade_scan_namespace'], barricade_game_for_server(), send_scan, verify_session,
+            credential_id=self.scope['barricade_credential_id'])
+
+    async def _durable_scan_loop(self):
+        while True:
+            await asyncio.sleep(60)
+            try:
+                await self._durable_scan_once()
+            except Exception:
+                logger.exception('Experimental Barricade scan pass failed; no legacy fallback')
 
     async def _scan_players_loop(self):
         # Session starts are stored as local wall time. Keep a non-null cursor
