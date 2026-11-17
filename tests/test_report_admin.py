@@ -20,6 +20,8 @@ from rcon import (
 from rcon.models import (
     PlayerID,
     PlayerSession,
+    PendingPlayerConnect,
+    PendingPlayerDisconnect,
     LogLine,
     MessageTemplate,
     AdminIncident,
@@ -35,7 +37,7 @@ def setup(db, monkeypatch):
     # Legacy migrations allow NULL for an open session; ORM annotation predates
     # Optional typing. Match the real schema without changing production models.
     with db() as sess:
-        for model in (PlayerID, PlayerSession, LogLine, MessageTemplate):
+        for model in (PlayerID, PlayerSession, PendingPlayerConnect, PendingPlayerDisconnect, LogLine, MessageTemplate):
             model.__table__.create(sess.bind)
     monkeypatch.setattr(service, "enter_session", db)
     monkeypatch.setattr(service, "delivered", lambda *_: True)
@@ -813,6 +815,25 @@ def test_current_session_required_on_enqueue(setup):
         row.end = service.utc(db.clock.now).replace(tzinfo=None)
     i = report(setup)
     assert i["report_admin"]["status"] == "manual"
+
+
+@pytest.mark.parametrize('player_id', ['target', 'v0'])
+@pytest.mark.parametrize('after_enqueue', [False, True])
+def test_pending_session_event_prevents_report_kick(setup, player_id, after_enqueue):
+    db, _, _ = setup
+    incident = report(setup) if after_enqueue else None
+    if incident:
+        assert incident['report_admin']['status'] == 'queued'
+    with db() as sess:
+        stamp = int(db.clock.now * 1_000_000)
+        sess.add(PendingPlayerDisconnect(server_number=1, player_id=player_id,
+            ended_event_us=stamp, ended_at=service.utc(db.clock.now).replace(tzinfo=None)))
+    if not after_enqueue:
+        incident = report(setup)
+        assert incident['report_admin']['status'] == 'manual'
+    api = transport()
+    service.tick(api, 1)
+    api.kick.assert_not_called()
 
 
 def test_server_scope_config_and_processing(setup):
