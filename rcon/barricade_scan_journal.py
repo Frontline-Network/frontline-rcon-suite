@@ -75,6 +75,7 @@ class BarricadeScanDelivery(Base):
     player_id: Mapped[str] = mapped_column(String(100), nullable=False)
     game: Mapped[str] = mapped_column(String(8), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
+    review_cause: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     __table_args__ = (
@@ -159,7 +160,7 @@ def list_reviews(server_number: int, offset: int = 0, limit: int = 50) -> dict:
                                .order_by(BarricadeScanDelivery.id).offset(offset).limit(limit)).all()
         return {'total': total, 'results': [
             {'id': row.id, 'integration_id': row.integration_id, 'player_id': row.player_id,
-             'player_session_id': row.player_session_id, 'game': row.game,
+             'player_session_id': row.player_session_id, 'game': row.game, 'review_cause': row.review_cause,
              'updated_at': row.updated_at.isoformat()} for row in rows]}
 
 
@@ -273,7 +274,7 @@ def find_unreserved_open_sessions(server_number: int, integration_id: str, *, af
             after_id < 0 or not 1 <= limit <= 1000 or
             (after_event_us is not None and (type(after_event_us) is not int or after_event_us < 0))):
         raise ValueError('Invalid Barricade scan query')
-    stmt = (select(PlayerSession.id, PlayerID.player_id, PlayerSession.start_event_us)
+    stmt = (select(PlayerSession.id, PlayerID.player_id, PlayerSession.start_event_us, BarricadeScanDelivery.status)
             .join(PlayerID, PlayerID.id == PlayerSession.player_id_id)
             .outerjoin(BarricadeScanDelivery, and_(
                 BarricadeScanDelivery.player_session_id == PlayerSession.id,
@@ -287,8 +288,24 @@ def find_unreserved_open_sessions(server_number: int, integration_id: str, *, af
         # Unknown starts are not assumed to be newer than the boundary.
         stmt = stmt.where(PlayerSession.start_event_us > after_event_us)
     with get_session_maker()() as session:
-        return [(row.id, row.player_id, row.start_event_us) if include_start else (row.id, row.player_id)
+        return [(row.id, row.player_id, row.start_event_us, row.status) if include_start else (row.id, row.player_id)
                 for row in session.execute(stmt)]
+
+
+def mark_activation_review(server_number: int, integration_id: str, session_id: int,
+                           player_id: str, game: str, cause: str) -> None:
+    """Record an ambiguous pre-send candidate; no remote action has occurred."""
+    _require_scope(server_number, integration_id)
+    if (cause not in ('activation_ambiguous', 'activation_unknown') or
+            game not in ('HLL', 'HLLV') or type(session_id) is not int or session_id <= 0 or
+            not isinstance(player_id, str) or not 0 < len(player_id) <= 100):
+        raise ValueError('Invalid activation review')
+    now = datetime.now(timezone.utc)
+    stmt = (insert(BarricadeScanDelivery).values(server_number=server_number, integration_id=integration_id,
+            player_session_id=session_id, player_id=player_id, game=game, status='review', review_cause=cause,
+            created_at=now, updated_at=now).on_conflict_do_nothing(constraint='uq_barricade_scan_session'))
+    with get_session_maker()() as session, session.begin():
+        session.execute(stmt)
 
 
 def reserve(server_number: int, integration_id: str, session_id: int, player_id: str, game: str) -> int | None:
@@ -315,6 +332,7 @@ def reserve(server_number: int, integration_id: str, session_id: int, player_id:
                 raise ValueError('Conflicting Barricade scan reservation')
             if existing.status == 'queued':
                 existing.status = 'sending'
+                existing.review_cause = None
                 existing.updated_at = now
                 return existing.id
         return delivery_id
@@ -327,7 +345,8 @@ def finish(delivery_id: int, server_number: int, integration_id: str, *, confirm
             .where(BarricadeScanDelivery.id == delivery_id, BarricadeScanDelivery.status == 'sending',
                    BarricadeScanDelivery.server_number == server_number,
                    BarricadeScanDelivery.integration_id == integration_id)
-            .values(status='done' if confirmed else 'review', updated_at=datetime.now(timezone.utc))
+            .values(status='done' if confirmed else 'review',
+                    review_cause=None if confirmed else 'uncertain_delivery', updated_at=datetime.now(timezone.utc))
             .returning(BarricadeScanDelivery.id))
     with get_session_maker()() as session, session.begin():
         return session.scalar(stmt) is not None
@@ -340,7 +359,7 @@ def recover_interrupted(server_number: int, integration_id: str) -> int:
             .where(BarricadeScanDelivery.server_number == server_number,
                    BarricadeScanDelivery.integration_id == integration_id,
                    BarricadeScanDelivery.status == 'sending')
-            .values(status='review', updated_at=datetime.now(timezone.utc))
+            .values(status='review', review_cause='uncertain_delivery', updated_at=datetime.now(timezone.utc))
             .returning(BarricadeScanDelivery.id))
     with get_session_maker()() as session, session.begin():
         return len(session.scalars(stmt).all())

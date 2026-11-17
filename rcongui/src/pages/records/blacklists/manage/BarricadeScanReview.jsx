@@ -14,6 +14,7 @@ function ReviewRow({ row, canReview, busy, onSave }) {
     <Stack spacing={1}>
       <Typography variant="body2">{t("barricadeScanReview.player")}: {row.player_id} · {row.game} · {new Date(row.updated_at).toLocaleString(i18n.resolvedLanguage)}</Typography>
       <Typography variant="body2">{t("barricadeScanReview.integration")}: {row.integration_id}</Typography>
+      <Alert severity="info">{t(`barricadeScanReview.cause.${["activation_ambiguous", "activation_unknown"].includes(row.review_cause) ? row.review_cause : "uncertain_delivery"}`)}</Alert>
       {canReview && <>
         <TextField select size="small" label={t("barricadeScanReview.decision")} value={decision} onChange={(event) => setDecision(event.target.value)}>
           <MenuItem value="" disabled>{t("barricadeScanReview.choose")}</MenuItem>

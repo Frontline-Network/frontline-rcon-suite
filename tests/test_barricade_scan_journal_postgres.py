@@ -473,7 +473,27 @@ def test_scan_activation_never_automatically_resends_old_or_ambiguous_sessions(d
         assert await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=2) == 'unauthorized'
     asyncio.run(run())
     with database() as session:
-        assert session.scalars(select(journal.BarricadeScanDelivery.player_id)).all() == ['new']
+        rows = session.scalars(select(journal.BarricadeScanDelivery)).all()
+        assert {row.player_id: (row.status, row.review_cause) for row in rows} == {
+            'legacy': ('review', 'activation_unknown'),
+            'ambiguous': ('review', 'activation_ambiguous'),
+            'new': ('done', None),
+        }
+        ambiguous_id = next(row.id for row in rows if row.player_id == 'ambiguous')
+    visible = journal.list_reviews(3)
+    assert {row['review_cause'] for row in visible['results']} == {'activation_unknown', 'activation_ambiguous'}
+    assert journal.list_reviews(4)['total'] == 0
+    journal.resolve_review(3, namespace, ambiguous_id, decision='retry', actor='operator', reason='synthetic review')
+    async def retry():
+        sent = []
+        async def sender(player_id, game):
+            sent.append((player_id, game))
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, page_size=1)
+        assert sent == [('ambiguous', 'HLLV')]
+    asyncio.run(retry())
+    with database() as session:
+        row = session.get(journal.BarricadeScanDelivery, ambiguous_id)
+        assert (row.status, row.review_cause) == ('done', None)
 
 
 def test_async_dispatch_cancellation_before_lock_does_not_send(database, monkeypatch):
