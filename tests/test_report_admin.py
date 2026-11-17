@@ -1,7 +1,7 @@
 """Synthetic SQLite and fake RCON only: no real messages or game actions."""
 
 from copy import deepcopy
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 import os
 
 os.environ.setdefault("HLL_MAINTENANCE_CONTAINER", "1")
@@ -49,6 +49,7 @@ def setup(db, monkeypatch):
                 PlayerSession(
                     player_id_id=pid.id,
                     start=service.utc(db.clock.now - 600).replace(tzinfo=None),
+                    start_event_us=int((db.clock.now - 600) * 1_000_000),
                     end=None,
                     server_number=1,
                     server_name="Test",
@@ -118,6 +119,58 @@ def report(setup, message="!admin able redet nicht", server=1, reporter_id="v0")
 def current(db, iid):
     with db() as sess:
         return sess.get(AdminIncident, iid).to_dict(include_events=True)
+
+
+def test_report_session_token_uses_absolute_connect_time_across_dst(setup):
+    db = setup[0]
+    old = datetime(2026, 10, 25, 0, 59, 58, tzinfo=timezone.utc)
+    current = datetime(2026, 10, 25, 1, 0, 1, tzinfo=timezone.utc)
+    with db() as sess:
+        player = PlayerID(player_id='synthetic-dst-report')
+        sess.add(player)
+        sess.flush()
+        newer = PlayerSession(player_id_id=player.id, server_number=1,
+            start=datetime(2026, 10, 25, 2, 0, 1), start_event_us=int(current.timestamp() * 1_000_000),
+            created=datetime(2026, 10, 25, 1, 0, 1))
+        older_delayed = PlayerSession(player_id_id=player.id, server_number=1,
+            start=datetime(2026, 10, 25, 2, 59, 58), start_event_us=int(old.timestamp() * 1_000_000),
+            created=datetime(2026, 10, 25, 1, 0, 2))
+        sess.add_all([newer, older_delayed])
+        sess.flush()
+        assert service.session_token(sess, 1, player.player_id, current.timestamp() + 3) == newer.id
+        newer.end_event_us = int((current.timestamp() + 2) * 1_000_000)
+        sess.flush()
+        assert service.session_token(sess, 1, player.player_id, current.timestamp() + 3) is None
+
+
+def test_report_session_token_rejects_unverified_legacy_session(setup):
+    db = setup[0]
+    with db() as sess:
+        player = PlayerID(player_id='synthetic-legacy-report')
+        sess.add(player)
+        sess.flush()
+        sess.add(PlayerSession(player_id_id=player.id, server_number=1,
+            start=datetime(2026, 1, 1, 12), created=datetime(2026, 1, 1, 12)))
+        sess.flush()
+        assert service.session_token(sess, 1, player.player_id, datetime(2026, 1, 1, 13, tzinfo=timezone.utc).timestamp()) is None
+
+
+def test_report_session_token_rejects_a_later_unverified_record(setup):
+    db = setup[0]
+    start = datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
+    with db() as sess:
+        player = PlayerID(player_id='synthetic-ambiguous-report')
+        sess.add(player)
+        sess.flush()
+        sess.add_all([
+            PlayerSession(player_id_id=player.id, server_number=1,
+                start=start.replace(tzinfo=None), start_event_us=int(start.timestamp() * 1_000_000),
+                created=start.replace(tzinfo=None)),
+            PlayerSession(player_id_id=player.id, server_number=1,
+                start=datetime(2026, 1, 1, 12, 5), created=datetime(2026, 1, 1, 12, 5)),
+        ])
+        sess.flush()
+        assert service.session_token(sess, 1, player.player_id, start.timestamp() + 600) is None
 
 
 def test_confirmed_report_admin_target_retains_own_live_statistics(setup):
