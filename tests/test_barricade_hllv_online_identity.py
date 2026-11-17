@@ -68,6 +68,23 @@ def test_duplicate_online_eos_links_fail_without_guessing():
         prepare_online_steam_identity(api, STEAM)
 
 
+@pytest.mark.parametrize('incomplete', [
+    row(steam=None), row(steam='invalid'), row(platform=''),
+    row(platform='EPlatformFamily::Unknown', steam=None),
+    {**row(), 'eosId': ''},
+])
+def test_incomplete_metadata_never_proves_steam_player_absent(incomplete):
+    api = api_with_players([incomplete])
+    with pytest.raises(ValueError):
+        prepare_online_steam_identity(api, STEAM)
+
+
+def test_unknown_second_row_does_not_hide_ambiguous_steam_identity():
+    api = api_with_players([row(), row(platform='', steam=None)])
+    with pytest.raises(ValueError, match='Unknown online platform'):
+        prepare_online_steam_identity(api, STEAM)
+
+
 def test_inconsistent_platform_for_same_steam_id_fails_closed():
     api = api_with_players([row(platform='EPlatformFamily::Xbox'), row()])
     with pytest.raises(ValueError, match='Inconsistent online Steam identity'):
