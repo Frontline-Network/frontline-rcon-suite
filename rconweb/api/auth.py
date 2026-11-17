@@ -71,6 +71,24 @@ def get_user(raw_api_key) -> tuple[User, object | None]:
 
 
 @database_sync_to_async
+def get_barricade_api_key_id(raw_api_key: str, user_id: int) -> int | None:
+    """Look up only the authenticated user's persistent legacy API-key ID."""
+    if not isinstance(raw_api_key, str) or not raw_api_key or type(user_id) is not int or user_id <= 0:
+        return None
+    hashed = make_password(raw_api_key, salt=SECRET_KEY.replace("$", ""))
+    return DjangoAPIKey.objects.filter(api_key=hashed, user_id=user_id).values_list('pk', flat=True).first()
+
+
+@database_sync_to_async
+def get_barricade_scan_namespace(query_string: bytes, credential_id: int | None) -> str | None:
+    from rcon.barricade_scan_identity import integration_namespace, parse_integration_id
+    from rcon.utils import get_server_number
+    if credential_id is None or parse_integration_id(query_string) is None:
+        return None
+    return integration_namespace(query_string, server_number=int(get_server_number()), credential_id=credential_id)
+
+
+@database_sync_to_async
 def has_perms(scope, perms: tuple[str, ...]) -> bool:
     user = scope.get("user")
     if not user:
@@ -167,6 +185,14 @@ class APITokenAuthMiddleware:
             )
             denier = WebsocketDenier()
             return await denier(scope, receive, send)
+
+        if ENDPOINT == '/ws/barricade':
+            scope['barricade_credential_id'] = None
+            user_id = getattr(scope.get('user'), 'pk', None)
+            if not session_id and scope.get('mobile_device') is None and type(user_id) is int:
+                scope['barricade_credential_id'] = await get_barricade_api_key_id(raw_api_key, user_id)
+            scope['barricade_scan_namespace'] = await get_barricade_scan_namespace(
+                scope.get('query_string', b''), scope['barricade_credential_id'])
 
         return await self.app(scope, receive, send)
 
