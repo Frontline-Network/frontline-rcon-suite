@@ -547,7 +547,7 @@ def run(stop_event=None):
                             if (
                                 last_updated_key
                                 and (timestamp - last_updated_key).total_seconds()
-                                < config.map_rotation_time_between_refreshes
+                                < config.player_stats_time_between_refreshes
                             ):
                                 continue
                             last_updated[url][key] = timestamp

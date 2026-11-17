@@ -1,6 +1,8 @@
 import os
 import logging
 import threading
+from contextlib import nullcontext
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest import mock
 
@@ -17,6 +19,40 @@ from rcon.user_config import scoreboard as scoreboard_config
 
 class StopScoreboard(BaseException):
     pass
+
+
+@pytest.mark.parametrize('statistics_interval,rotation_interval,expected', [
+    (10, 100, 2),
+    (100, 5, 1),
+])
+def test_player_statistics_refresh_uses_its_own_interval(
+    monkeypatch, statistics_interval, rotation_interval, expected
+):
+    now = datetime(2026, 1, 1, 12)
+    clock = mock.Mock()
+    clock.now.side_effect = [now, now + timedelta(seconds=11)]
+    monkeypatch.setattr(scoreboard, 'datetime', clock)
+    config = SimpleNamespace(
+        public_scoreboard_url='https://example.invalid',
+        hooks=[SimpleNamespace(url='https://example.invalid/webhook')],
+        header_gamestate_enabled=False, map_rotation_enabled=False, player_stats_enabled=True,
+        header_gamestate_time_between_refreshes=100,
+        map_rotation_time_between_refreshes=rotation_interval,
+        player_stats_time_between_refreshes=statistics_interval,
+    )
+    monkeypatch.setattr(scoreboard.ScoreboardUserConfig, 'load_from_db', lambda: config)
+    monkeypatch.setattr(scoreboard.RconServerSettingsUserConfig, 'load_from_db',
+                        lambda: SimpleNamespace(short_name='synthetic'))
+    monkeypatch.setattr('rcon.api_commands.get_rcon_api', lambda: object())
+    monkeypatch.setattr(scoreboard, 'enter_session', lambda: nullcontext(object()))
+    monkeypatch.setattr(scoreboard, 'get_set_wh_row', lambda **kwargs: SimpleNamespace(player_stats='synthetic'))
+    monkeypatch.setattr(scoreboard, 'MESSAGE_KEYS', [scoreboard.PLAYER_STATS])
+    monkeypatch.setattr(scoreboard, 'build_player_stats_embed', lambda **kwargs: object())
+    send = mock.Mock()
+    monkeypatch.setattr(scoreboard, 'send_message', send)
+    monkeypatch.setattr(scoreboard, 'wait', mock.Mock(side_effect=[False, True]))
+    scoreboard.run()
+    assert send.call_count == expected
 
 
 def test_webhook_repr_does_not_reveal_url():
