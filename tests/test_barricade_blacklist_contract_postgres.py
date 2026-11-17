@@ -11,8 +11,34 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rconweb.rconweb.test_settings')
 django.setup()
 from api import barricade
 from rcon import blacklist_sync_journal as journal
-from rcon.models import BlacklistRecord
+from rcon.models import BlacklistRecord, PlayerID, PlayerSession
 from tests.test_blacklist_sync_journal_postgres import database, existing_blacklist
+
+
+def test_session_ids_do_not_prove_commit_order(database):
+    """A scan cursor based only on a sequence can skip a later commit."""
+    engine = database.kw['bind']
+    PlayerID.__table__.create(engine)
+    PlayerSession.__table__.create(engine)
+    with database.begin() as session:
+        session.add_all([PlayerID(player_id='synthetic-delayed'),
+                         PlayerID(player_id='synthetic-committed')])
+    with database() as delayed, database() as committed:
+        delayed_player = delayed.scalar(select(PlayerID).where(PlayerID.player_id == 'synthetic-delayed'))
+        committed_player = committed.scalar(select(PlayerID).where(PlayerID.player_id == 'synthetic-committed'))
+        first = PlayerSession(player_id_id=delayed_player.id, server_number=3, start=datetime(2026, 1, 1))
+        second = PlayerSession(player_id_id=committed_player.id, server_number=3, start=datetime(2026, 1, 1))
+        delayed.add(first)
+        delayed.flush()
+        committed.add(second)
+        committed.commit()
+        assert first.id < second.id
+        with database() as reader:
+            assert reader.scalars(select(PlayerSession.id)).all() == [second.id]
+        delayed.commit()
+        with database() as reader:
+            assert reader.scalars(select(PlayerSession.id).where(PlayerSession.id > second.id)).all() == []
+            assert set(reader.scalars(select(PlayerSession.id)).all()) == {first.id, second.id}
 
 
 def test_real_list_scope_expiry_and_durable_delivery(database, existing_blacklist, monkeypatch):
