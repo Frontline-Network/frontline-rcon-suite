@@ -1,7 +1,8 @@
 """Durable reservations for outbound Barricade scans.
 
-This module is not wired to the websocket yet. A reservation is committed
-before any remote request; an uncertain result is never retried implicitly.
+Only explicitly registered opt-in websocket peers use this journal. A
+reservation is committed before any remote request; an uncertain result is
+never retried implicitly.
 """
 from datetime import datetime, timezone
 from contextlib import contextmanager

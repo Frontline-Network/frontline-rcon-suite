@@ -478,6 +478,28 @@ def test_scan_traverses_past_unverified_sessions_without_sending_them(database, 
     asyncio.run(run())
 
 
+@pytest.mark.parametrize('roster', [None, frozenset()])
+def test_scan_recovers_interrupted_send_even_without_roster(database, monkeypatch, roster):
+    prepare_adapter(database, monkeypatch)
+    engine = database.kw['bind']
+    PlayerID.__table__.create(engine)
+    PlayerSession.__table__.create(engine)
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    with journal.delivery_scope(3, namespace):
+        delivery_id = journal.reserve(3, namespace, 999, 'synthetic-eos', 'HLLV')
+    async def run():
+        async def get_roster():
+            return roster
+        async def sender(*_args):
+            pytest.fail('an interrupted send must not be replayed automatically')
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified,
+                                credential_id=1, get_roster=get_roster)
+    asyncio.run(run())
+    with database() as session:
+        row = session.get(journal.BarricadeScanDelivery, delivery_id)
+        assert (row.status, row.review_cause) == ('review', 'uncertain_delivery')
+
+
 def test_scan_does_not_confuse_old_and_current_session_of_same_player(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     engine = database.kw['bind']
