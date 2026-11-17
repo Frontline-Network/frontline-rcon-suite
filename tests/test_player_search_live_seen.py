@@ -90,6 +90,38 @@ def test_first_seen_with_unverified_legacy_start_preserves_existing_interpretati
     assert result['players'][0]['first_seen_timestamp_ms'] == int(legacy_start.timestamp() * 1000)
 
 
+@pytest.mark.skipif(not hasattr(time, 'tzset'), reason='requires process timezone control')
+def test_no_session_creation_timestamp_orders_as_utc_across_timezone_change(database, monkeypatch):
+    # PlayerID.created is UTC even though historical session wall times can be local.
+    newer = datetime(2024, 10, 27, 1, 20, tzinfo=timezone.utc)
+    older = datetime(2024, 10, 27, 1, 10, tzinfo=timezone.utc)
+    with monkeypatch.context() as scope:
+        scope.setenv('TZ', 'Europe/Berlin')
+        time.tzset()
+        try:
+            with Session(database) as sess:
+                sess.add(PlayerID(player_id='no-session-newer', created=newer.replace(tzinfo=None)))
+                player = PlayerID(player_id='verified-older', created=older.replace(tzinfo=None))
+                sess.add(player)
+                sess.flush()
+                sess.add(PlayerSession(player_id_id=player.id, server_number=3,
+                    start=datetime.fromtimestamp(older.timestamp() - 60),
+                    start_event_us=int((older.timestamp() - 60) * 1_000_000),
+                    end=datetime.fromtimestamp(older.timestamp()),
+                    end_event_us=int(older.timestamp() * 1_000_000)))
+                sess.commit()
+            result = player_history.get_players_by_appearance(
+                player_id='-older', online_now_ids=set(), observed_at=newer)
+            assert result['players'][0]['player_id'] == 'verified-older'
+            result = player_history.get_players_by_appearance(
+                online_now_ids=set(), observed_at=newer)
+            ids = [row['player_id'] for row in result['players']]
+            assert ids.index('no-session-newer') < ids.index('verified-older')
+        finally:
+            scope.undo()
+            time.tzset()
+
+
 def test_only_verified_online_player_matches_recent_filter(database):
     now = datetime(2026, 11, 16, 12, tzinfo=timezone.utc)
     result = player_history.get_players_by_appearance(
@@ -451,6 +483,15 @@ def test_postgres_filters_order_and_console_ids_with_utc_offsets(monkeypatch):
                         record.start_event_us = int(old.timestamp() * 1_000_000)
                         record.end = datetime(2026, 10, 25, 2, 59, 58)
                         record.end_event_us = int(old.timestamp() * 1_000_000)
+                        sess.add(PlayerID(player_id='no-session-newer',
+                                          created=(new + timedelta(seconds=10)).replace(tzinfo=None)))
+                        sess.commit()
+                    ordering = player_history.get_players_by_appearance(
+                        online_now_ids=set(), observed_at=new + timedelta(seconds=20))
+                    ordered_ids = [row['player_id'] for row in ordering['players']]
+                    assert ordered_ids.index('no-session-newer') < ordered_ids.index('console-online')
+                    with Session(engine) as sess:
+                        sess.query(PlayerID).filter_by(player_id='no-session-newer').delete()
                         sess.commit()
                     remote = {'orphan-other-server': PresenceWindow(new.timestamp(), new.timestamp())}
                     result = player_history.get_players_by_appearance(
