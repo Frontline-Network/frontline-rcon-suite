@@ -974,12 +974,15 @@ def blacklist_or_ban(
             raise
 
     if expires_at:
+        expires_at = normalize_blacklist_expiry(expires_at)
+        remaining = expires_at - datetime.now(tz=timezone.utc)
+        if remaining.total_seconds() <= 0:
+            logger.info("Skipping direct temporary ban: expiry has already passed")
+            return False
         return rcon.temp_ban(
             player_id=player_id,
             reason=reason,
-            duration_hours=round_timedelta_to_hours(
-                expires_at - datetime.now(tz=timezone.utc)
-            ),
+            duration_hours=round_timedelta_to_hours(remaining),
             by=admin_name,
         )
     else:
