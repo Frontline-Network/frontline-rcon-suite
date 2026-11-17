@@ -163,19 +163,18 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
     async def send_request(
         self, request_type: ServerRequestType, payload: dict | None
     ) -> dict | None:
-        # Send request
         request = RequestBody(
             id=next(self._counter),
             request=request_type,
             payload=payload,
         )
-        await self.send_json(request.model_dump())
-
-        # Allocate response waiter
-        fut = asyncio.Future()
+        # Register before yielding to the websocket send: a fast peer can
+        # otherwise answer before the response waiter exists.
+        fut = asyncio.get_running_loop().create_future()
         self._waiters[request.id] = fut
 
         try:
+            await self.send_json(request.model_dump())
             # Wait for response
             response: dict | None = await asyncio.wait_for(fut, timeout=10)
         except asyncio.TimeoutError:
@@ -193,6 +192,12 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
             # Remove waiter
             if request.id in self._waiters:
                 del self._waiters[request.id]
+            if not fut.done():
+                fut.cancel()
+            elif not fut.cancelled():
+                # A response may arrive before send_json subsequently fails.
+                # Consume any stored error so it does not become unhandled.
+                fut.exception()
 
         return response
 
