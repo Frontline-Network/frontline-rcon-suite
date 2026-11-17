@@ -651,7 +651,8 @@ def get_players_by_appearance(
         # Apply the current offset uniformly when comparing them with known instants.
         offset_us = int(observed_at.astimezone().utcoffset().total_seconds() * 1_000_000)
         legacy_sort = func.extract('epoch', sub.c.last) * 1_000_000 - offset_us
-        created_sort = func.extract('epoch', PlayerID.created) * 1_000_000 - offset_us
+        # PlayerID.created is written with utcnow(), unlike legacy session ends.
+        created_sort = func.extract('epoch', PlayerID.created) * 1_000_000
         sort_cases.append((sub.c.unverified_end_count == 0, sub.c.last_end_event_us))
         effective_sort = case(*sort_cases, else_=legacy_sort)
         query = sess.query(PlayerID, sub.c.first, effective_last,
