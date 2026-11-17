@@ -3,6 +3,7 @@ import itertools
 import os
 from datetime import datetime
 from logging import getLogger
+from urllib.parse import parse_qsl
 
 import pydantic
 from cachetools import TTLCache
@@ -26,6 +27,18 @@ from rcon.vip_rewards.locking import lock
 from rcon.utils import get_server_number
 
 logger = getLogger("rconweb")
+
+
+def _explicit_durable_request(query_string):
+    """Recognize a peer requesting the registered integration namespace."""
+    if not isinstance(query_string, bytes) or len(query_string) > 2048:
+        return True
+    try:
+        pairs = parse_qsl(query_string.decode('utf-8'), keep_blank_values=True,
+                          encoding='utf-8', errors='strict', max_num_fields=16)
+    except (UnicodeError, ValueError):
+        return True
+    return any(key == 'frontline_integration' for key, _ in pairs)
 
 
 @database_sync_to_async
@@ -114,15 +127,18 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         self._scan_players_task = None
 
     async def connect(self):
+        enabled = os.getenv('HLL_BARRICADE_DURABLE_SCANS') == '1'
+        durable = (enabled and self.scope.get('barricade_scan_namespace')
+                   and self.scope.get('barricade_credential_id'))
+        if (enabled and _explicit_durable_request(self.scope.get('query_string', b''))
+                and not durable):
+            logger.warning('Rejected Barricade connection with unregistered durable integration')
+            await self.close(code=4403)
+            return
         logger.info("Accepted connection with Barricade client")
-
         await self.accept()
-
         if self._scan_players_task and not self._scan_players_task.done():
             self._scan_players_task.cancel()
-        durable = (os.getenv('HLL_BARRICADE_DURABLE_SCANS') == '1'
-                   and self.scope.get('barricade_scan_namespace')
-                   and self.scope.get('barricade_credential_id'))
         self._scan_players_task = asyncio.create_task(
             self._durable_scan_loop() if durable else self._scan_players_loop())
 
