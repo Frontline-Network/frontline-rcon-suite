@@ -37,7 +37,7 @@ async def scan_once(server_number, integration_id, game, sender, is_present, *, 
         for session_id, player_id, start_event_us, delivery_status in rows:
             after_id = session_id
             classification = journal.classify_activation_start(boundary, start_event_us)
-            if delivery_status != 'queued' and classification in ('ambiguous', 'unknown'):
+            if delivery_status != 'queued' and classification in ('before', 'ambiguous', 'unknown'):
                 def record_review():
                     with journal.delivery_scope(server_number, integration_id):
                         if (journal.credential_is_registered(server_number, integration_id, credential_id)
