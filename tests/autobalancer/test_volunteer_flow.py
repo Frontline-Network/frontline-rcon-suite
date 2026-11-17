@@ -364,6 +364,25 @@ def test_failed_invitation_does_not_prevent_other_recipients(instance):
     )
 
 
+@pytest.mark.parametrize('result', [None, '', 1])
+def test_unconfirmed_invitation_is_not_reported_as_delivered_or_retried(instance, result):
+    original = instance.rcon.message_player
+    calls = []
+    def send(player_id, **kwargs):
+        calls.append(player_id)
+        return result if player_id == 'a0' else original(player_id, **kwargs)
+    instance.rcon.message_player = send
+    state = {}
+    snapshot = make_snapshot(at())
+    instance._request_volunteers(state, snapshot, config(volunteer_command='!teams'))
+    assert 'a0' not in state['volunteer_notified']
+    assert set(state['volunteer_notified']) == {'a1', 'a2', 'a3'}
+    assert calls.count('a0') == 1
+    # The reservation persists, so a second poll does not resend it.
+    instance._request_volunteers(state, snapshot, config(volunteer_command='!teams'))
+    assert calls.count('a0') == 1
+
+
 def test_invitation_is_visible_to_chat_worker_before_first_message(instance):
     instance.store.state = {
         "phase": Phase.OBSERVING,

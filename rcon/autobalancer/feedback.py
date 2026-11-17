@@ -62,8 +62,12 @@ def send_private(rcon, player_id: str | None, message: str) -> bool:
     if not player_id:
         return False
     try:
-        if rcon.message_player(player_id, message=message) is False:
+        result = rcon.message_player(player_id, message=message)
+        if result is False:
             logger.warning("Autobalancer private message was rejected")
+            return False
+        if result is not True:
+            logger.warning("Autobalancer private message was not confirmed")
             return False
         return True
     except Exception:

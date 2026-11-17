@@ -68,7 +68,7 @@ def enqueue(session, command: bytes, server_mask: int) -> int:
 
 
 def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id: int,
-                                   started_at: datetime) -> bool:
+                                   started_at: datetime, *, connected_eos_id: str | None = None) -> bool:
     """Persist one retry after an unattempted connect-time identity check.
 
     A matching pending/review item or a completion since this connect started
@@ -82,28 +82,34 @@ def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id
 
     if not 1 <= server_number <= 32 or not player_id or record_id <= 0 or started_at.tzinfo is None:
         raise ValueError('Invalid connect reconciliation')
+    if connected_eos_id is not None and (not isinstance(connected_eos_id, str) or len(connected_eos_id) != 32 or
+            not all(c in '0123456789abcdefABCDEF' for c in connected_eos_id)):
+        raise ValueError('Invalid verified EOS identity')
+    identities = {player_id, connected_eos_id} if connected_eos_id else {player_id}
     mask = 1 << (server_number - 1)
     with get_session_maker()() as session, session.begin():
         session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": 0x464C4E424C53594E})
-        rows = session.execute(select(BlacklistSyncDelivery.command, BlacklistSyncDelivery.status)
+        rows = session.execute(select(BlacklistSyncDelivery.id, BlacklistSyncDelivery.command, BlacklistSyncDelivery.status)
             .where(BlacklistSyncDelivery.server_number == server_number,
                    ((BlacklistSyncDelivery.status.in_(('queued', 'sending', 'review'))) |
                     ((BlacklistSyncDelivery.status == 'done') &
                      (BlacklistSyncDelivery.updated_at >= started_at))))).all()
         overlap = False
+        matching = []
         for row in rows:
             try:
                 existing = BlacklistCommand.decode(row.command)
                 if (existing.command == BlacklistCommandType.CREATE_RECORD
                         and existing.payload.get('record_id') == record_id
                         and existing.payload.get('player_id') == player_id):
-                    return False
+                    matching.append(row)
+                    continue
                 if existing.command == BlacklistCommandType.CREATE_RECORD:
-                    overlap |= existing.payload.get('player_id') == player_id
+                    overlap |= bool({existing.payload.get('player_id'), existing.payload.get('connected_eos_id')} & identities)
                 elif existing.command in (BlacklistCommandType.EDIT_RECORD, BlacklistCommandType.DELETE_RECORD):
-                    overlap |= existing.payload['old_record']['player_id'] == player_id
+                    overlap |= existing.payload['old_record']['player_id'] in identities
                 elif existing.command == BlacklistCommandType.EXPIRE_ALL:
-                    overlap |= existing.payload['player_id'] == player_id
+                    overlap |= existing.payload['player_id'] in identities
                 elif existing.command in (BlacklistCommandType.EDIT_LIST, BlacklistCommandType.DELETE_LIST):
                     # A list change may include this player. The worker may
                     # already have passed its overlap check before this new
@@ -111,8 +117,31 @@ def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id
                     overlap = True
             except Exception:
                 overlap = True
-        command = BlacklistCommand(command=BlacklistCommandType.CREATE_RECORD, server_mask=mask,
-                                   payload={'player_id': player_id, 'record_id': record_id})
+        if matching and not overlap:
+            return False
+        if matching and overlap:
+            need_review_record = False
+            for row in matching:
+                if row.status == 'review':
+                    continue
+                if row.status == 'queued':
+                    locked = session.scalar(select(BlacklistSyncDelivery).where(
+                        BlacklistSyncDelivery.id == row.id).with_for_update(skip_locked=True))
+                    if locked is not None and locked.status == 'queued':
+                        locked.status = 'review'
+                        locked.reason = 'overlapping blacklist changes require reconciliation before connect action'
+                        locked.updated_at = datetime.now(timezone.utc)
+                        continue
+                # Another worker may already be acting or the matching work
+                # may have completed. Preserve a separate review without
+                # waiting on its row while holding the producer lock.
+                need_review_record = True
+            if not need_review_record:
+                return False
+        payload = {'player_id': player_id, 'record_id': record_id}
+        if connected_eos_id:
+            payload['connected_eos_id'] = connected_eos_id
+        command = BlacklistCommand(command=BlacklistCommandType.CREATE_RECORD, server_mask=mask, payload=payload)
         now = datetime.now(timezone.utc)
         session.add(BlacklistSyncDelivery(server_number=server_number, command=command.encode(),
                                           status='review' if overlap else 'queued',
@@ -215,9 +244,16 @@ def process_one(server_number: int, handler, *, is_ready=None, prepare=None) -> 
                 record_id, player_id = None, None
             def identity(command):
                 if command.command in (BlacklistCommandType.CREATE_RECORD, BlacklistCommandType.EXPIRE_ALL):
-                    return command.payload["player_id"]
+                    values = {command.payload["player_id"]}
+                    if command.command == BlacklistCommandType.CREATE_RECORD and 'connected_eos_id' in command.payload:
+                        eos = command.payload['connected_eos_id']
+                        if (not isinstance(eos, str) or len(eos) != 32
+                                or not all(c in '0123456789abcdefABCDEF' for c in eos)):
+                            raise ValueError('Invalid connected EOS identity')
+                        values.add(eos)
+                    return values
                 if command.command in (BlacklistCommandType.EDIT_RECORD, BlacklistCommandType.DELETE_RECORD):
-                    return command.payload["old_record"]["player_id"]
+                    return {command.payload["old_record"]["player_id"]}
                 return None
 
             # A list-wide change or changes to different records for the same
@@ -227,15 +263,20 @@ def process_one(server_number: int, handler, *, is_ready=None, prepare=None) -> 
             ambiguous_all = record_id is None and before is not None and bool(following)
             ambiguous_player = False
             affected = []
+            try:
+                before_identities = identity(before) if before is not None else None
+            except Exception:
+                before_identities = None
+                ambiguous_all = bool(following)
             for item in following:
                 if before is None:
                     break
                 try:
                     candidate = BlacklistCommand.decode(item.command)
-                    candidate_player = identity(candidate)
-                    if candidate_player is None:
+                    candidate_players = identity(candidate)
+                    if candidate_players is None or before_identities is None:
                         ambiguous_all = True
-                    elif candidate_player == player_id:
+                    elif candidate_players & before_identities:
                         affected.append(item)
                         candidate_record = (candidate.payload.get("record_id") if candidate.command == BlacklistCommandType.CREATE_RECORD
                                             else candidate.payload.get("old_record", {}).get("id"))
@@ -258,20 +299,13 @@ def process_one(server_number: int, handler, *, is_ready=None, prepare=None) -> 
                     next_command = BlacklistCommand.decode(item.command)
                     same_record = (next_command.command in (BlacklistCommandType.EDIT_RECORD, BlacklistCommandType.DELETE_RECORD) and
                                    next_command.payload["old_record"]["id"] == record_id)
-                    if next_command.command == BlacklistCommandType.CREATE_RECORD:
-                        next_player = next_command.payload["player_id"]
-                    elif next_command.command in (BlacklistCommandType.EDIT_RECORD, BlacklistCommandType.DELETE_RECORD):
-                        next_player = next_command.payload["old_record"]["player_id"]
-                    elif next_command.command == BlacklistCommandType.EXPIRE_ALL:
-                        next_player = next_command.payload["player_id"]
-                    else:
-                        next_player = None
+                    next_players = identity(next_command)
                 except Exception:
                     break
                 if not same_record:
                     # Events for different players commute. A list-wide or
                     # same-player change remains an ordering barrier.
-                    if next_player is not None and next_player != player_id:
+                    if next_players is not None and before_identities is not None and not (next_players & before_identities):
                         continue
                     break
                 group.append(item)

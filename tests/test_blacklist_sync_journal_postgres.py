@@ -537,6 +537,71 @@ def test_connect_reconciliation_keeps_unrelated_player_work_queued(database):
         assert rows[1].status == 'queued'
 
 
+@pytest.mark.parametrize('command_type', [blacklist.BlacklistCommandType.CREATE_RECORD,
+                                          blacklist.BlacklistCommandType.EDIT_RECORD,
+                                          blacklist.BlacklistCommandType.EXPIRE_ALL])
+def test_connect_reconciliation_detects_overlap_with_verified_eos_alias(database, command_type):
+    eos, steam = '0123456789abcdef0123456789abcdef', '76561198036685843'
+    started = datetime.now(timezone.utc)
+    payload = ({'record_id': 8, 'player_id': eos} if command_type == blacklist.BlacklistCommandType.CREATE_RECORD
+               else {'old_record': {'id': 8, 'player_id': eos}} if command_type == blacklist.BlacklistCommandType.EDIT_RECORD
+               else {'player_id': eos})
+    command = blacklist.BlacklistCommand(command=command_type, server_mask=4, payload=payload).encode()
+    queue(database, command, 4)
+    assert journal.enqueue_connect_reconciliation(3, steam, 7, started, connected_eos_id=eos)
+    with database() as session:
+        rows = session.scalars(select(journal.BlacklistSyncDelivery).order_by(
+            journal.BlacklistSyncDelivery.id)).all()
+        assert rows[-1].status == 'review'
+
+
+def test_existing_connect_delivery_is_held_when_verified_eos_action_is_inflight(database):
+    eos, steam = '0123456789abcdef0123456789abcdef', '76561198036685843'
+    started = datetime.now(timezone.utc)
+    eos_command = blacklist.BlacklistCommand(command=blacklist.BlacklistCommandType.CREATE_RECORD,
+        server_mask=4, payload={'record_id': 8, 'player_id': eos}).encode()
+    steam_command = blacklist.BlacklistCommand(command=blacklist.BlacklistCommandType.CREATE_RECORD,
+        server_mask=4, payload={'record_id': 7, 'player_id': steam}).encode()
+    queue(database, eos_command, 4)
+    queue(database, steam_command, 4)
+    entered, release = Event(), Event()
+    def delivery(_):
+        entered.set()
+        assert release.wait(10)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        worker = executor.submit(journal.process_one, 3, delivery)
+        assert entered.wait(10)
+        try:
+            assert not journal.enqueue_connect_reconciliation(3, steam, 7, started, connected_eos_id=eos)
+            with database() as session:
+                rows = session.scalars(select(journal.BlacklistSyncDelivery).order_by(
+                    journal.BlacklistSyncDelivery.id)).all()
+                assert len(rows) == 2 and rows[1].status == 'review'
+        finally:
+            release.set()
+        assert worker.result(timeout=10) == 'done'
+    assert journal.process_one(3, lambda _: pytest.fail('must not replay')) == 'review'
+
+
+@pytest.mark.parametrize('command_type', [blacklist.BlacklistCommandType.CREATE_RECORD,
+                                          blacklist.BlacklistCommandType.EDIT_RECORD,
+                                          blacklist.BlacklistCommandType.EXPIRE_ALL])
+def test_later_eos_change_overlaps_earlier_verified_steam_connect_intent(database, command_type):
+    eos, steam = '0123456789abcdef0123456789abcdef', '76561198036685843'
+    assert journal.enqueue_connect_reconciliation(3, steam, 7, datetime.now(timezone.utc),
+                                                  connected_eos_id=eos)
+    payload = ({'record_id': 8, 'player_id': eos} if command_type == blacklist.BlacklistCommandType.CREATE_RECORD
+               else {'old_record': {'id': 8, 'player_id': eos}} if command_type == blacklist.BlacklistCommandType.EDIT_RECORD
+               else {'player_id': eos})
+    command = blacklist.BlacklistCommand(command=command_type, server_mask=4, payload=payload).encode()
+    queue(database, command, 4)
+    assert journal.process_one(3, lambda _: pytest.fail('must not execute overlapping action')) == 'review'
+    with database() as session:
+        rows = session.scalars(select(journal.BlacklistSyncDelivery).order_by(
+            journal.BlacklistSyncDelivery.id)).all()
+        assert [row.status for row in rows] == ['review', 'review']
+
+
 def test_connect_reconciliation_reviews_recently_completed_overlapping_edit(database):
     steam = '76561198036685843'
     started = datetime.now(timezone.utc) - timedelta(seconds=1)
