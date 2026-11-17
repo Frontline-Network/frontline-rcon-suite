@@ -660,6 +660,45 @@ def test_scan_revisits_delayed_lower_session_id_after_later_commit(database, mon
             journal.BarricadeScanDelivery.id)).all() == ['done', 'done']
 
 
+@pytest.mark.parametrize('acknowledged', [True, False])
+def test_parallel_scan_passes_share_one_inflight_delivery(database, monkeypatch, acknowledged):
+    prepare_adapter(database, monkeypatch)
+    engine = database.kw['bind']
+    PlayerID.__table__.create(engine)
+    PlayerSession.__table__.create(engine)
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    with database.begin() as session:
+        player = PlayerID(player_id='synthetic-eos')
+        session.add(player)
+        session.flush()
+        session.add(PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2026, 1, 1),
+                                  start_event_us=(int(time.time()) + 2) * 1_000_000))
+    async def run():
+        entered = asyncio.Event()
+        release = asyncio.Event()
+        sent = []
+        async def sender(player_id, game):
+            sent.append((player_id, game))
+            entered.set()
+            await release.wait()
+            if not acknowledged:
+                raise OSError('synthetic lost reply')
+        async def scan():
+            await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1)
+        first = asyncio.create_task(scan())
+        await asyncio.wait_for(entered.wait(), 5)
+        second = asyncio.create_task(scan())
+        await asyncio.sleep(0.1)
+        release.set()
+        await asyncio.wait_for(asyncio.gather(first, second), 10)
+        await scan()
+        assert sent == [('synthetic-eos', 'HLLV')]
+    asyncio.run(run())
+    with database() as session:
+        assert session.scalars(select(journal.BarricadeScanDelivery.status)).all() == [
+            'done' if acknowledged else 'review']
+
+
 def test_disconnected_sessions_are_visible_without_replaying_ended_session(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     engine = database.kw['bind']
