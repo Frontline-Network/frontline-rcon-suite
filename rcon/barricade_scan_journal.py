@@ -124,6 +124,28 @@ class BarricadeScanReviewAudit(Base):
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
 
 
+def classify_activation_start(registered_at_us: int, start_event_us: int | None) -> str:
+    """Classify second-resolution log timestamps against a proposed boundary.
+
+    This accounts for lost subsecond precision only. It does not prove that
+    the game server and registration host have synchronized clocks, or that
+    the server has delivered all its logs. Ambiguous/unknown is not eligible
+    for an automatic decision.
+    """
+    if type(registered_at_us) is not int or registered_at_us < 0:
+        raise ValueError('Invalid Barricade registration timestamp')
+    if start_event_us is None:
+        return 'unknown'
+    if (type(start_event_us) is not int or start_event_us < 0 or
+            start_event_us % 1_000_000 != 0):
+        return 'unknown'
+    if start_event_us + 1_000_000 <= registered_at_us:
+        return 'before'
+    if start_event_us > registered_at_us:
+        return 'after'
+    return 'ambiguous'
+
+
 def list_reviews(server_number: int, offset: int = 0, limit: int = 50) -> dict:
     """Read unconfirmed deliveries for one server; caller must authorize access."""
     server_number, offset, limit = int(server_number), int(offset), int(limit)

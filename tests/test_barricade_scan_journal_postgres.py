@@ -24,6 +24,20 @@ async def verified(_session_id, _player_id):
     return True
 
 
+@pytest.mark.parametrize(('event_us', 'expected'), [
+    (1_000_000, 'before'), (2_000_000, 'ambiguous'), (3_000_000, 'after'),
+    (None, 'unknown'), (2_400_000, 'unknown'), (True, 'unknown'),
+])
+def test_activation_boundary_retains_second_resolution_uncertainty(event_us, expected):
+    assert journal.classify_activation_start(2_500_000, event_us) == expected
+
+
+def test_activation_boundary_at_exact_second_does_not_assume_event_order():
+    assert journal.classify_activation_start(2_000_000, 2_000_000) == 'ambiguous'
+    with pytest.raises(ValueError):
+        journal.classify_activation_start(True, 2_000_000)
+
+
 def prepare(database, monkeypatch):
     journal.BarricadeScanDelivery.__table__.create(database.kw['bind'])
     journal.BarricadeScanIntegration.__table__.create(database.kw['bind'])
