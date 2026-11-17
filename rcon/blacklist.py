@@ -989,6 +989,8 @@ def expire_all_player_blacklists(player_id: str):
             include_expired=False,
         )
 
+        kick_only_mask = 0
+        ban_mask = 0
         if records:
             expire_time = datetime.now(tz=timezone.utc)
             server_mask = 0
@@ -999,12 +1001,18 @@ def expire_all_player_blacklists(player_id: str):
                 if servers is None:
                     servers = 2**32 - 1
                 server_mask |= servers
+                if record.blacklist.sync == BlacklistSyncMethod.KICK_ONLY:
+                    kick_only_mask |= servers
+                else:
+                    ban_mask |= servers
         commit_blacklist_change(sess,
             BlacklistCommand(
                 command=BlacklistCommandType.EXPIRE_ALL,
                 # server_mask=server_mask,
                 server_mask=2**32 - 1,
-                payload=BlacklistExpireAllCommand(player_id=player_id).model_dump(),
+                payload=BlacklistExpireAllCommand(
+                    player_id=player_id, kick_only_server_mask=kick_only_mask & ~ban_mask
+                ).model_dump(),
             )
         )
 
@@ -1045,6 +1053,16 @@ class BlacklistDeleteListCommand(BaseModel):
 
 class BlacklistExpireAllCommand(BaseModel):
     player_id: str
+    # None identifies a historical command that did not capture the prior
+    # synchronization modes. Never infer ownership from that old payload.
+    kick_only_server_mask: int | None = None
+
+    @field_validator('kick_only_server_mask')
+    @classmethod
+    def validate_server_mask(cls, value):
+        if value is not None and not 0 <= value <= 0xFFFFFFFF:
+            raise ValueError('Invalid kick-only server mask')
+        return value
 
 
 class BlacklistBarricadeWarnOnlineCommand(BaseModel):
@@ -1542,6 +1560,13 @@ class BlacklistCommandHandler:
 
     def handle_expire_all(self, payload: BlacklistExpireAllCommand):
         if _is_hllv_steam_id(self.rcon, payload.player_id):
+            mask = getattr(payload, 'kick_only_server_mask', None)
+            if mask is not None and mask & get_server_number_mask():
+                with blacklist_change_session() as sess:
+                    if is_player_blacklisted(sess, payload.player_id) is not None:
+                        raise HLLVSteamIdentityUnverified('A Steam restriction is still active')
+                logger.info('Expired kick-only Steam restrictions need no game-server unban')
+                return
             raise HLLVSteamBanOwnershipUnverified('Steam expiry needs EOS ownership review')
         with lock(f"blacklist-sync:{SERVER_NUMBER}"):
             _require_blacklist_action_review_clear(payload.player_id)
