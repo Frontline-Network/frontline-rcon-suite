@@ -72,6 +72,11 @@ def session_has_bounded_evidence(red, *, scope: str, server_number: int, session
                 UnidentifiedSessionEvent.event_us >= row.start_event_us).limit(1))
             if ambiguous is not None:
                 return None
+        # A newer roster may contradict the snapshot while the database is
+        # being read. Never use a superseded sighting as proof of presence.
+        latest_sightings, latest_available = read_observations(red, scope=scope, server_numbers=[server_number])
+        if server_number not in latest_available or latest_sightings.get(player_id) != window:
+            return None
         # Reject evidence that expired during database work or was replaced.
         now = redis_time(red)
         if (abs(now - time.time()) > 2 or not 0 <= now - window.earliest <= MAX_SNAPSHOT_AGE_SECONDS or
