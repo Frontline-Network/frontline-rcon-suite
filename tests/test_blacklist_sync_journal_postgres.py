@@ -494,6 +494,63 @@ def test_connect_reconciliation_deduplicates_against_inflight_delivery(database,
         assert len(rows) == 1 and rows[0].status == ('review' if uncertain else 'done')
 
 
+@pytest.mark.parametrize('command_type,payload', [
+    (blacklist.BlacklistCommandType.EDIT_RECORD,
+     {'old_record': {'id': 7, 'player_id': '76561198036685843'}}),
+    (blacklist.BlacklistCommandType.DELETE_RECORD,
+     {'old_record': {'id': 7, 'player_id': '76561198036685843'}}),
+    (blacklist.BlacklistCommandType.EDIT_LIST, {'synthetic': True}),
+])
+def test_connect_reconciliation_marks_overlapping_inflight_change_for_review(database, command_type, payload):
+    steam = '76561198036685843'
+    started = datetime.now(timezone.utc)
+    command = blacklist.BlacklistCommand(command=command_type, server_mask=4, payload=payload).encode()
+    queue(database, command, 4)
+    entered, release = Event(), Event()
+    def delivery(_):
+        entered.set()
+        assert release.wait(10)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        worker = executor.submit(journal.process_one, 3, delivery)
+        assert entered.wait(10)
+        try:
+            assert journal.enqueue_connect_reconciliation(3, steam, 7, started)
+            with database() as session:
+                rows = session.scalars(select(journal.BlacklistSyncDelivery).order_by(
+                    journal.BlacklistSyncDelivery.id)).all()
+                assert len(rows) == 2 and rows[1].status == 'review'
+        finally:
+            release.set()
+        assert worker.result(timeout=10) == 'done'
+    assert journal.process_one(3, lambda _: pytest.fail('must not replay')) == 'review'
+
+
+def test_connect_reconciliation_keeps_unrelated_player_work_queued(database):
+    started = datetime.now(timezone.utc)
+    command = blacklist.BlacklistCommand(command=blacklist.BlacklistCommandType.EDIT_RECORD,
+        server_mask=4, payload={'old_record': {'id': 8, 'player_id': '76561198036685844'}}).encode()
+    queue(database, command, 4)
+    assert journal.enqueue_connect_reconciliation(3, '76561198036685843', 7, started)
+    with database() as session:
+        rows = session.scalars(select(journal.BlacklistSyncDelivery).order_by(
+            journal.BlacklistSyncDelivery.id)).all()
+        assert rows[1].status == 'queued'
+
+
+def test_connect_reconciliation_reviews_recently_completed_overlapping_edit(database):
+    steam = '76561198036685843'
+    started = datetime.now(timezone.utc) - timedelta(seconds=1)
+    command = blacklist.BlacklistCommand(command=blacklist.BlacklistCommandType.EDIT_RECORD,
+        server_mask=4, payload={'old_record': {'id': 7, 'player_id': steam}}).encode()
+    queue(database, command, 4)
+    assert journal.process_one(3, lambda _: True) == 'done'
+    assert journal.enqueue_connect_reconciliation(3, steam, 7, started)
+    with database() as session:
+        rows = session.scalars(select(journal.BlacklistSyncDelivery).order_by(
+            journal.BlacklistSyncDelivery.id)).all()
+        assert rows[-1].status == 'review'
+
+
 def test_connect_reconciliation_does_not_repeat_recently_completed_delivery(database):
     steam = '76561198036685843'
     start = datetime.now(timezone.utc) - timedelta(seconds=1)
