@@ -1,5 +1,6 @@
 """Session identity must be proven before automatic report moderation."""
 import os
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -41,7 +42,24 @@ def database(request):
         base.dispose()
 
 
-def test_latest_absolute_session_and_uncertain_legacy_are_safe(database):
+@pytest.fixture
+def berlin_time():
+    if not hasattr(time, 'tzset'):
+        pytest.skip('requires controllable local timezone')
+    previous = os.environ.get('TZ')
+    os.environ['TZ'] = 'Europe/Berlin'
+    time.tzset()
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop('TZ', None)
+        else:
+            os.environ['TZ'] = previous
+        time.tzset()
+
+
+def test_latest_absolute_session_and_uncertain_legacy_are_safe(database, berlin_time):
     old = datetime(2026, 10, 25, 0, 59, 58, tzinfo=timezone.utc)
     now = old + timedelta(seconds=3)
     with Session(database) as sess:
@@ -62,6 +80,11 @@ def test_latest_absolute_session_and_uncertain_legacy_are_safe(database):
         sess.flush()
         assert session_token(sess, 3, player.player_id, now.timestamp() + 4) == current.id
         assert session_token(sess, 3, player.player_id, now.timestamp() - 1) is None
+        current.start += timedelta(seconds=1)
+        sess.flush()
+        assert session_token(sess, 3, player.player_id, now.timestamp() + 4) is None
+        current.start -= timedelta(seconds=1)
+        sess.flush()
         duplicate = PlayerSession(player_id_id=player.id, server_number=3,
             start=current.start, created=current.created, start_event_us=current.start_event_us)
         sess.add(duplicate)
