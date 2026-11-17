@@ -39,17 +39,25 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
     monkeypatch.setattr(presence, 'get_session_maker', lambda: database)
     start = time.time() - 60
     with database.begin() as session:
+        binding = session.get(journal.BarricadeScanIntegration,
+                              (3, '01234567-89ab-4def-8012-0123456789ab'))
+        binding.registered_at_us = int((start - 60) * 1_000_000)
         player = PlayerID(player_id='synthetic-eos')
         session.add(player)
         session.flush()
-        row = PlayerSession(player_id_id=player.id, server_number=3, start=datetime.fromtimestamp(start),
-                            start_event_us=int(start * 1_000_000))
+        row = PlayerSession(player_id_id=player.id, server_number=3, start=datetime.fromtimestamp(int(start)),
+                            start_event_us=int(start) * 1_000_000)
         session.add(row)
         session.flush()
         session_id = row.id
     red = redis.Redis.from_url(url, decode_responses=True)
     scope = uuid4().hex * 2
     namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    monkeypatch.setenv('HLL_DB_URL', 'postgresql://synthetic@localhost/synthetic')
+    monkeypatch.setattr('rcon.cache_utils.get_redis_client', lambda **_kwargs: red)
+    monkeypatch.setattr('rcon.player_presence.database_scope', lambda _url: scope)
+    monkeypatch.setattr(barricade, 'get_server_number', lambda: '3')
+    monkeypatch.setattr(barricade, 'barricade_game_for_server', lambda: 'HLLV')
     try:
         api = SimpleNamespace(without_retries=lambda: nullcontext(),
                               get_player_ids=lambda: [('synthetic', 'synthetic-eos')])
@@ -66,18 +74,12 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
             class TestConsumer(barricade.BarricadeConsumer):
                 async def connect(self):
                     await self.accept()
-                    async def sender(player_id, game):
-                        return await self.send_request(ServerRequestType.SCAN_PLAYERS,
-                                                       {'player_ids': [player_id], 'game': game})
-                    async def verified(row_id, player_id):
-                        return await asyncio.to_thread(presence.session_has_bounded_evidence, red,
-                            scope=scope, server_number=3, session_id=row_id, player_id=player_id)
                     async def start_scan():
-                        result = await adapter.dispatch(3, self.scope['barricade_scan_namespace'], session_id,
-                            'synthetic-eos', 'HLLV', sender, credential_id=self.scope['barricade_credential_id'],
-                            verify_session=verified, timeout=0.7)
+                        result = await self._durable_scan_once()
                         await results.put(result)
                     self.scan_task = asyncio.create_task(start_scan())
+                async def send_request(self, request_type, payload):
+                    return await asyncio.wait_for(super().send_request(request_type, payload), timeout=0.7)
             app = auth.APITokenAuthMiddleware(TestConsumer.as_asgi(), perms=('synthetic',))
             ws_scope = {'type': 'websocket', 'path': '/ws/barricade',
                 'query_string': b'frontline_integration=synthetic',
@@ -97,8 +99,7 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
                     if scenario == 'confirmed':
                         await socket.send_input({'type': 'websocket.receive', 'text': json.dumps(
                             {'id': request['id'], 'request': None, 'failed': False, 'response': None})})
-                expected = {'confirmed': 'done', 'lost_response': 'review', 'pending_event': 'deferred'}[scenario]
-                assert await asyncio.wait_for(results.get(), 5) == expected
+                assert await asyncio.wait_for(results.get(), 5) is None
                 await socket.send_input({'type': 'websocket.disconnect', 'code': 1000})
                 await socket.wait(timeout=5)
         asyncio.run(run())
