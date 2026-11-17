@@ -83,6 +83,29 @@ def test_direct_ban_result_is_propagated(returned, temporary):
     assert blacklist.blacklist_or_ban(rcon, None, 'synthetic-id', 'reason', expires_at=expires) is returned
 
 
+@pytest.mark.parametrize('naive', [False, True])
+def test_expired_direct_ban_is_not_sent(naive):
+    rcon = Mock()
+    expires = datetime.now(timezone.utc) - timedelta(seconds=1)
+    if naive:
+        expires = expires.replace(tzinfo=None)
+    assert blacklist.blacklist_or_ban(rcon, None, 'synthetic-id', 'reason', expires_at=expires) is False
+    rcon.temp_ban.assert_not_called()
+    rcon.perma_ban.assert_not_called()
+
+
+@pytest.mark.parametrize('naive', [False, True])
+def test_future_direct_ban_is_sent(naive):
+    rcon = Mock()
+    rcon.temp_ban.return_value = True
+    expires = datetime.now(timezone.utc) + timedelta(hours=2)
+    if naive:
+        expires = expires.replace(tzinfo=None)
+    assert blacklist.blacklist_or_ban(rcon, None, 'synthetic-id', 'reason', expires_at=expires) is True
+    rcon.temp_ban.assert_called_once_with(player_id='synthetic-id', reason='reason', duration_hours=2, by='')
+    rcon.perma_ban.assert_not_called()
+
+
 def test_another_player_with_same_name_cannot_trigger_a_ban(monkeypatch):
     connected = {'action': 'CONNECTED', 'timestamp_ms': 100000,
                  'player_name_1': 'same-name', 'player_id_1': 'target-id'}
