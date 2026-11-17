@@ -72,8 +72,11 @@ def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id
     """Persist one retry after an unattempted connect-time identity check.
 
     A matching pending/review item or a completion since this connect started
-    already covers the work. The same target lock as normal producers makes
-    this check atomic against other producers and the delivery worker.
+    already covers the work. This enqueues an intent only; it does not mutate
+    blacklist state. The producer lock serializes it with other enqueues, but
+    taking the target lock here would block all producers while a worker is
+    waiting for the game server. Workers publish their sending state before
+    acting, so the read below can also deduplicate against in-flight work.
     """
     from rcon.blacklist import BlacklistCommand, BlacklistCommandType
 
@@ -81,7 +84,7 @@ def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id
         raise ValueError('Invalid connect reconciliation')
     mask = 1 << (server_number - 1)
     with get_session_maker()() as session, session.begin():
-        _lock_targets(session, [server_number])
+        session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": 0x464C4E424C53594E})
         rows = session.execute(select(BlacklistSyncDelivery.command, BlacklistSyncDelivery.status)
             .where(BlacklistSyncDelivery.server_number == server_number,
                    ((BlacklistSyncDelivery.status.in_(('queued', 'sending', 'review'))) |
@@ -100,7 +103,9 @@ def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id
                 continue
         command = BlacklistCommand(command=BlacklistCommandType.CREATE_RECORD, server_mask=mask,
                                    payload={'player_id': player_id, 'record_id': record_id})
-        enqueue(session, command.encode(), mask)
+        now = datetime.now(timezone.utc)
+        session.add(BlacklistSyncDelivery(server_number=server_number, command=command.encode(),
+                                          status='queued', created_at=now, updated_at=now))
         return True
 
 
