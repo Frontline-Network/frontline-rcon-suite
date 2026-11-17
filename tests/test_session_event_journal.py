@@ -8,6 +8,20 @@ from rcon.session_event_journal import SessionEventJournal
 from rcon.session_event_journal_cli import inspect_unidentified
 
 
+def test_pending_counts_are_local_server_scoped_and_do_not_claim_log_completeness(tmp_path):
+    journal = SessionEventJournal(tmp_path / 'events.sqlite')
+    journal.remember_batch([(3, 'synthetic-a', 'connect', 1000), (4, 'synthetic-b', 'disconnect', 1001)], 0,
+        [(3, 'disconnect', 1002, '', 'synthetic'), (4, 'connect', 1003, '', 'synthetic')])
+    assert journal.pending_counts(3) == (1, 1)
+    assert journal.pending_counts(4) == (1, 1)
+    assert journal.drain(lambda *_: None) == 2
+    assert journal.pending_counts(3) == (0, 1)
+    assert journal.publish_unidentified(lambda *_: None) == 2
+    assert journal.pending_counts(3) == (0, 0)
+    with pytest.raises(ValueError):
+        journal.pending_counts(True)
+
+
 def test_unacknowledged_event_survives_restart_and_handler_failure(tmp_path):
     path = tmp_path / "events.sqlite"
     journal = SessionEventJournal(path)
