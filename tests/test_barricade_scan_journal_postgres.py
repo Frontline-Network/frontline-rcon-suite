@@ -17,7 +17,8 @@ from rcon import barricade_scan_journal as journal
 from rcon import barricade_scan_dispatch as adapter
 from rcon.barricade_scan_identity import integration_namespace
 from rcon.models import PlayerID, PlayerSession
-from tests.test_blacklist_sync_journal_postgres import database
+from tests.test_blacklist_sync_journal_postgres import database, queue
+from rcon.blacklist_sync_journal import BlacklistSyncDelivery
 
 
 async def verified(_session_id, _player_id):
@@ -120,10 +121,18 @@ def test_migration_roundtrip_and_protects_delivery_history(database, monkeypatch
     spec.loader.exec_module(migration)
     engine = database.kw['bind']
     monkeypatch.setattr(journal, 'get_session_maker', lambda: database)
+    for index in range(5):
+        assert queue(database, f'synthetic-{index}'.encode(), 1 << 3) == 1
+    def existing_queue():
+        with database() as session:
+            return [(row.id, row.server_number, row.command, row.status)
+                    for row in session.scalars(select(BlacklistSyncDelivery).order_by(BlacklistSyncDelivery.id))]
+    before = existing_queue()
     with engine.begin() as connection:
         with Operations.context(MigrationContext.configure(connection)):
             migration.upgrade()
         assert inspect(connection).has_table('barricade_scan_delivery')
+    assert existing_queue() == before
     with journal.delivery_scope(3, 'integration-a'):
         assert journal.reserve(3, 'integration-a', 1, 'synthetic', 'HLLV') is not None
     with engine.begin() as connection:
@@ -134,6 +143,7 @@ def test_migration_roundtrip_and_protects_delivery_history(database, monkeypatch
         with Operations.context(MigrationContext.configure(connection)):
             migration.downgrade()
         assert not inspect(connection).has_table('barricade_scan_delivery')
+    assert existing_queue() == before
 
 
 def test_concurrent_reservation_is_once_and_isolated_by_server_and_integration(database, monkeypatch):
