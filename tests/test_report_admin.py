@@ -3,6 +3,7 @@
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import os
+import time
 
 os.environ.setdefault("HLL_MAINTENANCE_CONTAINER", "1")
 os.environ.setdefault("SERVER_NUMBER", "1")
@@ -121,7 +122,24 @@ def current(db, iid):
         return sess.get(AdminIncident, iid).to_dict(include_events=True)
 
 
-def test_report_session_token_uses_absolute_connect_time_across_dst(setup):
+@pytest.fixture
+def berlin_time():
+    if not hasattr(time, 'tzset'):
+        pytest.skip('requires controllable local timezone')
+    previous = os.environ.get('TZ')
+    os.environ['TZ'] = 'Europe/Berlin'
+    time.tzset()
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop('TZ', None)
+        else:
+            os.environ['TZ'] = previous
+        time.tzset()
+
+
+def test_report_session_token_uses_absolute_connect_time_across_dst(setup, berlin_time):
     db = setup[0]
     old = datetime(2026, 10, 25, 0, 59, 58, tzinfo=timezone.utc)
     current = datetime(2026, 10, 25, 1, 0, 1, tzinfo=timezone.utc)

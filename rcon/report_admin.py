@@ -217,9 +217,15 @@ def session_token(sess, server, pid, stamp):
     if len(rows) > 1 and rows[0].start_event_us == rows[1].start_event_us:
         return None
     row = rows[0] if rows else None
-    if row is None or row.end is not None or row.end_event_us is not None:
+    if row is None or row.end is not None or row.end_event_us is not None or row.start is None:
         return None
     if row.start_event_us > stamp * 1_000_000:
+        return None
+    # A legacy writer might mutate the wall-clock start without updating the
+    # verified instant. Treat a mismatch (including a changed process timezone)
+    # as uncertain rather than applying a report to the wrong connection.
+    expected_local = datetime.fromtimestamp(row.start_event_us / 1_000_000)
+    if abs((row.start.replace(tzinfo=None) - expected_local).total_seconds()) > 0.001:
         return None
     verified_start = datetime.fromtimestamp(row.start_event_us / 1_000_000, timezone.utc).replace(tzinfo=None)
     # An unverified row inserted after the confirmed connection may represent
