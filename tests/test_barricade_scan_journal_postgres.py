@@ -535,6 +535,43 @@ def test_scan_revisits_delayed_lower_session_id_after_later_commit(database, mon
             journal.BarricadeScanDelivery.id)).all() == ['done', 'done']
 
 
+def test_disconnected_sessions_are_visible_without_replaying_ended_session(database, monkeypatch):
+    prepare_adapter(database, monkeypatch)
+    engine = database.kw['bind']
+    PlayerID.__table__.create(engine)
+    PlayerSession.__table__.create(engine)
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    event = (int(time.time()) + 2) * 1_000_000
+    with database.begin() as session:
+        for pid in ('never-sent', 'previously-uncertain'):
+            player = PlayerID(player_id=pid)
+            session.add(player)
+            session.flush()
+            session.add(PlayerSession(player_id_id=player.id, server_number=3,
+                start=datetime(2026, 1, 1), start_event_us=event,
+                end=datetime(2026, 1, 1), end_event_us=event + 1_000_000))
+    with database() as session:
+        ended = session.scalar(select(PlayerSession.id).join(PlayerID).where(
+            PlayerID.player_id == 'previously-uncertain'))
+    with journal.delivery_scope(3, namespace):
+        delivery = journal.reserve(3, namespace, ended, 'previously-uncertain', 'HLLV')
+        assert journal.finish(delivery, 3, namespace, confirmed=False)
+    journal.resolve_review(3, namespace, delivery, decision='retry', actor='operator', reason='synthetic review')
+    async def run():
+        async def sender(*_args):
+            pytest.fail('must not scan a disconnected session')
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, page_size=1)
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, page_size=1)
+    asyncio.run(run())
+    with database() as session:
+        rows = session.scalars(select(journal.BarricadeScanDelivery)).all()
+        assert {r.player_id: (r.status, r.review_cause) for r in rows} == {
+            'never-sent': ('review', 'session_ended_before_scan'),
+            'previously-uncertain': ('review', 'session_ended_before_scan')}
+    with pytest.raises(ValueError, match='session ended'):
+        journal.resolve_review(3, namespace, delivery, decision='retry', actor='operator', reason='synthetic')
+
+
 def test_async_dispatch_cancellation_before_lock_does_not_send(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     async def run():

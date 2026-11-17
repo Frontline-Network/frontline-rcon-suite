@@ -27,29 +27,42 @@ async def scan_once(server_number, integration_id, game, sender, is_present, *, 
     boundary = await asyncio.to_thread(journal.registration_boundary, server_number, integration_id, credential_id)
     if boundary is None:
         return 'unauthorized'
+    async def record_review(session_id, player_id, cause):
+        def record():
+            with journal.delivery_scope(server_number, integration_id):
+                if (journal.credential_is_registered(server_number, integration_id, credential_id)
+                        and key_is_live(credential_id) is True):
+                    journal.mark_activation_review(server_number, integration_id, session_id, player_id, game, cause)
+        await asyncio.to_thread(record)
+
     after_id = 0
     while True:
         rows = await asyncio.to_thread(journal.find_unreserved_open_sessions,
                                        server_number, integration_id, after_id=after_id, limit=page_size,
                                        include_start=True)
         if not rows:
-            return
+            break
         for session_id, player_id, start_event_us, delivery_status in rows:
             after_id = session_id
             classification = journal.classify_activation_start(boundary, start_event_us)
             if delivery_status != 'queued' and classification in ('before', 'ambiguous', 'unknown'):
-                def record_review():
-                    with journal.delivery_scope(server_number, integration_id):
-                        if (journal.credential_is_registered(server_number, integration_id, credential_id)
-                                and key_is_live(credential_id) is True):
-                            journal.mark_activation_review(server_number, integration_id, session_id, player_id,
-                                                           game, 'activation_' + classification)
-                await asyncio.to_thread(record_review)
+                await record_review(session_id, player_id, 'activation_' + classification)
                 continue
             if delivery_status != 'queued' and classification != 'after':
                 continue
             await dispatch(server_number, integration_id, session_id, player_id, game, sender,
                            credential_id=credential_id, verify_session=is_present)
+        if len(rows) < page_size:
+            break
+    after_id = 0
+    while True:
+        rows = await asyncio.to_thread(journal.find_unreserved_recent_closed_sessions,
+            server_number, integration_id, boundary, after_id=after_id, limit=page_size)
+        if not rows:
+            return
+        for session_id, player_id in rows:
+            after_id = session_id
+            await record_review(session_id, player_id, 'session_ended_before_scan')
         if len(rows) < page_size:
             return
 

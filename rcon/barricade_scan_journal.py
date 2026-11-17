@@ -182,6 +182,8 @@ def resolve_review(server_number: int, integration_id: str, delivery_id: int, *,
                 BarricadeScanDelivery.integration_id == integration_id).with_for_update())
             if row is None or row.status != 'review':
                 raise ValueError('Barricade scan is not awaiting review')
+            if row.review_cause == 'session_ended_before_scan' and decision == 'retry':
+                raise ValueError('The session ended; an automatic retry cannot verify this session')
             row.status = {'confirmed': 'done', 'dismissed': 'reviewed', 'retry': 'queued'}[decision]
             row.updated_at = datetime.now(timezone.utc)
             session.add(BarricadeScanReviewAudit(delivery_id=delivery_id, server_number=server_number,
@@ -296,7 +298,8 @@ def mark_activation_review(server_number: int, integration_id: str, session_id: 
                            player_id: str, game: str, cause: str) -> None:
     """Record an ambiguous pre-send candidate; no remote action has occurred."""
     _require_scope(server_number, integration_id)
-    if (cause not in ('activation_before', 'activation_ambiguous', 'activation_unknown') or
+    if (cause not in ('activation_before', 'activation_ambiguous', 'activation_unknown',
+                      'session_ended_before_scan') or
             game not in ('HLL', 'HLLV') or type(session_id) is not int or session_id <= 0 or
             not isinstance(player_id, str) or not 0 < len(player_id) <= 100):
         raise ValueError('Invalid activation review')
@@ -306,6 +309,40 @@ def mark_activation_review(server_number: int, integration_id: str, session_id: 
             created_at=now, updated_at=now).on_conflict_do_nothing(constraint='uq_barricade_scan_session'))
     with get_session_maker()() as session, session.begin():
         session.execute(stmt)
+        if cause == 'session_ended_before_scan':
+            session.execute(update(BarricadeScanDelivery).where(
+                BarricadeScanDelivery.server_number == server_number,
+                BarricadeScanDelivery.integration_id == integration_id,
+                BarricadeScanDelivery.player_session_id == session_id,
+                BarricadeScanDelivery.player_id == player_id,
+                BarricadeScanDelivery.game == game,
+                BarricadeScanDelivery.status == 'queued').values(
+                    status='review', review_cause=cause, updated_at=now))
+
+
+def find_unreserved_recent_closed_sessions(server_number: int, integration_id: str, boundary_us: int,
+                                            *, after_id: int = 0, limit: int = 100):
+    """Find recently ended candidates without assuming their scan succeeded."""
+    if (type(server_number) is not int or not 1 <= server_number <= 32 or
+            not isinstance(integration_id, str) or not 0 < len(integration_id) <= 128 or
+            type(boundary_us) is not int or boundary_us < 0 or
+            type(after_id) is not int or after_id < 0 or type(limit) is not int or not 1 <= limit <= 1000):
+        raise ValueError('Invalid Barricade closed session query')
+    floor = boundary_us // 1_000_000 * 1_000_000
+    stmt = (select(PlayerSession.id, PlayerID.player_id)
+        .join(PlayerID, PlayerID.id == PlayerSession.player_id_id)
+        .outerjoin(BarricadeScanDelivery, and_(
+            BarricadeScanDelivery.player_session_id == PlayerSession.id,
+            BarricadeScanDelivery.server_number == server_number,
+            BarricadeScanDelivery.integration_id == integration_id))
+        .where(PlayerSession.server_number == server_number, PlayerSession.id > after_id,
+            or_(PlayerSession.end.is_not(None), PlayerSession.end_event_us.is_not(None)),
+            or_(PlayerSession.start_event_us >= floor, PlayerSession.end_event_us >= floor,
+                BarricadeScanDelivery.status == 'queued'),
+            or_(BarricadeScanDelivery.id.is_(None), BarricadeScanDelivery.status == 'queued'))
+        .order_by(PlayerSession.id).limit(limit))
+    with get_session_maker()() as session:
+        return [(row.id, row.player_id) for row in session.execute(stmt)]
 
 
 def reserve(server_number: int, integration_id: str, session_id: int, player_id: str, game: str) -> int | None:

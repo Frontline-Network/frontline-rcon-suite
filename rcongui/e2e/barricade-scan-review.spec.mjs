@@ -29,4 +29,11 @@ for (const sample of [
       query: { demo_barricade_review: 1, demo_barricade_cause: "activation_before" } });
     await expect(main.getByTestId("barricade-scan-review").getByText(sample.before, { exact: false })).toBeVisible();
   });
+  test(`does not offer automatic retry for ended session in ${sample.language}`, async ({ page }) => {
+    const main = await openDemoPage(page, "/records/blacklists/manage", { language: sample.language,
+      query: { demo_barricade_review: 1, demo_barricade_cause: "session_ended_before_scan" } });
+    const panel = main.getByTestId("barricade-scan-review");
+    await panel.getByRole("combobox", { name: sample.decision }).click();
+    await expect(page.getByRole("option", { name: sample.retry })).toHaveCount(0);
+  });
 }
