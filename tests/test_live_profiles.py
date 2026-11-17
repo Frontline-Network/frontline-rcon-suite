@@ -179,6 +179,51 @@ def test_live_profile_current_session_is_local_but_count_remains_global(live_pro
     assert missing["sessions_count"] == 2 and missing["current_playtime_seconds"] == 0
 
 
+def test_late_older_connect_does_not_replace_newer_live_session(live_profile_database):
+    _engine, sessions = live_profile_database
+    now = datetime.now(timezone.utc)
+    with sessions.begin() as session:
+        player = PlayerID(player_id='synthetic-late-connect', steam_id=None, created=now.replace(tzinfo=None))
+        session.add(player)
+        session.flush()
+        old = now - timedelta(hours=1)
+        recent = now - timedelta(minutes=5)
+        session.add_all([
+            PlayerSession(player_id_id=player.id, start=recent.replace(tzinfo=None), end=None,
+                          start_event_us=int(recent.timestamp() * 1_000_000),
+                          created=(now - timedelta(minutes=4)).replace(tzinfo=None), server_number=1),
+            PlayerSession(player_id_id=player.id, start=old.replace(tzinfo=None),
+                          end=(old + timedelta(minutes=10)).replace(tzinfo=None),
+                          start_event_us=int(old.timestamp() * 1_000_000),
+                          created=now.replace(tzinfo=None), server_number=1),
+        ])
+    profile = get_live_profiles(['synthetic-late-connect'])[0]
+    assert profile['sessions_count'] == 2
+    assert 295 <= profile['current_playtime_seconds'] <= 310
+
+
+def test_newer_legacy_session_retains_creation_time_fallback(live_profile_database):
+    _engine, sessions = live_profile_database
+    now = datetime.now(timezone.utc)
+    with sessions.begin() as session:
+        player = PlayerID(player_id='synthetic-mixed-sessions', steam_id=None, created=now.replace(tzinfo=None))
+        session.add(player)
+        session.flush()
+        old = now - timedelta(hours=1)
+        legacy = now - timedelta(minutes=5)
+        session.add_all([
+            PlayerSession(player_id_id=player.id, start=legacy.replace(tzinfo=None), end=None,
+                          start_event_us=None, created=legacy.replace(tzinfo=None), server_number=1),
+            PlayerSession(player_id_id=player.id, start=old.replace(tzinfo=None),
+                          end=(old + timedelta(minutes=10)).replace(tzinfo=None),
+                          start_event_us=int(old.timestamp() * 1_000_000),
+                          created=now.replace(tzinfo=None), server_number=1),
+        ])
+    profile = get_live_profiles(['synthetic-mixed-sessions'])[0]
+    assert profile['sessions_count'] == 2
+    assert 295 <= profile['current_playtime_seconds'] <= 310
+
+
 def test_live_profile_query_count_is_constant_and_joins_scalar_relationships(
     live_profile_database,
 ):
