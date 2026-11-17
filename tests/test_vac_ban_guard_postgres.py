@@ -41,7 +41,10 @@ def test_uncertain_result_survives_reconnect_and_blocks_concurrent_requests(data
         action.assert_called_once()
 
 
-@pytest.mark.parametrize('blacklist_id,result', [(None, True), (None, False), (7, {'id': 42})])
+@pytest.mark.parametrize('blacklist_id,result', [
+    (None, True), (None, False),
+    (7, {'id': 42, 'player_id': 'synthetic-player', 'blacklist': {'id': 7}}),
+])
 def test_explicit_results_release_reservation(database, monkeypatch, blacklist_id, result):
     monkeypatch.setattr('rcon.hooks.get_server_number', lambda: 3)
     player, config = fixtures(blacklist_id)
@@ -68,7 +71,12 @@ def test_global_transition_hold_blocks_until_operator_review(database, monkeypat
         action.assert_called_once()
 
 
-@pytest.mark.parametrize('blacklist_id,result', [(None, None), (7, {}), (7, {'reason': 'missing id'})])
+@pytest.mark.parametrize('blacklist_id,result', [
+    (None, None), (7, {}), (7, {'reason': 'missing id'}),
+    (7, {'id': 42, 'player_id': 'other', 'blacklist': {'id': 7}}),
+    (7, {'id': 42, 'player_id': 'synthetic-player', 'blacklist': {'id': 8}}),
+    (7, {'id': True, 'player_id': 'synthetic-player', 'blacklist': {'id': 7}}),
+])
 def test_ambiguous_result_remains_pending(database, monkeypatch, blacklist_id, result):
     monkeypatch.setattr('rcon.hooks.get_server_number', lambda: 3)
     player, config = fixtures(blacklist_id)

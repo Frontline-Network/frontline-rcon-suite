@@ -625,8 +625,15 @@ def ban_if_has_vac_bans(rcon: Rcon, player_id: str, name: str):
             except Exception:
                 logger.exception("VAC action result uncertain; reservation retained")
                 return
-            confirmed = (config.blacklist_id is not None and isinstance(result, dict) and bool(result.get("id"))) or (
+            confirmed = (
                 config.blacklist_id is None and result is True
+            ) or (
+                config.blacklist_id is not None
+                and isinstance(result, dict)
+                and type(result.get('id')) is int and result['id'] > 0
+                and result.get('player_id') == str(player_id)
+                and isinstance(result.get('blacklist'), dict)
+                and result['blacklist'].get('id') == config.blacklist_id
             )
             if confirmed or result is False:
                 try:
