@@ -28,6 +28,18 @@ async def scan_once(server_number, integration_id, game, sender, is_present, *, 
     boundary = await asyncio.to_thread(journal.registration_boundary, server_number, integration_id, credential_id)
     if boundary is None:
         return 'unauthorized'
+    def recover():
+        # Recovery must not depend on a new eligible player: a worker may have
+        # died after sending while the server is now empty or unavailable.
+        # The same scope lock prevents reclassifying an active sender.
+        with journal.delivery_scope(server_number, integration_id):
+            if (not journal.credential_is_registered(server_number, integration_id, credential_id)
+                    or key_is_live(credential_id) is not True):
+                return False
+            journal.recover_interrupted(server_number, integration_id)
+            return True
+    if not await asyncio.to_thread(recover):
+        return 'unauthorized'
     # Missing roster evidence skips open candidates for this pass, never
     # promotes stale database rows to online presence. Closed sessions are
     # still traversed below and may be retained for review.
