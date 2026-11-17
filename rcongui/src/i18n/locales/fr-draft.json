@@ -4718,6 +4718,7 @@
       "notAuthenticated": "Vous n'êtes pas authentifié.",
       "notAuthorized": "Vous n'êtes pas autorisé à effectuer cette action.",
       "connectionProblem": "Il y a eu un problème de connexion à votre serveur CRCON.",
+      "gameServerUnavailable": "Le serveur de jeu est actuellement indisponible. Veuillez réessayer plus tard.",
       "invalidJson": "Le serveur n'a pas retourné JSON valide.",
       "htmlResponse": "La commande API \"{{command}}\" a retourné un document HTML au lieu des données.",
       "mobileRequestFailed": "La requête mobile API a échoué.",

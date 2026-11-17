@@ -210,6 +210,9 @@ async function handleFetchResponse(req, res, cmd) {
     if (isText) {
       error = data;
     }
+    if (res.status === 503 && cmd === "get_public_info" && error === "game_server_unavailable") {
+      throw new APIError(i18n.t("sharedOperations.http.gameServerUnavailable"), cmd, 503);
+    }
     switch (res.status) {
       case 401:
         markSessionExpired(cmd);
