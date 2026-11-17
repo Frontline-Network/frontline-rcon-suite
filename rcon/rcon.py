@@ -352,7 +352,7 @@ class Rcon(ServerCtl):
         rows = super().get_all_player_info()
         return {"captured_at": datetime.now(timezone.utc).timestamp(), "players": rows}
 
-    def get_all_player_info(self) -> list[CanonicalPlayerInfo]:
+    def get_all_player_info(self, *, strict: bool = False) -> list[CanonicalPlayerInfo]:
         """Expose only validated, game-neutral player DTOs above the RCON boundary."""
         adapter = self.game_profile.player_adapter
         if adapter is None:  # Defensive guard for third-party game profiles.
@@ -363,6 +363,10 @@ class Rcon(ServerCtl):
             try:
                 players.append(adapter.adapt(raw))
             except PlayerResponseAdapterError as exc:
+                if strict:
+                    # Callers making an absence decision must not mistake a
+                    # partially decoded roster for a complete snapshot.
+                    raise
                 logger.warning(
                     "Ignoring invalid player response from %s: %s",
                     self.config.game,

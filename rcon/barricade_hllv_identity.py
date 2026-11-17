@@ -25,7 +25,9 @@ def prepare_online_steam_identity(rcon, steam_id: str) -> dict:
         raise ValueError('Invalid Steam ID')
     rcon.get_raw_player_snapshot.clear_for()
     with rcon.without_retries():
-        players = rcon.get_all_player_info()
+        # A silently skipped malformed player would make an online Steam ID
+        # appear absent, potentially acknowledging an unenforced restriction.
+        players = rcon.get_all_player_info(strict=True)
     if not isinstance(players, list):
         raise ValueError('Invalid player snapshot')
     matching = set()

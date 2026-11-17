@@ -7,6 +7,9 @@ import pytest
 from rcon import blacklist
 from rcon.barricade_hllv_identity import prepare_online_steam_identity
 from rcon.types import BlacklistSyncMethod, GameEnum
+from rcon.game.hllv.player_adapter import HLLVPlayerInfoAdapter
+from rcon.game.player_adapter import PlayerResponseAdapterError
+from rcon.rcon import Rcon
 
 STEAM = '76561198036685843'
 EOS = '0123456789abcdef0123456789abcdef'
@@ -37,6 +40,26 @@ def test_preparation_uses_fresh_verified_steam_eos_and_ignores_console():
     api = api_with_players([row(platform='EPlatformFamily::Xbox', steam=None), row()])
     assert prepare_online_steam_identity(api, STEAM) == {'steam_id': STEAM, 'eos_id': EOS}
     api.get_raw_player_snapshot.clear_for.assert_called_once_with()
+    api.get_all_player_info.assert_called_once_with(strict=True)
+
+
+def test_malformed_online_roster_is_not_treated_as_offline():
+    api = api_with_players([])
+    api.game_profile.player_adapter = HLLVPlayerInfoAdapter()
+    api.get_raw_player_snapshot.return_value = {
+        'players': [{'iD': EOS, 'eosId': EOS, 'steamId': STEAM,
+                     'platform': 'EPlatformFamily::Steam'}],  # Missing name.
+    }
+    api.get_all_player_info.side_effect = lambda **kwargs: Rcon.get_all_player_info(api, **kwargs)
+    with pytest.raises(PlayerResponseAdapterError):
+        prepare_online_steam_identity(api, STEAM)
+
+
+def test_regular_roster_consumers_keep_skipping_invalid_rows():
+    api = api_with_players([])
+    api.game_profile.player_adapter = HLLVPlayerInfoAdapter()
+    api.get_raw_player_snapshot.return_value = {'players': [{'iD': EOS}]}
+    assert Rcon.get_all_player_info(api) == []
 
 
 def test_duplicate_online_eos_links_fail_without_guessing():
