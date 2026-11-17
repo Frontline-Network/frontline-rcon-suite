@@ -930,6 +930,7 @@ export function makeServer({ environment = "development" } = {}) {
         const results = showFixture ? [{ id: 1, command: "EXPIRE_ALL", review_kind: reviewKind, payload: { player_id: "fake-console-id" }, updated_at: "2026-01-02T12:00:00Z" }] : [];
         return ok({ total: results.length, results });
       });
+      this.get("/get_barricade_scan_status", () => ok({ state: "disabled" }));
       this.get("/get_barricade_scan_reviews", () => {
         const show = typeof window !== "undefined" &&
           new URLSearchParams(window.location.search).get("demo_barricade_review") === "1" &&

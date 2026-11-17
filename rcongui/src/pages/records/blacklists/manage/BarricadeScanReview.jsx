@@ -35,10 +35,20 @@ export default function BarricadeScanReview() {
   const canInspect = !!has("can_view_blacklists");
   const canReview = !!has("can_change_blacklists");
   const [journal, setJournal] = useState({ total: 0, results: [] });
+  const [status, setStatus] = useState("checking");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [offset, setOffset] = useState(0);
   const load = useCallback(async () => {
+    const loadStatus = async () => {
+      try {
+        const response = await get("get_barricade_scan_status");
+        const data = await response.json();
+        const allowed = ["disabled", "unregistered", "waiting_roster", "waiting_logs", "pending_logs", "evidence_available", "unavailable"];
+        setStatus(response.ok && !data.failed && allowed.includes(data.result?.state) ? data.result.state : "unavailable");
+      } catch { setStatus("unavailable"); }
+    };
+    void loadStatus();
     try {
       const response = await get(`get_barricade_scan_reviews?limit=50&offset=${offset}`);
       const data = await response.json();
@@ -67,6 +77,7 @@ export default function BarricadeScanReview() {
         <Button size="small" onClick={load} disabled={busy}>{t("barricadeScanReview.refresh")}</Button>
       </Stack>
       <Typography variant="body2" color="text.secondary">{t("barricadeScanReview.help")}</Typography>
+      <Alert severity={status === "evidence_available" ? "info" : "warning"}>{t(`barricadeScanReview.state.${status}`)}</Alert>
       {error && <Alert severity="error">{error}</Alert>}
       {!error && !journal.results.length && <Typography variant="body2">{t("barricadeScanReview.empty")}</Typography>}
       {journal.results.map((row) => <ReviewRow key={row.id} row={row} canReview={canReview} busy={busy} onSave={save} />)}
