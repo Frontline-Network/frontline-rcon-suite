@@ -346,15 +346,29 @@ class PlayerID(Base):
             PlayerActionState.PERMABAN.name: counts[PlayerActionState.PERMABAN],
         }
 
+    @staticmethod
+    def _session_order_key(session):
+        if session.start_event_us is not None:
+            instant = session.start_event_us
+        elif session.created is not None:
+            created = session.created
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            instant = round(created.timestamp() * 1_000_000)
+        else:
+            instant = float('-inf')
+        return instant, session.id or 0
+
     def get_total_playtime_seconds(self) -> int:
         total = 0
+        latest = max(self.sessions, key=self._session_order_key, default=None)
 
-        for i, s in enumerate(self.sessions):
+        for s in self.sessions:
             if s.start_event_us is not None and s.end_event_us is not None:
                 total += max(0, (s.end_event_us - s.start_event_us) / 1_000_000)
-            elif s.start_event_us is not None and s.end is None and i == 0:
+            elif s.start_event_us is not None and s.end is None and s is latest:
                 total += max(0, datetime.now(timezone.utc).timestamp() - s.start_event_us / 1_000_000)
-            elif not s.end and s.start and i == 0:
+            elif not s.end and s.start and s is latest:
                 total += (datetime.now() - s.start).total_seconds()
             elif s.end and s.start:
                 total += (s.end - s.start).total_seconds()
@@ -362,14 +376,15 @@ class PlayerID(Base):
         return int(total)
 
     def get_current_playtime_seconds(self) -> int:
-        if self.sessions:
-            if self.sessions[0].end:
-                return 0
-            if self.sessions[0].start_event_us is not None:
-                return max(0, int(datetime.now(timezone.utc).timestamp() - self.sessions[0].start_event_us / 1_000_000))
-            start = self.sessions[0].start or self.sessions[0].created
-            return int((datetime.now() - start).total_seconds())
-        return 0
+        server = int(get_server_number())
+        local = (s for s in self.sessions if s.server_number == server)
+        session = max(local, key=self._session_order_key, default=None)
+        if session is None or session.end is not None or session.end_event_us is not None:
+            return 0
+        if session.start_event_us is not None:
+            return max(0, int(datetime.now(timezone.utc).timestamp() - session.start_event_us / 1_000_000))
+        start = session.start or session.created
+        return max(0, int((datetime.now() - start).total_seconds())) if start else 0
 
     def to_dict(
         self,
