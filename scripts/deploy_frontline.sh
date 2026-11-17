@@ -45,14 +45,18 @@ if [[ ! -f compose.yaml || ! -f compose.mobile-admin.yaml \
   exit 1
 fi
 
-# The generated compose.yaml is installation-specific: a one-server host must
-# not start backend_2/frontend_2/supervisor_2 merely because the shared
-# Frontline override also knows how to customize those services. Start with
-# only the services that exist in the generated base file. The optional mobile
-# push worker is added below only when its relay is configured.
-mapfile -t deployment_services < <(
-  docker compose -f compose.yaml config --services
-)
+# A generated base file can retain intentionally stopped server definitions.
+# Preserve their state even when they are still listed in Compose. Capture both
+# commands' exit statuses; failure to observe runtime state must abort.
+configured_services="$(docker compose -f compose.yaml config --services)"
+running_services="$(docker compose -f compose.yaml ps --status running --services)"
+selected_services="$(python3 scripts/select_deployment_services.py \
+  --configured "$configured_services" --running "$running_services")"
+if [[ -z "$selected_services" ]]; then
+  echo "No deployment services found in compose.yaml." >&2
+  exit 1
+fi
+mapfile -t deployment_services <<< "$selected_services"
 if ((${#deployment_services[@]} == 0)); then
   echo "No deployment services found in compose.yaml." >&2
   exit 1
@@ -381,6 +385,10 @@ abort_before_service_change() {
   fi
   exit 1
 }
+if ! compose_target config --format json | python3 scripts/select_deployment_services.py \
+    --check-dependencies "${deployment_services[@]}"; then
+  abort_before_service_change
+fi
 echo "Building immutable images for $target_short..."
 if ! compose_target build --pull "${deployment_services[@]}"; then
   abort_before_service_change
