@@ -33,6 +33,16 @@ active it waits for the sender to finish; if it remains interrupted, it moves
 the entry to review without transmitting again. A completed send is not
 overwritten. A later retry remains a separate, explicitly audited decision.
 
+The public Barricade custom-integration handler at commit
+`de36456bb4aebbc253fe6d1839af7efac8bbbdf8` runs its player-alert handler before
+responding. That handler can return without an alert (for example, when no
+alerts channel is configured); a successful response confirms completion of
+the handler, not that a Discord message was delivered. A downstream failure
+can occur after some side effects, and a repeated scan can invoke the alert
+path again. Therefore a failed or missing response must not be replayed
+automatically. This source inspection and isolated contract test do not prove
+which Barricade version is running for a particular deployment.
+
 With the new consumer, an explicit `frontline_integration` connection is
 rejected if durable scanning is disabled or the binding is invalid. A peer
 without that parameter keeps the legacy path. **Older application versions do
