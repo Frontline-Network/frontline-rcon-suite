@@ -1520,12 +1520,21 @@ class BlacklistCommandHandler:
             if steam_ids:
                 if payload.blacklist["sync"] != BlacklistSyncMethod.KICK_ONLY:
                     raise HLLVSteamBanOwnershipUnverified('Steam list deletion needs EOS ownership review')
-                # Removing a kick-only entry with no remaining Steam record
-                # needs no game-server action or identity guess. Preflight all
-                # Steam entries before touching any other player, so a case
-                # that still needs reconciliation cannot partially execute.
-                if any(is_player_blacklisted(sess, player_id) is not None for player_id in steam_ids):
-                    raise HLLVSteamIdentityUnverified('Steam list deletion has remaining restrictions')
+                # No action is needed if there is no remaining restriction,
+                # or if an existing one was strictly higher priority even
+                # before deletion. Equal priority is ambiguous: record order
+                # can determine which rule was effective. Preflight every
+                # Steam entry before touching any other player.
+                for player_id in steam_ids:
+                    remaining = is_player_blacklisted(sess, player_id)
+                    if remaining is None:
+                        continue
+                    removed_created, removed_expires = payload.banned_players[player_id]
+                    if not _is_higher_priority_record(
+                        remaining.created_at, remaining.expires_at,
+                        removed_created, removed_expires,
+                    ):
+                        raise HLLVSteamIdentityUnverified('Steam list deletion has remaining restrictions')
             for player_id, (created_at, expires_at) in payload.banned_players.items():
                 if player_id in steam_ids:
                     continue

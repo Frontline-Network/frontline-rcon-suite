@@ -649,6 +649,40 @@ def test_hllv_expire_all_only_skips_unban_for_proven_kick_only_records(
     api.remove_perma_ban.assert_not_called()
 
 
+@pytest.mark.parametrize('remaining_hours,expected', [(3, 'done'), (2, 'review'), (1, 'review')])
+def test_hllv_deleted_kick_list_with_remaining_steam_restriction_uses_priority(
+        database, existing_blacklist, monkeypatch, remaining_hours, expected):
+    from rcon.types import GameEnum
+
+    record_id, first_id, second_id = existing_blacklist
+    now = datetime.now(timezone.utc)
+    with database() as session, session.begin():
+        entry = session.get(BlacklistRecord, record_id)
+        entry.player.player_id = '76561198036685843'
+        entry.created_at = now
+        entry.expires_at = now + timedelta(hours=2)
+        entry.blacklist.sync = BlacklistSyncMethod.KICK_ONLY
+        entry.blacklist.servers = 4
+        other = session.get(Blacklist, second_id)
+        other.servers = 4
+        session.add(BlacklistRecord(player_id_id=entry.player_id_id, blacklist_id=other.id,
+                                    created_at=now, expires_at=now + timedelta(hours=remaining_hours),
+                                    reason='synthetic', admin_name='test'))
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    assert blacklist.delete_blacklist(first_id)
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == expected
+    api.kick.assert_not_called()
+    api.temp_ban.assert_not_called()
+    api.perma_ban.assert_not_called()
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
+
+
 @pytest.mark.parametrize('missing', ['name', 'steamId', 'platform'])
 def test_hllv_malformed_roster_defers_then_recovers_without_losing_delivery(database, existing_blacklist, monkeypatch, missing):
     from contextlib import nullcontext

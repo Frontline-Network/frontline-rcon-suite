@@ -374,14 +374,39 @@ def test_kick_only_list_delete_preflights_steam_before_any_other_player_action()
     api = api_with_players([])
     handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
     handler.rcon = api
+    now = datetime.now(timezone.utc)
     payload = SimpleNamespace(blacklist={'sync': BlacklistSyncMethod.KICK_ONLY},
-                              banned_players={EOS: (None, None), STEAM: (None, None)})
+                              banned_players={EOS: (now, None), STEAM: (now, None)})
     with patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
-         patch.object(blacklist, 'is_player_blacklisted', return_value=record()), \
+         patch.object(blacklist, 'is_player_blacklisted', return_value=record(created=now)), \
          patch.object(blacklist, 'synchronize_ban') as sync:
         with pytest.raises(blacklist.HLLVSteamIdentityUnverified):
             handler.handle_delete_list(payload)
     sync.assert_not_called()
+
+
+@pytest.mark.parametrize('remaining_hours,expected_review', [(3, False), (2, True), (1, True)])
+def test_kick_list_deletion_only_skips_strictly_higher_remaining_steam_restriction(
+        remaining_hours, expected_review):
+    api = api_with_players([])
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api
+    now = datetime.now(timezone.utc)
+    removed = now + timedelta(hours=2)
+    payload = SimpleNamespace(blacklist={'sync': BlacklistSyncMethod.KICK_ONLY},
+                              banned_players={STEAM: (now, removed)})
+    remaining = record(expires=now + timedelta(hours=remaining_hours), created=now)
+    with patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
+         patch.object(blacklist, 'is_player_blacklisted', return_value=remaining), \
+         patch.object(blacklist, 'synchronize_ban') as sync:
+        if expected_review:
+            with pytest.raises(blacklist.HLLVSteamIdentityUnverified):
+                handler.handle_delete_list(payload)
+        else:
+            handler.handle_delete_list(payload)
+    sync.assert_not_called()
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
 
 
 def test_kick_only_list_delete_keeps_other_eos_processing():
