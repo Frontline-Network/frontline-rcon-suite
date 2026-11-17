@@ -477,6 +477,7 @@ class RconAPI(Rcon):
     def get_pending_automod_actions(self, limit: int = 50):
         from rcon.automods import action_guard, tk_action_guard
         server = int(get_server_number())
+        limit = int(limit)
         general = action_guard.list_pending(server, limit)
         teamkill = tk_action_guard.list_pending(server, limit)
         # ISO timestamps may carry different UTC offsets. Compare instants,

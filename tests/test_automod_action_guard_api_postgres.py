@@ -40,6 +40,17 @@ def guard_api(monkeypatch):
         root.dispose()
 
 
+def test_review_endpoint_accepts_real_query_string_limit(guard_api):
+    action_guard.reserve(3, 'synthetic-one', ['no-leader'], 'message')
+    action_guard.reserve(3, 'synthetic-two', ['no-leader'], 'message')
+    response = invoke('get_pending_automod_actions', 'GET',
+                      {'api.can_view_player_profile'}, {'limit': '1'})
+    assert response.status_code == 200
+    result = json.loads(response.content)['result']
+    assert len(result['results']) == 1
+    assert result['more'] is True
+
+
 def test_guard_review_requires_permissions_and_audits_actor(guard_api):
     token = action_guard.reserve(3, "fake-console", ["no-leader"], "message")
     hidden = action_guard.reserve(4, "other-console", ["other-rule"], "message")

@@ -67,7 +67,7 @@ def invoke(name, method, permissions, body=None):
             permissions=views.ENDPOINT_PERMISSIONS[func], endpoint_allowed_http_methods=views.RCON_ENDPOINT_HTTP_METHODS)
     factory = RequestFactory()
     request = (factory.post(f"/api/{name}", data=json.dumps(body or {}), content_type="application/json")
-               if method == "POST" else factory.get(f"/api/{name}"))
+               if method == "POST" else factory.get(f"/api/{name}", data=body or {}))
     request.user = SimpleNamespace(is_authenticated=True, username="Operator",
                                    has_perms=lambda needed: set(needed).issubset(permissions))
     with mock.patch.object(auth, "check_api_key"), mock.patch("api.audit_log.enter_session"):
