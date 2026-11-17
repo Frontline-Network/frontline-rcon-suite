@@ -20,6 +20,7 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import SecurityOutlinedIcon from "@mui/icons-material/SecurityOutlined";
 import SyncAltIcon from "@mui/icons-material/SyncAlt";
 import BlacklistSyncReview from "./BlacklistSyncReview";
+import BarricadeScanReview from "./BarricadeScanReview";
 import {
   get,
   handle_http_errors,
@@ -281,6 +282,7 @@ const BlacklistLists = () => {
       {isLoading ? <LinearProgress /> : null}
 
       <BlacklistSyncReview />
+      <BarricadeScanReview />
 
       <Box
         component="section"
