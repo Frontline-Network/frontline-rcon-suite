@@ -591,6 +591,10 @@ def get_players_by_appearance(
                     "last"
                 ),
                 func.max(PlayerSession.end_event_us).label("last_end_event_us"),
+                func.min(PlayerSession.start_event_us).label("first_start_event_us"),
+                func.sum(case((PlayerSession.start_event_us.is_(None), 1), else_=0)).label(
+                    "unverified_start_count"
+                ),
                 func.sum(case((PlayerSession.end_event_us.is_(None), 1), else_=0)).label(
                     "unverified_end_count"
                 ),
@@ -650,7 +654,8 @@ def get_players_by_appearance(
         sort_cases.append((sub.c.unverified_end_count == 0, sub.c.last_end_event_us))
         effective_sort = case(*sort_cases, else_=legacy_sort)
         query = sess.query(PlayerID, sub.c.first, effective_last,
-                           sub.c.last_end_event_us, sub.c.unverified_end_count).outerjoin(
+                           sub.c.last_end_event_us, sub.c.unverified_end_count,
+                           sub.c.first_start_event_us, sub.c.unverified_start_count).outerjoin(
             sub, sub.c.player_id_id == PlayerID.id
         )
 
@@ -819,7 +824,8 @@ def get_players_by_appearance(
                         (n.name for n in p[0].names), key=cmp_to_key(sort_name_match)
                     ),
                     "first_seen_timestamp_ms": (
-                        int(p[1].timestamp() * 1000) if p[1] else None
+                        int(p[5] // 1000) if p[6] == 0 and p[5] is not None
+                        else int(p[1].timestamp() * 1000) if p[1] else None
                     ),
                     "last_seen_timestamp_ms": last_seen_metadata(p[0].player_id, p[2], p[3], p[4])[0],
                     "last_seen_observation_window_ms": last_seen_metadata(p[0].player_id, p[2], p[3], p[4])[1],
