@@ -4,6 +4,8 @@ Used only by the opt-in consumer. A fresh log poll is not a guarantee that the
 game server has already exposed every event; an unobserved reconnect remains
 possible.
 """
+import asyncio
+import math
 import time
 
 from sqlalchemy import select
@@ -36,7 +38,8 @@ def player_is_currently_observed(red, *, scope: str, server_number: int, player_
     return player_id in players if players is not None else None
 
 
-def session_has_bounded_evidence(red, *, scope: str, server_number: int, session_id: int, player_id: str):
+def session_has_bounded_evidence(red, *, scope: str, server_number: int, session_id: int, player_id: str,
+                                 min_poll_started_at=None):
     """True means observed evidence is consistent, not that unseen logs cannot exist.
 
     False means a fresh roster does not contain the player. None means the
@@ -44,6 +47,8 @@ def session_has_bounded_evidence(red, *, scope: str, server_number: int, session
     """
     if (type(server_number) is not int or not 1 <= server_number <= 32 or
             type(session_id) is not int or session_id <= 0 or
+            (min_poll_started_at is not None and
+             (type(min_poll_started_at) not in (int, float) or not math.isfinite(min_poll_started_at))) or
             not isinstance(player_id, str) or not player_id or len(player_id) > 100):
         return None
     try:
@@ -57,6 +62,7 @@ def session_has_bounded_evidence(red, *, scope: str, server_number: int, session
             return False
         observation = read_journal_observation(red, scope=scope, server_number=server_number)
         if (observation is None or observation.pending or observation.unpublished_anonymous or
+                (min_poll_started_at is not None and observation.poll_started_at <= min_poll_started_at) or
                 observation.poll_started_at < window.latest):
             return None
         with get_session_maker()() as session:
@@ -85,4 +91,28 @@ def session_has_bounded_evidence(red, *, scope: str, server_number: int, session
         return True
     except Exception:
         # DB, Redis and malformed configuration are unknown, never presence.
+        return None
+
+
+async def confirm_with_fresh_poll(red, *, scope: str, server_number: int, session_id: int,
+                                  player_id: str, timeout: float = 8):
+    """Require a collector poll begun after a Redis-time barrier.
+
+    This prevents a still-readable old observation from authorizing a scan
+    when the collector cannot reach Redis. It cannot prove that subsequent
+    game-server log events have arrived or eliminate a later disconnect race.
+    """
+    try:
+        barrier = await asyncio.to_thread(redis_time, red)
+        deadline = time.monotonic() + timeout
+        while True:
+            result = await asyncio.to_thread(session_has_bounded_evidence, red,
+                scope=scope, server_number=server_number, session_id=session_id,
+                player_id=player_id, min_poll_started_at=barrier)
+            if result is True or result is False:
+                return result
+            if time.monotonic() >= deadline:
+                return None
+            await asyncio.sleep(min(0.25, max(0, deadline - time.monotonic())))
+    except Exception:
         return None

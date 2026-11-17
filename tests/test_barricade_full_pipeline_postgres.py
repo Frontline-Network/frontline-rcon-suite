@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import time
+from threading import Event
 from contextlib import nullcontext
 from datetime import datetime
 from types import SimpleNamespace
@@ -30,7 +31,7 @@ from tests.test_log_loop_session_journal import make_loop
 
 
 @pytest.mark.parametrize('scenario', ['confirmed', 'lost_response', 'pending_event', 'no_marker', 'failed_poll',
-                                      'stale_after_failure', 'stale_after_journal_failure'])
+                                      'stale_after_failure', 'stale_after_journal_failure', 'stale_collector_partition'])
 def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_path, scenario):
     url = os.environ.get('TEST_REDIS_URL')
     if not url:
@@ -97,6 +98,16 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
 
         async def run():
             results = asyncio.Queue()
+            barrier_seen = Event()
+            original_check = presence.session_has_bounded_evidence
+            original_confirm = presence.confirm_with_fresh_poll
+            def observe_check(*args, **kwargs):
+                barrier_seen.set()
+                return original_check(*args, **kwargs)
+            async def short_confirm(*args, **kwargs):
+                return await original_confirm(*args, timeout=1.5, **kwargs)
+            monkeypatch.setattr(presence, 'session_has_bounded_evidence', observe_check)
+            monkeypatch.setattr(presence, 'confirm_with_fresh_poll', short_confirm)
             class TestConsumer(barricade.BarricadeConsumer):
                 async def connect(self):
                     await self.accept()
@@ -118,6 +129,11 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
                 socket = ApplicationCommunicator(app, ws_scope)
                 await socket.send_input({'type': 'websocket.connect'})
                 assert (await socket.receive_output(timeout=5))['type'] == 'websocket.accept'
+                assert await asyncio.to_thread(barrier_seen.wait, 3)
+                if scenario in ('confirmed', 'lost_response', 'pending_event'):
+                    # The scan's barrier already exists; simulate the next real
+                    # collector pass, rather than reusing the old observation.
+                    await asyncio.to_thread(collector.process_logs)
                 if scenario in ('confirmed', 'lost_response'):
                     request = json.loads((await socket.receive_output(timeout=5))['text'])
                     assert request['request'] == 'scan_players'
@@ -133,7 +149,7 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
             statuses = session.scalars(select(journal.BarricadeScanDelivery.status)).all()
             assert statuses == {'confirmed': ['done'], 'lost_response': ['review'], 'pending_event': [],
                                 'no_marker': [], 'failed_poll': [], 'stale_after_failure': [],
-                                'stale_after_journal_failure': []}[scenario]
+                                'stale_after_journal_failure': [], 'stale_collector_partition': []}[scenario]
     finally:
         red.delete(snapshot_key(scope, 3), observations.observation_key(scope, 3))
         red.close()
