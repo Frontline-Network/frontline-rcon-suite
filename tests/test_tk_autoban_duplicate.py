@@ -23,7 +23,7 @@ def test_only_one_ban_for_multiple_teamkills_in_one_history_scan(monkeypatch):
     second = {**first, 'timestamp_ms': 102000}
     monkeypatch.setattr(tk_autoban, 'get_player_profile', lambda *_: None)
     monkeypatch.setattr(tk_autoban, 'get_recent_logs', lambda **_: {'logs': [second, first, connected]})
-    ban = Mock(return_value={'id': 1})
+    ban = Mock(return_value={'id': 1, 'player_id': 'synthetic-id', 'blacklist': {'id': 1}})
     audit = Mock()
     monkeypatch.setattr(tk_autoban, 'blacklist_or_ban', ban)
     monkeypatch.setattr(tk_autoban, 'send_to_discord_audit', audit)
