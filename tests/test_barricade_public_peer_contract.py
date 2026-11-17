@@ -237,6 +237,33 @@ def test_public_crcon_profile_lookup_never_returns_vietnam_eos():
     request.assert_awaited_once_with('GET', '/get_player_profile', data={'player_id': 123})
 
 
+def test_public_crcon_missing_remote_record_deletes_local_reference():
+    directory = os.environ.get('BARRICADE_PEER_URL_SOURCES')
+    if not directory:
+        pytest.skip('requires pinned public Barricade URL sources')
+    @asynccontextmanager
+    async def fake_session():
+        yield db
+    db = SimpleNamespace(delete=AsyncMock())
+    ban = SimpleNamespace(remote_id='9')
+    async def local_bans(*_args, **_kwargs):
+        yield ban
+    async def community(*_args, **_kwargs):
+        return SimpleNamespace()
+    peer = SimpleNamespace(config=SimpleNamespace(id=1, community_id=2),
+        get_blacklist_bans=AsyncMock(return_value={}), expire_ban=AsyncMock(),
+        logger=logging.getLogger('synthetic-crcon'))
+    synchronize = public_method(Path(directory) / 'crcon.py',
+        '783e5fe6d52071d68b652e39a1fd8c91990d4b22', 'CRCONIntegration', 'synchronize', {
+            'session_factory': SimpleNamespace(begin=fake_session), 'get_community_by_id': community,
+            'schemas': SimpleNamespace(CommunityRef=SimpleNamespace(model_validate=lambda value: value)),
+            'Game': (Game.HLLV,), 'get_bans_by_integration': local_bans,
+        })
+    asyncio.run(synchronize(peer))
+    db.delete.assert_awaited_once_with(ban)
+    peer.expire_ban.assert_not_awaited()
+
+
 def test_public_forwarding_uses_vietnam_game_id_as_eos():
     path = os.environ.get('BARRICADE_PEER_FORWARDING_SOURCE')
     if not path:

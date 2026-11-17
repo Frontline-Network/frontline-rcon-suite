@@ -79,6 +79,19 @@ unchanged, and the PostgreSQL test
 as a strict expected failure. Do not enable the guard on an existing connection
 without first resolving existing records and the CRCON synchronization issue.
 The feature flag and isolated tests do not certify the entire peer workflow.
+
+The pinned public peer exposes `GET /communities/me/bans`, requiring its own
+community ban-read scope, with an `integration_id` filter and per-item `game`
+and `remote_id` fields. The Frontline Custom WebSocket credential is not
+evidence of access to that API. Its query uses offset pagination without an
+explicit ordering or snapshot; a live multi-page read can omit or duplicate
+records when data changes. A complete, consistent, correctly scoped snapshot
+is therefore a prerequisite for reconciliation, not something inferred from
+an empty response or one successful page. Filtering existing Frontline rows
+without proving the peer's complete state is unsafe: the peer deletes its
+own local reference when its remote ID is absent. The read-only comparison
+helper classifies overlaps and discrepancies, but does not establish record
+ownership or authorize changes.
 To repeat the optional offline contract test, obtain the four public files at
 that revision (`integrations/custom/websocket.py`, `integrations/custom/integration.py`,
 `integrations/crcon/integration.py`, and `integrations/websocket.py`). Set
