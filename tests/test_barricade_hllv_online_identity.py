@@ -186,8 +186,10 @@ def test_list_delete_and_expire_do_not_guess_steam_ban_ownership():
     api = api_with_players([row()])
     handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
     handler.rcon = api
-    payload = SimpleNamespace(banned_players={EOS: (None, None), STEAM: (None, None)})
-    with patch.object(blacklist, 'synchronize_ban') as sync:
+    payload = SimpleNamespace(blacklist={'sync': BlacklistSyncMethod.BAN_IMMEDIATELY},
+                              banned_players={EOS: (None, None), STEAM: (None, None)})
+    with patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
+         patch.object(blacklist, 'synchronize_ban') as sync:
         with pytest.raises(blacklist.HLLVSteamBanOwnershipUnverified):
             handler.handle_delete_list(payload)
         with pytest.raises(blacklist.HLLVSteamBanOwnershipUnverified):
@@ -197,3 +199,59 @@ def test_list_delete_and_expire_do_not_guess_steam_ban_ownership():
     api.get_perma_bans.assert_not_called()
     api.remove_temp_ban.assert_not_called()
     api.remove_perma_ban.assert_not_called()
+
+
+def test_deleting_kick_only_steam_list_without_remaining_record_never_unbans():
+    api = api_with_players([])
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api
+    payload = SimpleNamespace(blacklist={'sync': BlacklistSyncMethod.KICK_ONLY},
+                              banned_players={STEAM: (None, None)})
+    with patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
+         patch.object(blacklist, 'is_player_blacklisted', return_value=None), \
+         patch.object(blacklist, 'synchronize_ban') as sync:
+        handler.handle_delete_list(payload)
+    sync.assert_not_called()
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
+
+
+def test_kick_only_list_delete_preflights_steam_before_any_other_player_action():
+    api = api_with_players([])
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api
+    payload = SimpleNamespace(blacklist={'sync': BlacklistSyncMethod.KICK_ONLY},
+                              banned_players={EOS: (None, None), STEAM: (None, None)})
+    with patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
+         patch.object(blacklist, 'is_player_blacklisted', return_value=record()), \
+         patch.object(blacklist, 'synchronize_ban') as sync:
+        with pytest.raises(blacklist.HLLVSteamIdentityUnverified):
+            handler.handle_delete_list(payload)
+    sync.assert_not_called()
+
+
+def test_kick_only_list_delete_keeps_other_eos_processing():
+    api = api_with_players([])
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api
+    payload = SimpleNamespace(blacklist={'sync': BlacklistSyncMethod.KICK_ONLY},
+                              banned_players={EOS: (None, None), STEAM: (None, None)})
+    with patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
+         patch.object(blacklist, 'is_player_blacklisted', return_value=None), \
+         patch.object(blacklist, 'synchronize_ban') as sync:
+        handler.handle_delete_list(payload)
+    sync.assert_called_once_with(api, EOS, None, blacklist.BanState.NONE)
+
+
+def test_classic_hll_steam_list_delete_keeps_existing_behavior():
+    api = api_with_players([])
+    api.game_profile.game = GameEnum.HLL_WW2
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api
+    payload = SimpleNamespace(blacklist={'sync': BlacklistSyncMethod.KICK_ONLY},
+                              banned_players={STEAM: (None, None)})
+    with patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
+         patch.object(blacklist, 'is_player_blacklisted', return_value=None), \
+         patch.object(blacklist, 'synchronize_ban') as sync:
+        handler.handle_delete_list(payload)
+    sync.assert_called_once_with(api, STEAM, None, blacklist.BanState.NONE)

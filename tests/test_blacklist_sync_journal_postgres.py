@@ -627,6 +627,29 @@ def test_deleted_list_delivery_keeps_snapshot_after_source_is_gone(database, exi
         assert "synthetic-player" in command.payload["banned_players"]
 
 
+def test_deleted_kick_only_steam_list_completes_without_game_action(database, existing_blacklist, monkeypatch):
+    from rcon.types import GameEnum
+
+    record_id, first, _ = existing_blacklist
+    with database() as session, session.begin():
+        record = session.get(BlacklistRecord, record_id)
+        record.player.player_id = '76561198036685843'
+        record.blacklist.sync = BlacklistSyncMethod.KICK_ONLY
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 1)
+    monkeypatch.setattr(blacklist, 'get_server_number_mask', lambda: 1)
+    assert blacklist.delete_blacklist(first)
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = mock.Mock()
+    receiver.rcon.game_profile.game = GameEnum.HLL_VIETNAM
+    assert journal.process_one(1, receiver.dispatch) == 'done'
+    with database() as session:
+        row = session.scalar(select(journal.BlacklistSyncDelivery))
+        assert row.status == 'done'
+    receiver.rcon.get_detailed_player_info.assert_not_called()
+    receiver.rcon.remove_temp_ban.assert_not_called()
+    receiver.rcon.remove_perma_ban.assert_not_called()
+
+
 @pytest.mark.parametrize("operation", ["create", "remove", "edit_list", "delete_list", "expire"])
 def test_failed_journal_insert_rolls_back_all_mutations(database, existing_blacklist, monkeypatch, operation):
     record_id, first, _second = existing_blacklist

@@ -1407,12 +1407,22 @@ class BlacklistCommandHandler:
         if not payload.banned_players:
             return
 
-        if any(_is_hllv_steam_id(self.rcon, player_id) for player_id in payload.banned_players):
-            raise HLLVSteamBanOwnershipUnverified('Steam list deletion needs EOS ownership review')
-
         failures = 0
         with blacklist_change_session() as sess:
+            steam_ids = {player_id for player_id in payload.banned_players
+                         if _is_hllv_steam_id(self.rcon, player_id)}
+            if steam_ids:
+                if payload.blacklist["sync"] != BlacklistSyncMethod.KICK_ONLY:
+                    raise HLLVSteamBanOwnershipUnverified('Steam list deletion needs EOS ownership review')
+                # Removing a kick-only entry with no remaining Steam record
+                # needs no game-server action or identity guess. Preflight all
+                # Steam entries before touching any other player, so a case
+                # that still needs reconciliation cannot partially execute.
+                if any(is_player_blacklisted(sess, player_id) is not None for player_id in steam_ids):
+                    raise HLLVSteamIdentityUnverified('Steam list deletion has remaining restrictions')
             for player_id, (created_at, expires_at) in payload.banned_players.items():
+                if player_id in steam_ids:
+                    continue
                 try:
                     new_record = is_player_blacklisted(sess, player_id)
                     if (
