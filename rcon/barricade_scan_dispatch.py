@@ -1,7 +1,7 @@
 """Experimental async adapter for durable Barricade scan delivery.
 
-Not wired to the consumer: caller identity, session discovery and review UI
-must be resolved before it can replace the production scan loop.
+Wired only to explicitly registered opt-in consumers. It must not replace the
+production scan loop until the remaining evidence and rollout gaps are resolved.
 """
 import asyncio
 from contextvars import Context

@@ -1,4 +1,5 @@
 """Synthetic bounded evidence; not a claim about unseen game-server logs."""
+import asyncio
 import time
 from datetime import datetime
 from unittest.mock import Mock
@@ -38,6 +39,14 @@ def test_only_consistent_bounded_evidence_accepts_current_session(database, monk
         return candidate.session_has_bounded_evidence(object(), scope='synthetic', server_number=3,
                                                        session_id=session_id, player_id='synthetic-eos')
     assert check() is True
+    def check_after(barrier):
+        return candidate.session_has_bounded_evidence(object(), scope='synthetic', server_number=3,
+            session_id=session_id, player_id='synthetic-eos', min_poll_started_at=barrier)
+    # A readable but pre-barrier observation must not prove the collector is
+    # currently connected to Redis. Equality is also insufficient.
+    assert check_after(now - 7) is None
+    assert check_after(now - 8) is None
+    assert check_after(now - 9) is True
     roster.side_effect = [(seen, {3}), ({}, {3})]
     assert check() is None
     roster.side_effect = [(seen, {3}), ({'synthetic-eos': PresenceWindow(now - 2, now - 1)}, {3})]
@@ -73,3 +82,20 @@ def test_only_consistent_bounded_evidence_accepts_current_session(database, monk
         session.add(UnidentifiedSessionEvent(fingerprint='x' * 64, server_number=3,
             event_kind='disconnect', event_us=int((now - 1) * 1_000_000), player_name='', raw='synthetic'))
     assert check() is None
+
+
+def test_fresh_poll_barrier_defers_stale_observations_and_accepts_new_poll(monkeypatch):
+    monkeypatch.setattr(candidate, 'redis_time', lambda _red: 123.0)
+    check = Mock(return_value=None)
+    monkeypatch.setattr(candidate, 'session_has_bounded_evidence', check)
+    kwargs = dict(scope='synthetic', server_number=3, session_id=1, player_id='synthetic-eos')
+    assert asyncio.run(candidate.confirm_with_fresh_poll(object(), timeout=0, **kwargs)) is None
+    assert check.call_args.kwargs['min_poll_started_at'] == 123.0
+    check.side_effect = [None, True]
+    assert asyncio.run(candidate.confirm_with_fresh_poll(object(), timeout=2, **kwargs)) is True
+    assert check.call_count == 3
+    check.side_effect = None
+    check.return_value = False
+    assert asyncio.run(candidate.confirm_with_fresh_poll(object(), timeout=2, **kwargs)) is False
+    monkeypatch.setattr(candidate, 'redis_time', Mock(side_effect=OSError('partition')))
+    assert asyncio.run(candidate.confirm_with_fresh_poll(object(), timeout=0, **kwargs)) is None

@@ -20,7 +20,11 @@ fresh when checked. It does not establish their relative ordering, a current
 Barricade connection, complete game logs, or successful scan delivery. A new
 collector pass attempts to invalidate its prior success until that pass
 completes. If the collector cannot reach Redis, the previous observation may
-remain readable until it expires; the marker is not a completeness guarantee.
+remain readable until it expires, so the status display may still report
+individually available evidence. Before each automatic scan, a Redis-time
+barrier now requires a collector poll to begin after the verification starts;
+an older readable observation alone cannot pass that check. The barrier does
+not prove complete game logs or prevent a disconnect immediately afterward.
 
 With the new consumer, an explicit `frontline_integration` connection is
 rejected if durable scanning is disabled or the binding is invalid. A peer
