@@ -47,11 +47,25 @@ At the same public Barricade revision, Custom integrations use the configured
 WebSocket address directly and preserve its query string. Community RCON
 integrations instead append `/ws/barricade` to the configured base URL. Adding
 the integration query to that base URL therefore does not produce the intended
-WebSocket path and query. The current explicit-query binding must not be
-advertised as compatible with the Community RCON integration until an explicit,
-safe peer identity mechanism is designed and tested for it. Do not infer a
-unique peer from a potentially shared API key. The isolated contract test
-exercises both published URL adapters, not the version in actual use.
+WebSocket path and query. An experimental path-scoped proxy route carries an
+explicit peer ID for both the API and WebSocket, but the full integration is
+not yet compatible: RCON3 reports Frontline `v0.9.12` and the published peer
+rejects versions below v10. It also expires active records it does not know in
+its selected blacklist. Do not advertise a compatibility version or activate
+this route until the API contract and blacklist ownership behavior have been
+validated and protected. Do not infer a unique peer from a potentially shared
+API key. The isolated contract test exercises published peer code with
+synthetic data, not the version in actual use.
+The pinned public CRCON peer's `get_player_eos_ids` also returns `None` for
+its Hell Let Loose Vietnam EOS-ID slot even when the profile contains an EOS
+ID. The separate compatibility version cannot change that peer behavior. This
+is specifically a limitation of that lookup method; it does not by itself
+prove that every other Vietnam operation fails. Verify and correct the peer's
+lookup before claiming full Vietnam compatibility. The protective 403 for
+automatic record expiry can interrupt synchronization when Barricade sees an
+unrecognized active record; it protects the record but does not constitute a
+successful synchronization. Do not enable this experimental route as a
+production-ready integration while these conditions remain unresolved.
 To repeat the optional offline contract test, obtain the four public files at
 that revision (`integrations/custom/websocket.py`, `integrations/custom/integration.py`,
 `integrations/crcon/integration.py`, and `integrations/websocket.py`). Set

@@ -89,6 +89,12 @@ def set_temp_msg(request, func, name):
 @require_http_methods(["GET"])
 @ratelimit(key=request_rate_limit_key, rate="30/m", block=True)
 def get_version(request):
+    if "frontline_integration" in request.GET:
+        from .barricade_crcon_compat import COMPATIBILITY_VERSION, authorized_peer
+        if not authorized_peer(request):
+            return api_response(result=None, failed=True, error="Barricade compatibility unavailable",
+                                command="get_version", status_code=403)
+        return api_response(COMPATIBILITY_VERSION, failed=False, command="get_version")
     return api_response(TAG_VERSION, failed=False, command="get_version")
 
 
