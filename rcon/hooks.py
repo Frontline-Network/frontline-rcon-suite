@@ -1,5 +1,6 @@
 import json
 import logging
+from time import monotonic
 import re
 import shlex
 from datetime import UTC, datetime, timedelta, timezone
@@ -9,7 +10,12 @@ from typing import Final
 from discord_webhook import DiscordEmbed
 
 import rcon.steam_utils as steam_utils
-from rcon.barricade_hllv_identity import verified_steam_id as _verified_hllv_steam_id
+from rcon.barricade_hllv_identity import (
+    NON_STEAM_FAMILIES,
+    prepare_online_identity_snapshot,
+    prepare_online_steam_identity,
+    verified_steam_id as _verified_hllv_steam_id,
+)
 from discord.utils import escape_markdown
 from rcon.arguments import max_arg_index, replace_params
 from rcon.automods import action_guard
@@ -421,12 +427,57 @@ def _connect_blacklist_record(sess, player_id: str, verified_steam_id: str | Non
     return get_highest_priority_record(records) if records else None
 
 
+def _connect_verified_steam_id(rcon, player_id: str, player_info: dict | None) -> str | None:
+    steam_id = _verified_hllv_steam_id(rcon, player_id, player_info)
+    if steam_id or getattr(getattr(rcon, 'game_profile', None), 'game', None) != GameEnum.HLL_VIETNAM:
+        return steam_id
+    if isinstance(player_info, dict):
+        platform = str(player_info.get('platform') or '').strip().lower()
+        if (player_info.get('player_id') == player_id and player_info.get('eos_id') == player_id
+                and platform in NON_STEAM_FAMILIES):
+            return None
+    try:
+        # A complete, fresh server roster may contain the alias missing from
+        # the individual player response. Never use names or old associations.
+        return prepare_online_identity_snapshot(rcon).get(player_id, {}).get('steam_id')
+    except Exception:
+        logger.warning('Unable to verify HLLV Steam identity on connect; EOS-only check used')
+        return None
+
+
 def ban_if_blacklisted(rcon: Rcon, player_id: str, name: str, verified_steam_id: str | None = None):
     """Return whether a restriction exists and whether its action was confirmed."""
+    started_at = datetime.now(timezone.utc)
     with enter_session() as sess:
         blacklist = _connect_blacklist_record(sess, player_id, verified_steam_id)
         if not blacklist:
             return False, False
+        needs_steam = (verified_steam_id and getattr(getattr(blacklist, 'player', None), 'player_id', None)
+                       == verified_steam_id)
+        record_id = blacklist.id if needs_steam else None
+
+    def defer(record_id):
+        try:
+            from rcon.blacklist_sync_journal import enqueue_connect_reconciliation
+            enqueue_connect_reconciliation(int(get_server_number()), verified_steam_id, record_id, started_at)
+        except Exception:
+            logger.exception('Unable to queue unattempted HLLV blacklist reconciliation')
+
+    prepared_at = None
+    if needs_steam:
+        try:
+            # A live roster can be slow or unavailable; never hold the shared
+            # blacklist mutation lock while making this read.
+            identity = prepare_online_steam_identity(rcon, verified_steam_id)
+            if identity.get('eos_id') != player_id:
+                raise RuntimeError('HLLV Steam association changed before blacklist action')
+            prepared_at = monotonic()
+        except Exception:
+            logger.warning('Unable to revalidate HLLV Steam identity for blacklist action')
+            defer(record_id)
+            return True, False
+    deferred_record_id = None
+    action_attempted = False
     try:
         with lock(f"blacklist-sync:{int(get_server_number())}"):
             # Re-read under the same lock used by blacklist synchronization;
@@ -435,12 +486,25 @@ def ban_if_blacklisted(rcon: Rcon, player_id: str, name: str, verified_steam_id:
                 blacklist = _connect_blacklist_record(sess, player_id, verified_steam_id)
                 if not blacklist:
                     return False, False
-                confirmed = apply_blacklist_punishment(
-                    rcon, blacklist, player_id=player_id, player_name=name
-                )
-                return True, confirmed is True
+                if (verified_steam_id and getattr(getattr(blacklist, 'player', None), 'player_id', None)
+                        == verified_steam_id):
+                    if prepared_at is None or monotonic() - prepared_at > 5:
+                        logger.warning('HLLV Steam identity became stale before blacklist action')
+                        deferred_record_id = blacklist.id
+                if deferred_record_id is None:
+                    action_attempted = True
+                    confirmed = apply_blacklist_punishment(
+                        rcon, blacklist, player_id=player_id, player_name=name
+                    )
+                    return True, confirmed is True
+        # Never acquire the journal's producer lock while holding the shared
+        # blacklist operation lock on a different database connection.
+        defer(deferred_record_id)
+        return True, False
     except Exception:
         logger.exception("Unable to confirm blacklist action; no VAC fallback")
+        if needs_steam and not action_attempted:
+            defer(record_id)
         return True, False
 
 
@@ -608,7 +672,10 @@ def handle_on_connect(
         return
 
     try:
-        player_info = rcon.get_detailed_player_info(player_id)
+        if getattr(getattr(rcon, 'game_profile', None), 'game', None) == GameEnum.HLL_VIETNAM:
+            player_info = rcon.get_uncached_detailed_player_info(player_id)
+        else:
+            player_info = rcon.get_detailed_player_info(player_id)
     except HLLCommandFailedError as e:
         logger.warning("Unable to update soldier info for %s\n%s", player_id, str(e))
         player_info = None
@@ -623,7 +690,7 @@ def handle_on_connect(
     if player_info:
         PlayerSoldier.update(player_info)
 
-    verified_steam_id = _verified_hllv_steam_id(rcon, player_id, player_info)
+    verified_steam_id = _connect_verified_steam_id(rcon, player_id, player_info)
     blacklisted, blacklist_action_confirmed = ban_if_blacklisted(
         rcon, player_id, struct_log["player_name_1"], verified_steam_id=verified_steam_id
     )
