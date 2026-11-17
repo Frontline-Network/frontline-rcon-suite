@@ -1,7 +1,10 @@
 from types import SimpleNamespace
 from unittest.mock import Mock
+from uuid import uuid4
+import os
 
 import pytest
+import redis
 
 from rcon import player_history, session_event_review
 from rcon.logs import loop as log_loop
@@ -80,7 +83,8 @@ def test_optional_backlog_observation_runs_after_log_processing(tmp_path, monkey
     instance = make_loop(tmp_path, monkeypatch, [])
     monkeypatch.setenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS', '1')
     monkeypatch.setenv('HLL_DB_URL', 'postgresql://synthetic@localhost/test')
-    red = object()
+    red = Mock()
+    red.time.side_effect = [(1000, 0), (1001, 0)]
     publish = Mock()
     monkeypatch.setattr(log_loop, 'get_redis_client', lambda **_kwargs: red)
     monkeypatch.setattr(observations, 'publish', publish)
@@ -88,6 +92,8 @@ def test_optional_backlog_observation_runs_after_log_processing(tmp_path, monkey
     publish.assert_called_once()
     assert publish.call_args.args == (red, instance.session_journal)
     assert publish.call_args.kwargs['server_number'] == 3
+    assert publish.call_args.kwargs['poll_started_at'] == 1000
+    assert publish.call_args.kwargs['poll_finished_at'] == 1001
 
 
 def test_backlog_observation_is_disabled_by_default(tmp_path, monkeypatch):
@@ -104,7 +110,9 @@ def test_observation_failure_never_interrupts_log_processing(tmp_path, monkeypat
     instance = make_loop(tmp_path, monkeypatch, [])
     monkeypatch.setenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS', '1')
     monkeypatch.setenv('HLL_DB_URL', 'postgresql://synthetic@localhost/test')
-    monkeypatch.setattr(log_loop, 'get_redis_client', lambda **_kwargs: object())
+    red = Mock()
+    red.time.side_effect = [(1000, 0), (1001, 0), (1002, 0), (1003, 0)]
+    monkeypatch.setattr(log_loop, 'get_redis_client', lambda **_kwargs: red)
     publish = Mock(side_effect=OSError('sensitive synthetic detail'))
     monkeypatch.setattr(observations, 'publish', publish)
     instance.process_logs()
@@ -121,3 +129,27 @@ def test_failed_log_fetch_does_not_publish_new_observation(tmp_path, monkeypatch
     with pytest.raises(OSError):
         instance.process_logs()
     instance._publish_session_journal_observation.assert_not_called()
+
+
+@pytest.mark.skipif(not os.environ.get('TEST_REDIS_URL'), reason='requires isolated Redis')
+def test_log_loop_publishes_bounded_backlog_observation_to_real_redis(tmp_path, monkeypatch):
+    from rcon.player_presence import database_scope
+    from rcon import session_journal_observation as observations
+    instance = make_loop(tmp_path, monkeypatch, [])
+    url = f'postgresql://synthetic@localhost/db_{uuid4().hex}'
+    scope = database_scope(url)
+    client = redis.Redis.from_url(os.environ['TEST_REDIS_URL'], decode_responses=True)
+    key = observations.observation_key(scope, 3)
+    monkeypatch.setenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS', '1')
+    monkeypatch.setenv('HLL_DB_URL', url)
+    monkeypatch.setattr(log_loop, 'get_redis_client', lambda **_kwargs: client)
+    try:
+        instance.process_logs()
+        value = observations.read(client, scope=scope, server_number=3)
+        assert value is not None
+        assert value.poll_started_at <= value.poll_finished_at <= value.started_at <= value.finished_at
+        assert (value.pending, value.unpublished_anonymous) == (0, 0)
+        assert client.ttl(key) > 0
+    finally:
+        client.delete(key)
+        client.close()

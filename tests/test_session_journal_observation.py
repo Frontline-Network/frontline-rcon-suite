@@ -9,13 +9,15 @@ from rcon import session_journal_observation as observation
 
 
 def valid(**changes):
-    return {'version': 1, 'server_number': 3, 'started_at': 990, 'finished_at': 992,
+    return {'version': 1, 'server_number': 3, 'poll_started_at': 988, 'poll_finished_at': 989,
+            'started_at': 990, 'finished_at': 992,
             'pending': 0, 'unpublished_anonymous': 0, **changes}
 
 
 @pytest.mark.parametrize('change', [
     {'version': True}, {'server_number': 4}, {'started_at': 960}, {'started_at': float('nan')},
-    {'finished_at': 1001}, {'started_at': 993}, {'pending': -1}, {'pending': True},
+    {'finished_at': 1001}, {'started_at': 993}, {'poll_started_at': 991},
+    {'poll_finished_at': float('nan')}, {'pending': -1}, {'pending': True},
     {'unpublished_anonymous': -1}, {'unpublished_anonymous': None},
 ])
 def test_invalid_observation_is_not_accepted(change):
@@ -24,7 +26,7 @@ def test_invalid_observation_is_not_accepted(change):
 
 def test_counts_are_observations_not_boolean_completeness():
     value = observation.validate(valid(pending=2, unpublished_anonymous=1), server_number=3, now=1000)
-    assert value == observation.JournalObservation(990, 992, 2, 1)
+    assert value == observation.JournalObservation(988, 989, 990, 992, 2, 1)
 
 
 @pytest.mark.skipif(not os.environ.get('TEST_REDIS_URL'), reason='requires isolated Redis')
@@ -34,7 +36,9 @@ def test_real_redis_isolates_servers_and_retains_only_newer_observations():
     key3, key4 = [observation.observation_key(scope, server) for server in (3, 4)]
     try:
         journal = SimpleNamespace(pending_counts=lambda server: (2, 1) if server == 3 else (0, 0))
-        assert observation.publish(client, journal, scope=scope, server_number=3)
+        now = observation.redis_time(client)
+        assert observation.publish(client, journal, scope=scope, server_number=3,
+                                   poll_started_at=now - 2, poll_finished_at=now - 1)
         first = observation.read(client, scope=scope, server_number=3)
         assert (first.pending, first.unpublished_anonymous) == (2, 1)
         assert observation.read(client, scope=scope, server_number=4) is None
@@ -44,7 +48,8 @@ def test_real_redis_isolates_servers_and_retains_only_newer_observations():
                 return (int(first.started_at) - 5, 0)
             def eval(self, *args):
                 return client.eval(*args)
-        assert not observation.publish(OlderClock(), journal, scope=scope, server_number=3)
+        assert not observation.publish(OlderClock(), journal, scope=scope, server_number=3,
+            poll_started_at=first.poll_started_at - 5, poll_finished_at=first.poll_started_at - 4)
         assert observation.read(client, scope=scope, server_number=3) == first
         client.set(key4, '{invalid')
         assert observation.read(client, scope=scope, server_number=4) is None
