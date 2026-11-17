@@ -8,7 +8,7 @@ from rcon.types import GameEnum
 # Steam account. Unknown or newly introduced platforms require a fresh read.
 NON_STEAM_FAMILIES = frozenset({
     'eplatformfamily::xbox', 'eplatformfamily::xboxseries',
-    'eplatformfamily::ps5', 'eplatformfamily::wingdk',
+    'eplatformfamily::ps5', 'eplatformfamily::wingdk', 'eplatformfamily::egs',
 })
 
 
@@ -74,6 +74,8 @@ def prepare_online_steam_identity(rcon, steam_id: str) -> dict:
     if not isinstance(players, list):
         raise ValueError('Invalid player snapshot')
     matching = set()
+    seen_eos = set()
+    seen_steam = set()
     for row in players:
         if not isinstance(row, dict):
             raise ValueError('Invalid player snapshot row')
@@ -88,6 +90,16 @@ def prepare_online_steam_identity(rcon, steam_id: str) -> dict:
                 raise ValueError('Incomplete online Steam identity')
         elif platform not in NON_STEAM_FAMILIES:
             raise ValueError('Unknown online platform in identity snapshot')
+        elif row.get('steamId'):
+            raise ValueError('Inconsistent online Steam identity')
+        if (len(eos) != 32 or not all(c in '0123456789abcdefABCDEF' for c in eos)
+                or row.get('eosId') != eos or eos in seen_eos):
+            raise ValueError('Invalid or duplicate EOS identity in player snapshot')
+        seen_eos.add(eos)
+        if platform == 'eplatformfamily::steam':
+            if row['steamId'] in seen_steam:
+                raise ValueError('Multiple online EOS IDs for one Steam ID')
+            seen_steam.add(row['steamId'])
         if row.get('steamId') == steam_id:
             if verified_steam_id(rcon, eos, details) != steam_id:
                 raise ValueError('Inconsistent online Steam identity')
