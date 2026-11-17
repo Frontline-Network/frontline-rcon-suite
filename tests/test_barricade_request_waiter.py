@@ -131,3 +131,21 @@ def test_scan_recovers_from_initial_database_error():
         assert before <= read.await_args.args[0] <= datetime.now()
 
     asyncio.run(run())
+
+
+@pytest.mark.xfail(strict=True, reason='Unconfirmed scan is lost; see issue #397')
+def test_scan_failure_does_not_advance_past_unconfirmed_players():
+    async def run():
+        consumer = BarricadeConsumer()
+        initial = datetime(2026, 1, 1, 12)
+        later = datetime(2026, 1, 1, 12, 1)
+        read = AsyncMock(side_effect=[[('synthetic-player', later)], []])
+        consumer.send_request = AsyncMock(side_effect=OSError('synthetic disconnect'))
+        with patch.object(barricade, 'get_most_recent_session_date', AsyncMock(return_value=initial)), \
+             patch.object(barricade, 'get_joined_players_since', read), \
+             patch.object(barricade.asyncio, 'sleep', AsyncMock(side_effect=[None, None, asyncio.CancelledError])):
+            with pytest.raises(asyncio.CancelledError):
+                await consumer._scan_players_loop()
+        assert read.await_args_list[1].args[0] == initial
+
+    asyncio.run(run())
