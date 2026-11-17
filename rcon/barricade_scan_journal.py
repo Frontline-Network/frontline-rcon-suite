@@ -264,7 +264,7 @@ def registration_boundary(server_number: int, namespace: str, credential_id: int
 
 def find_unreserved_open_sessions(server_number: int, integration_id: str, *, after_id: int = 0,
                                   limit: int = 100, after_event_us: int | None = None,
-                                  include_start: bool = False):
+                                  include_start: bool = False, player_ids=None):
     """Find candidates without a high-water mark; an open row is not proof of presence.
 
     The page position is valid only within one traversal; restart from zero
@@ -289,6 +289,13 @@ def find_unreserved_open_sessions(server_number: int, integration_id: str, *, af
     if after_event_us is not None:
         # Unknown starts are not assumed to be newer than the boundary.
         stmt = stmt.where(PlayerSession.start_event_us > after_event_us)
+    if player_ids is not None:
+        if (not isinstance(player_ids, (set, frozenset)) or len(player_ids) > 250 or
+                any(not isinstance(value, str) or not value or len(value) > 100 for value in player_ids)):
+            raise ValueError('Invalid Barricade roster')
+        if not player_ids:
+            return []
+        stmt = stmt.where(PlayerID.player_id.in_(player_ids))
     with get_session_maker()() as session:
         return [(row.id, row.player_id, row.start_event_us, row.status) if include_start else (row.id, row.player_id)
                 for row in session.execute(stmt)]

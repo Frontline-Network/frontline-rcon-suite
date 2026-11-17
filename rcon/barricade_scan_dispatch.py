@@ -19,7 +19,7 @@ def key_is_live(credential_id):
 
 
 async def scan_once(server_number, integration_id, game, sender, is_present, *, credential_id,
-                    is_observed=None, page_size=100):
+                    is_observed=None, get_roster=None, page_size=100):
     """Traverse once; ambiguous activation or presence is deferred, not sent.
 
     This is experimental: a boundary compares two clocks and cannot prove that
@@ -28,6 +28,14 @@ async def scan_once(server_number, integration_id, game, sender, is_present, *, 
     boundary = await asyncio.to_thread(journal.registration_boundary, server_number, integration_id, credential_id)
     if boundary is None:
         return 'unauthorized'
+    # Missing roster evidence skips open candidates for this pass, never
+    # promotes stale database rows to online presence. Closed sessions are
+    # still traversed below and may be retained for review.
+    roster = None
+    if get_roster is not None:
+        roster = await get_roster()
+        if roster is None:
+            roster = frozenset()
     async def record_review(session_id, player_id, cause):
         def record():
             with journal.delivery_scope(server_number, integration_id):
@@ -40,7 +48,7 @@ async def scan_once(server_number, integration_id, game, sender, is_present, *, 
     while True:
         rows = await asyncio.to_thread(journal.find_unreserved_open_sessions,
                                        server_number, integration_id, after_id=after_id, limit=page_size,
-                                       include_start=True)
+                                       include_start=True, player_ids=roster)
         if not rows:
             break
         for session_id, player_id, start_event_us, delivery_status in rows:
