@@ -51,6 +51,10 @@ def restore_missing_vips(rcon_hook: Rcon) -> int:
     added directly on the game server.
     """
 
+    from rcon.automods import action_guard
+    from rcon.vip_rewards.locking import vip_lock
+    from rcon.vip_rewards.service import expiration as normalize_expiration
+
     server_number = get_server_number()
     now = datetime.now(timezone.utc)
     # A game-process restart happens outside CRCON, so the shared five-minute
@@ -73,21 +77,46 @@ def restore_missing_vips(rcon_hook: Rcon) -> int:
             player_id = vip.player.player_id
             if player_id in live_vip_ids:
                 continue
-            try:
-                description = vip.player.names[0].name
-            except IndexError:
-                description = "Restored CRCON VIP"
-            missing_vips.append((player_id, description, vip.expiration.isoformat()))
+            missing_vips.append(player_id)
 
     restored = 0
-    for player_id, description, expiration in missing_vips:
+    for player_id in missing_vips:
         try:
-            rcon_hook.add_vip(
-                player_id=player_id,
-                description=description,
-                expiration=expiration,
-            )
-            restored += 1
+            # The initial scan is only a hint. A revoke or extension may have
+            # happened since then; serialize with the regular VIP operations
+            # and re-read both sources before issuing any game-server command.
+            with vip_lock(player_id):
+                with enter_session() as session:
+                    vip = (session.query(PlayerVIP).join(PlayerID, PlayerVIP.player_id_id == PlayerID.id)
+                           .filter(PlayerVIP.server_number == server_number, PlayerID.player_id == player_id)
+                           .with_for_update().one_or_none())
+                    if vip is None or normalize_expiration(vip.expiration) <= datetime.now(timezone.utc):
+                        continue
+                    current_expiration = vip.expiration.isoformat()
+                    try:
+                        description = vip.player.names[0].name
+                    except IndexError:
+                        description = "Restored CRCON VIP"
+                rcon_hook.get_vip_ids.cache_clear()
+                if player_id in {vip["player_id"] for vip in rcon_hook.get_vip_ids()}:
+                    continue
+                token = action_guard.reserve(int(server_number), player_id, ["VietnamVipRestore"], "vip")
+                if token is None:
+                    logger.warning("VIP restore awaits review for %s", player_id)
+                    continue
+                with rcon_hook.without_retries():
+                    result = rcon_hook.add_vip(
+                        player_id=player_id,
+                        description=description,
+                        expiration=current_expiration,
+                    )
+                if result is True or result is False:
+                    action_guard.finish(int(server_number), player_id, token,
+                                        "confirmed" if result is True else "rejected", expected=1)
+                if result is True:
+                    restored += 1
+                else:
+                    logger.warning("VIP restore was not confirmed for %s", player_id)
         except Exception:
             logger.exception("Unable to restore VIP %s", player_id)
 

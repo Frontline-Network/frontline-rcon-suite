@@ -11,7 +11,8 @@ def test_alembic_has_one_production_compatible_head():
     config.set_main_option("script_location", str(ROOT / "alembic"))
 
     scripts = ScriptDirectory.from_config(config)
-    assert scripts.get_heads() == ["f6660a1b2c3d"]
+    assert scripts.get_heads() == ["f7770a1b2c3d"]
+    assert scripts.get_revision("f7770a1b2c3d").down_revision == "f6660a1b2c3d"
     assert scripts.get_revision("f6660a1b2c3d").down_revision == "f5550a1b2c3d"
     assert scripts.get_revision("f5550a1b2c3d").down_revision == "f4440a1b2c3d"
     assert scripts.get_revision("f4440a1b2c3d").down_revision == "e4430a1b2c3d"
