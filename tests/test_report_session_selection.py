@@ -60,7 +60,8 @@ def berlin_time():
 
 
 @pytest.mark.parametrize('kind', ['connect', 'disconnect'])
-def test_unresolved_same_player_event_prevents_report_session_selection(database, kind):
+@pytest.mark.parametrize('offset', [0, 1])
+def test_unresolved_same_player_event_prevents_report_session_selection(database, kind, offset):
     now = datetime.now(timezone.utc).replace(microsecond=0)
     with Session(database) as sess:
         player = PlayerID(player_id='synthetic-report-player')
@@ -70,12 +71,12 @@ def test_unresolved_same_player_event_prevents_report_session_selection(database
             start=datetime.fromtimestamp(now.timestamp()), start_event_us=int(now.timestamp() * 1_000_000))
         sess.add(active)
         event = (PendingPlayerConnect(server_number=3, player_id=player.player_id,
-                    started_at=datetime.fromtimestamp(now.timestamp() + 1),
-                    started_event_us=int((now.timestamp() + 1) * 1_000_000))
+                    started_at=datetime.fromtimestamp(now.timestamp() + offset),
+                    started_event_us=int((now.timestamp() + offset) * 1_000_000))
                  if kind == 'connect' else
                  PendingPlayerDisconnect(server_number=3, player_id=player.player_id,
-                    ended_at=datetime.fromtimestamp(now.timestamp() + 1),
-                    ended_event_us=int((now.timestamp() + 1) * 1_000_000)))
+                    ended_at=datetime.fromtimestamp(now.timestamp() + offset),
+                    ended_event_us=int((now.timestamp() + offset) * 1_000_000)))
         sess.add(event)
         sess.flush()
         assert session_token(sess, 3, player.player_id, now.timestamp() + 2) is None
@@ -83,6 +84,29 @@ def test_unresolved_same_player_event_prevents_report_session_selection(database
         event.server_number = 4
         sess.flush()
         assert session_token(sess, 3, player.player_id, now.timestamp() + 2) == active.id
+
+
+@pytest.mark.parametrize('kind', ['connect', 'disconnect'])
+def test_older_unresolved_event_does_not_block_proven_newer_session(database, kind):
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    with Session(database) as sess:
+        player = PlayerID(player_id='synthetic-report-player')
+        sess.add(player)
+        sess.flush()
+        current = PlayerSession(player_id_id=player.id, server_number=3,
+            start=datetime.fromtimestamp(now.timestamp()), start_event_us=int(now.timestamp() * 1_000_000))
+        sess.add(current)
+        earlier = now - timedelta(minutes=5)
+        event = (PendingPlayerConnect(server_number=3, player_id=player.player_id,
+                    started_at=datetime.fromtimestamp(earlier.timestamp()),
+                    started_event_us=int(earlier.timestamp() * 1_000_000))
+                 if kind == 'connect' else
+                 PendingPlayerDisconnect(server_number=3, player_id=player.player_id,
+                    ended_at=datetime.fromtimestamp(earlier.timestamp()),
+                    ended_event_us=int(earlier.timestamp() * 1_000_000)))
+        sess.add(event)
+        sess.flush()
+        assert session_token(sess, 3, player.player_id, now.timestamp() + 2) == current.id
 
 
 def test_latest_absolute_session_and_uncertain_legacy_are_safe(database, berlin_time):

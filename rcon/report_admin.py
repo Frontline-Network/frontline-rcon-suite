@@ -205,13 +205,6 @@ def kick_reason(sess, payload):
 def session_token(sess, server, pid, stamp):
     # A moderation decision must bind to an actual connection instant; naive
     # legacy wall times cannot prove identity across a repeated DST hour.
-    # An unresolved event for this player may refer to a newer connection or
-    # an already-ended one. Do not act on an older still-open session while
-    # session reconciliation is pending.
-    for model in (PendingPlayerConnect, PendingPlayerDisconnect):
-        if sess.scalar(select(model.player_id).where(
-                model.server_number == server, model.player_id == pid).limit(1)) is not None:
-            return None
     rows = sess.scalars(
         select(PlayerSession)
         .join(PlayerID)
@@ -230,6 +223,15 @@ def session_token(sess, server, pid, stamp):
         return None
     if row.start_event_us > stamp * 1_000_000:
         return None
+    # An unresolved event at or after this verified start may refer to a newer
+    # connection or end this one. Earlier events cannot belong to this later
+    # connection and must not indefinitely block it.
+    for model, event_time in ((PendingPlayerConnect, PendingPlayerConnect.started_event_us),
+                              (PendingPlayerDisconnect, PendingPlayerDisconnect.ended_event_us)):
+        if sess.scalar(select(model.player_id).where(
+                model.server_number == server, model.player_id == pid,
+                event_time >= row.start_event_us).limit(1)) is not None:
+            return None
     # A legacy writer might mutate the wall-clock start without updating the
     # verified instant. Treat a mismatch (including a changed process timezone)
     # as uncertain rather than applying a report to the wrong connection.
