@@ -7,11 +7,14 @@ from contextvars import copy_context
 import asyncio
 from datetime import datetime
 import time
+import os
+import subprocess
+import sys
 
 import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy import inspect, select
+from sqlalchemy import inspect, select, text
 
 from rcon import barricade_scan_journal as journal
 from rcon import barricade_scan_dispatch as adapter
@@ -248,6 +251,55 @@ def test_unconfirmed_and_crashed_reservations_are_never_replayed(database, monke
     with database() as session:
         assert session.scalar(select(journal.BarricadeScanDelivery.status).where(
             journal.BarricadeScanDelivery.id == crash_id)) == 'review'
+
+
+def test_process_restart_does_not_replay_confirmed_or_crashed_scan(database, monkeypatch):
+    """Separate interpreters exercise a real process exit after reservation."""
+    prepare_adapter(database, monkeypatch)
+    with database.kw['bind'].connect() as connection:
+        schema = connection.scalar(text('SELECT current_schema()'))
+    script = r'''
+import asyncio, os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+import rcon.models
+from rcon import barricade_scan_dispatch as adapter, barricade_scan_journal as journal
+engine = create_engine(os.environ['TEST_POSTGRES_DSN'],
+    connect_args={'options': '-csearch_path=' + os.environ['BARRICADE_TEST_SCHEMA']})
+maker = sessionmaker(bind=engine, expire_on_commit=False)
+rcon.models.get_engine = lambda: engine
+journal.get_session_maker = lambda: maker
+adapter.key_is_live = lambda _: True
+async def verified(_session_id, _player_id): return True
+async def sender(_player_id, _game):
+    print('SYNTHETIC_SEND', flush=True)
+    if os.environ['BARRICADE_TEST_CRASH'] == '1': os._exit(17)
+async def main():
+    result = await adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab',
+        int(os.environ['BARRICADE_TEST_SESSION']), 'synthetic-eos', 'HLLV', sender,
+        credential_id=1, verify_session=verified)
+    print('RESULT', result, flush=True)
+asyncio.run(main())
+'''
+    def invoke(session_id, crash=False):
+        env = os.environ.copy()
+        env.update(BARRICADE_TEST_SCHEMA=schema, BARRICADE_TEST_SESSION=str(session_id),
+                   BARRICADE_TEST_CRASH='1' if crash else '0')
+        return subprocess.run([sys.executable, '-c', script], env=env, text=True,
+                              capture_output=True, timeout=20)
+    confirmed = invoke(201)
+    assert confirmed.returncode == 0 and 'RESULT done' in confirmed.stdout
+    repeated = invoke(201)
+    assert repeated.returncode == 0 and 'RESULT already_recorded' in repeated.stdout
+    assert 'SYNTHETIC_SEND' not in repeated.stdout
+    crashed = invoke(202, crash=True)
+    assert crashed.returncode == 17 and 'SYNTHETIC_SEND' in crashed.stdout
+    recovered = invoke(202)
+    assert recovered.returncode == 0 and 'RESULT already_recorded' in recovered.stdout
+    assert 'SYNTHETIC_SEND' not in recovered.stdout
+    with database() as session:
+        assert session.scalars(select(journal.BarricadeScanDelivery.status).order_by(
+            journal.BarricadeScanDelivery.player_session_id)).all() == ['done', 'review']
 
 
 def test_journal_refuses_work_without_matching_scope(database, monkeypatch):
