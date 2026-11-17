@@ -497,6 +497,44 @@ def test_scan_activation_never_automatically_resends_old_or_ambiguous_sessions(d
         assert (row.status, row.review_cause) == ('done', None)
 
 
+def test_scan_revisits_delayed_lower_session_id_after_later_commit(database, monkeypatch):
+    """A per-pass page cursor must not become a permanent high-water mark."""
+    prepare_adapter(database, monkeypatch)
+    engine = database.kw['bind']
+    PlayerID.__table__.create(engine)
+    PlayerSession.__table__.create(engine)
+    with database.begin() as session:
+        session.add_all([PlayerID(player_id='late'), PlayerID(player_id='early')])
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    seen = []
+    async def sender(player_id, game):
+        seen.append((player_id, game))
+    async def scan():
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, page_size=1)
+    event_time = (int(time.time()) + 2) * 1_000_000
+    with database() as delayed, database() as fast:
+        late_player = delayed.scalar(select(PlayerID.id).where(PlayerID.player_id == 'late'))
+        early_player = fast.scalar(select(PlayerID.id).where(PlayerID.player_id == 'early'))
+        late = PlayerSession(player_id_id=late_player, server_number=3, start=datetime(2026, 1, 1),
+                             start_event_us=event_time)
+        early = PlayerSession(player_id_id=early_player, server_number=3, start=datetime(2026, 1, 1),
+                              start_event_us=event_time)
+        delayed.add(late)
+        delayed.flush()
+        fast.add(early)
+        fast.commit()
+        assert late.id < early.id
+        asyncio.run(scan())
+        assert seen == [('early', 'HLLV')]
+        delayed.commit()
+        asyncio.run(scan())
+        asyncio.run(scan())
+        assert seen == [('early', 'HLLV'), ('late', 'HLLV')]
+    with database() as session:
+        assert session.scalars(select(journal.BarricadeScanDelivery.status).order_by(
+            journal.BarricadeScanDelivery.id)).all() == ['done', 'done']
+
+
 def test_async_dispatch_cancellation_before_lock_does_not_send(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     async def run():
