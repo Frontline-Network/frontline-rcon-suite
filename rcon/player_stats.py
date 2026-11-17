@@ -384,6 +384,9 @@ class LiveStats(BaseStats):
             return None
 
         player_profile = player.get("profile", {})
+        if "current_session_start" in player_profile:
+            session_start = player_profile["current_session_start"]
+            return session_start.astimezone(datetime.UTC) if session_start else None
         player_sessions = player_profile.get("sessions")
         if not player_sessions:
             logger.warning("No sessions in player profile %s", player_profile)

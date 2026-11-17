@@ -45,14 +45,18 @@ if [[ ! -f compose.yaml || ! -f compose.mobile-admin.yaml \
   exit 1
 fi
 
-# The generated compose.yaml is installation-specific: a one-server host must
-# not start backend_2/frontend_2/supervisor_2 merely because the shared
-# Frontline override also knows how to customize those services. Start with
-# only the services that exist in the generated base file. The optional mobile
-# push worker is added below only when its relay is configured.
-mapfile -t deployment_services < <(
-  docker compose -f compose.yaml config --services
-)
+# A generated base file can retain intentionally stopped server definitions.
+# Preserve their state even when they are still listed in Compose. Capture both
+# commands' exit statuses; failure to observe runtime state must abort.
+configured_services="$(docker compose -f compose.yaml config --services)"
+running_services="$(docker compose -f compose.yaml ps --status running --services)"
+selected_services="$(python3 scripts/select_deployment_services.py \
+  --configured "$configured_services" --running "$running_services")"
+if [[ -z "$selected_services" ]]; then
+  echo "No deployment services found in compose.yaml." >&2
+  exit 1
+fi
+mapfile -t deployment_services <<< "$selected_services"
 if ((${#deployment_services[@]} == 0)); then
   echo "No deployment services found in compose.yaml." >&2
   exit 1
@@ -95,7 +99,8 @@ target_override="$(mktemp "${TMPDIR:-/tmp}/crcon-compose.XXXXXX.yaml")"
 target_worker_override="$(mktemp "${TMPDIR:-/tmp}/crcon-workers.XXXXXX.yaml")"
 target_health_override="$(mktemp "${TMPDIR:-/tmp}/crcon-health.XXXXXX.json")"
 target_health_generator="$(mktemp "${TMPDIR:-/tmp}/crcon-health-generator.XXXXXX.py")"
-trap 'rm -f "$target_override" "$target_worker_override" "$target_health_override" "$target_health_generator"' EXIT
+target_source_archive="$(mktemp "${TMPDIR:-/tmp}/crcon-runtime-source.XXXXXX.tar")"
+trap 'rm -f "$target_override" "$target_worker_override" "$target_health_override" "$target_health_generator" "$target_source_archive"' EXIT
 git show "$target_sha:compose.mobile-admin.yaml" > "$target_override"
 git show "$target_sha:compose.combined-workers.yaml" > "$target_worker_override"
 git show "$target_sha:scripts/backend_health_override.py" > "$target_health_generator"
@@ -380,6 +385,10 @@ abort_before_service_change() {
   fi
   exit 1
 }
+if ! compose_target config --format json | python3 scripts/select_deployment_services.py \
+    --check-dependencies "${deployment_services[@]}"; then
+  abort_before_service_change
+fi
 echo "Building immutable images for $target_short..."
 if ! compose_target build --pull "${deployment_services[@]}"; then
   abort_before_service_change
@@ -393,6 +402,20 @@ fi
 if ! verify_readiness_images "$backend_images"; then
   abort_before_service_change
 fi
+if ! git archive --format=tar "$target_sha" rcon rconweb alembic scripts docs/releases \
+  alembic.ini entrypoint.sh manage.py LICENSE requirements.lock requirements-vcs.txt > "$target_source_archive"; then
+  abort_before_service_change
+fi
+while IFS= read -r backend_image; do
+  [[ -n "$backend_image" ]] || continue
+  if ! docker run --rm --network none --entrypoint python \
+    -v "$target_source_archive:/tmp/frontline-target-source.tar:ro" \
+    -v "$repo_root/scripts/verify_backend_source.py:/tmp/frontline-verify-source.py:ro" \
+    "$backend_image" /tmp/frontline-verify-source.py /tmp/frontline-target-source.tar; then
+    echo "Backend image $backend_image does not match target $target_short." >&2
+    abort_before_service_change
+  fi
+done <<< "$backend_images"
 
 if [[ "$background_worker_mode" == combined ]]; then
   # Configured services from the inactive split profile are not orphans. Stop

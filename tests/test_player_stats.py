@@ -87,6 +87,16 @@ def test_live_first_appearance_preserves_aware_session_instant():
     assert calc._get_player_first_appearance({"profile": {"sessions": [{"start": start}]}}) == datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
 
 
+def test_live_first_appearance_uses_selected_local_session():
+    calc = LiveStats.__new__(LiveStats)
+    local = datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
+    remote = datetime(2026, 1, 1, 13, tzinfo=timezone.utc)
+    profile = {"current_session_start": local, "sessions": [{"start": remote}]}
+    assert calc._get_player_first_appearance({"profile": profile}) == local
+    profile["current_session_start"] = None
+    assert calc._get_player_first_appearance({"profile": profile}) is None
+
+
 @pytest.mark.skipif(not hasattr(time, "tzset"), reason="requires POSIX timezone support")
 def test_live_first_appearance_converts_legacy_local_wall_time(monkeypatch):
     original_tz = os.environ.get("TZ")

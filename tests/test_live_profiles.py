@@ -109,6 +109,21 @@ def test_bulk_profile_serialization_accepts_preloaded_vips(monkeypatch):
     ]
     assert profile["is_vip"] is True
     assert profile["sessions_count"] == 0
+    assert profile["current_session_start"] is None
+
+    local_start = datetime(2026, 8, 26, 10, tzinfo=timezone.utc)
+    player.sessions = [
+        PlayerSession(id=2, server_number=4, start=datetime(2026, 8, 26, 11),
+                      created=datetime(2026, 8, 26, 11)),
+        PlayerSession(id=1, server_number=3, start=local_start.replace(tzinfo=None),
+                      start_event_us=int(local_start.timestamp() * 1_000_000),
+                      created=datetime(2026, 8, 26, 10)),
+    ]
+    profile = player.to_dict(limit_sessions=1, preloaded_vips=[preloaded_vip])
+    assert profile["sessions"][0]["id"] == 2
+    assert profile["current_session_start"] == local_start
+    player.sessions[1].end_event_us = int(local_start.timestamp() * 1_000_000) + 1
+    assert player.to_dict(limit_sessions=1, preloaded_vips=[preloaded_vip])["current_session_start"] is None
 
 
 def test_empty_live_profile_request_does_not_open_a_database_session(monkeypatch):
