@@ -51,6 +51,45 @@ def database(monkeypatch):
     engine.dispose()
 
 
+@pytest.mark.skipif(not hasattr(time, 'tzset'), reason='requires process timezone control')
+def test_first_seen_uses_absolute_connect_instants_across_repeated_hour(database, monkeypatch):
+    older = datetime(2024, 10, 27, 0, 50, tzinfo=timezone.utc)
+    newer = datetime(2024, 10, 27, 1, 10, tzinfo=timezone.utc)
+    with monkeypatch.context() as scope:
+        scope.setenv('TZ', 'Europe/Berlin')
+        time.tzset()
+        try:
+            with Session(database) as sess:
+                player = sess.query(PlayerID).filter_by(player_id='console-online').one()
+                first = sess.query(PlayerSession).filter_by(player_id_id=player.id).one()
+                first.start = datetime.fromtimestamp(older.timestamp())
+                first.start_event_us = int(older.timestamp() * 1_000_000)
+                sess.add(PlayerSession(player_id_id=player.id, server_number=3,
+                    start=datetime.fromtimestamp(newer.timestamp()), start_event_us=int(newer.timestamp() * 1_000_000)))
+                sess.commit()
+            result = player_history.get_players_by_appearance(player_id='console-online', online_now_ids=set(),
+                observed_at=datetime(2024, 10, 27, 2, 0, tzinfo=timezone.utc))
+            assert result['players'][0]['first_seen_timestamp_ms'] == int(older.timestamp() * 1000)
+        finally:
+            scope.undo()
+            time.tzset()
+
+
+def test_first_seen_with_unverified_legacy_start_preserves_existing_interpretation(database):
+    legacy_start = datetime(2020, 1, 1, 12)
+    known_start = datetime(2021, 1, 1, 12, tzinfo=timezone.utc)
+    with Session(database) as sess:
+        player = sess.query(PlayerID).filter_by(player_id='console-online').one()
+        legacy = sess.query(PlayerSession).filter_by(player_id_id=player.id).one()
+        legacy.start, legacy.start_event_us = legacy_start, None
+        sess.add(PlayerSession(player_id_id=player.id, server_number=3,
+            start=known_start.replace(tzinfo=None), start_event_us=int(known_start.timestamp() * 1_000_000)))
+        sess.commit()
+    result = player_history.get_players_by_appearance(player_id='console-online', online_now_ids=set(),
+        observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    assert result['players'][0]['first_seen_timestamp_ms'] == int(legacy_start.timestamp() * 1000)
+
+
 def test_only_verified_online_player_matches_recent_filter(database):
     now = datetime(2026, 11, 16, 12, tzinfo=timezone.utc)
     result = player_history.get_players_by_appearance(
@@ -408,6 +447,8 @@ def test_postgres_filters_order_and_console_ids_with_utc_offsets(monkeypatch):
                             record.created = datetime(2026, 10, 24, 12)
                         player = sess.query(PlayerID).filter_by(player_id='console-online').one()
                         record = sess.query(PlayerSession).filter_by(player_id_id=player.id).one()
+                        record.start = datetime.fromtimestamp(old.timestamp())
+                        record.start_event_us = int(old.timestamp() * 1_000_000)
                         record.end = datetime(2026, 10, 25, 2, 59, 58)
                         record.end_event_us = int(old.timestamp() * 1_000_000)
                         sess.commit()
@@ -420,6 +461,15 @@ def test_postgres_filters_order_and_console_ids_with_utc_offsets(monkeypatch):
                         player_id='console-online', last_seen_from=new,
                         online_now_ids=set(), observed_at=new + timedelta(seconds=3))
                     assert recent['total'] == 0
+                    with Session(engine) as sess:
+                        player = sess.query(PlayerID).filter_by(player_id='console-online').one()
+                        sess.add(PlayerSession(player_id_id=player.id, server_number=3,
+                            start=datetime.fromtimestamp(new.timestamp()), end=datetime.fromtimestamp(new.timestamp()),
+                            start_event_us=int(new.timestamp() * 1_000_000), end_event_us=int(new.timestamp() * 1_000_000)))
+                        sess.commit()
+                    first_seen = player_history.get_players_by_appearance(
+                        player_id='console-online', online_now_ids=set(), observed_at=new + timedelta(seconds=3))
+                    assert first_seen['players'][0]['first_seen_timestamp_ms'] == int(old.timestamp() * 1000)
             finally:
                 time.tzset()
     finally:
