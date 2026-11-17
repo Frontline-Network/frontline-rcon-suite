@@ -599,6 +599,8 @@ const de = {
       eyebrow: "Moderation",
       subtitle: "Spieler suchen, auswählen und serverübergreifend verwalten.",
       liveSnapshotUnavailable: "Der aktuelle Spielerstatus ist nicht verfügbar. Die zuletzt gesehenen Zeiten können unvollständig sein.",
+      observedApproximately: "etwa {{time}}",
+      seenFilterLimitations: "Beobachtungen anderer Server können fehlen. Liegt eine Filtergrenze innerhalb des Beobachtungszeitraums, erscheint der Spieler möglicherweise nicht im Ergebnis.",
       results: "{{count}} Ergebnisse",
       selected: "Ausgewählt: {{count}}",
       created: "Erstellt",

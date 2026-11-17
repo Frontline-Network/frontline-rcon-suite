@@ -74,6 +74,13 @@ def run_population_history():
     run()
 
 
+@cli.command(name="player_presence")
+def run_player_presence():
+    from rcon.player_presence import run
+
+    run()
+
+
 @cli.command(name="autobalancer")
 def run_autobalancer():
     try:

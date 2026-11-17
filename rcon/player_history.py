@@ -545,6 +545,7 @@ def get_players_by_appearance(
     country: str | None = None,
     online_now_ids: set[str] | None = None,
     observed_at: datetime.datetime | None = None,
+    remote_observations: dict | None = None,
 ):
     page = int(page)
     page_size = int(page_size)
@@ -559,7 +560,7 @@ def get_players_by_appearance(
     online_now_ids = set(online_now_ids or ())
     observed_at = observed_at or datetime.datetime.now(datetime.timezone.utc)
     observed_local = observed_at.astimezone().replace(tzinfo=None)
-    observed_ms = int(observed_at.timestamp() * 1000)
+    remote_observations = remote_observations or {}
 
     def live_matches(bound, *, after):
         # Naive filters retain the legacy local-time interpretation. Offset
@@ -589,16 +590,67 @@ def get_players_by_appearance(
                 func.max(func.coalesce(PlayerSession.end, PlayerSession.created)).label(
                     "last"
                 ),
+                func.max(PlayerSession.end_event_us).label("last_end_event_us"),
+                func.sum(case((PlayerSession.end_event_us.is_(None), 1), else_=0)).label(
+                    "unverified_end_count"
+                ),
             )
             .group_by(PlayerSession.player_id_id)
             .subquery()
         )
         is_online = PlayerID.player_id.in_(online_now_ids) if online_now_ids else None
-        effective_last = (
-            case((is_online, literal(observed_local)), else_=sub.c.last)
-            if online_now_ids else sub.c.last
+        grouped_remote = {}
+        grouped_remote_epoch = {}
+        for remote_player_id, window in remote_observations.items():
+            seen = datetime.datetime.fromtimestamp(window.earliest)
+            grouped_remote.setdefault(seen, []).append(remote_player_id)
+            grouped_remote_epoch.setdefault(int(window.earliest * 1_000_000), []).append(remote_player_id)
+        remote_seen = (
+            case(*[(PlayerID.player_id.in_(players), literal(seen))
+                   for seen, players in grouped_remote.items()], else_=None)
+            if grouped_remote else None
         )
-        query = sess.query(PlayerID, sub.c.first, effective_last).outerjoin(
+        remote_seen_us = (
+            case(*[(PlayerID.player_id.in_(players), literal(epoch_us))
+                   for epoch_us, players in grouped_remote_epoch.items()], else_=None)
+            if grouped_remote_epoch else None
+        )
+        last_cases = []
+        sort_cases = []
+        if is_online is not None:
+            remote_later = [pid for pid in online_now_ids if pid in remote_observations
+                            and remote_observations[pid].earliest > observed_at.timestamp()]
+            local_last = (case((PlayerID.player_id.in_(remote_later), remote_seen),
+                               else_=literal(observed_local))
+                          if remote_later else literal(observed_local))
+            last_cases.append((is_online, local_last))
+            observed_us = int(observed_at.timestamp() * 1_000_000)
+            local_sort = (case((PlayerID.player_id.in_(remote_later), remote_seen_us),
+                               else_=literal(observed_us))
+                          if remote_later else literal(observed_us))
+            sort_cases.append((is_online, local_sort))
+        if remote_seen is not None:
+            # Verified event instants remain ordered across a repeated local hour.
+            # Legacy rows lack an absolute end and retain their prior semantics.
+            remote_after_history = case(
+                (sub.c.unverified_end_count == 0, remote_seen_us > sub.c.last_end_event_us),
+                else_=remote_seen > sub.c.last,
+            )
+            use_remote = and_(remote_seen.is_not(None),
+                              or_(sub.c.last.is_(None), remote_after_history))
+            last_cases.append((use_remote, remote_seen))
+            sort_cases.append((use_remote, remote_seen_us))
+        effective_last = case(*last_cases, else_=sub.c.last) if last_cases else sub.c.last
+        # Historical timestamps without an absolute event retain the existing
+        # local-wall-clock ordering; their original offset is not recoverable.
+        # Apply the current offset uniformly when comparing them with known instants.
+        offset_us = int(observed_at.astimezone().utcoffset().total_seconds() * 1_000_000)
+        legacy_sort = func.extract('epoch', sub.c.last) * 1_000_000 - offset_us
+        created_sort = func.extract('epoch', PlayerID.created) * 1_000_000 - offset_us
+        sort_cases.append((sub.c.unverified_end_count == 0, sub.c.last_end_event_us))
+        effective_sort = case(*sort_cases, else_=legacy_sort)
+        query = sess.query(PlayerID, sub.c.first, effective_last,
+                           sub.c.last_end_event_us, sub.c.unverified_end_count).outerjoin(
             sub, sub.c.player_id_id == PlayerID.id
         )
 
@@ -662,22 +714,47 @@ def get_players_by_appearance(
             )
 
         if last_seen_from:
-            historical = sub.c.last >= last_seen_from
+            historical = case(
+                (sub.c.unverified_end_count == 0,
+                 sub.c.last_end_event_us >= int(last_seen_from.timestamp() * 1_000_000)),
+                else_=sub.c.last >= last_seen_from,
+            )
+            confirmed = []
+            if remote_observations:
+                cutoff = last_seen_from.timestamp()
+                confirmed = [pid for pid, window in remote_observations.items()
+                             if window.earliest >= cutoff]
             if is_online is not None:
                 historical = (or_(is_online, historical) if live_matches(last_seen_from, after=True)
                               else and_(~is_online, historical))
+            if confirmed:
+                historical = or_(historical, PlayerID.player_id.in_(confirmed))
             query = query.filter(historical)
         if last_seen_till:
-            historical = sub.c.last <= last_seen_till
+            historical = case(
+                (sub.c.unverified_end_count == 0,
+                 sub.c.last_end_event_us <= int(last_seen_till.timestamp() * 1_000_000)),
+                else_=sub.c.last <= last_seen_till,
+            )
+            uncertain_or_newer = []
+            if remote_observations:
+                cutoff = last_seen_till.timestamp()
+                remote_ids = list(remote_observations)
+                historical = or_(historical, and_(sub.c.last.is_(None),
+                                                   PlayerID.player_id.in_(remote_ids)))
+                uncertain_or_newer = [pid for pid, window in remote_observations.items()
+                                      if window.latest > cutoff]
             if is_online is not None:
                 historical = (or_(is_online, historical) if live_matches(last_seen_till, after=False)
                               else and_(~is_online, historical))
+            if uncertain_or_newer:
+                historical = and_(historical, ~PlayerID.player_id.in_(uncertain_or_newer))
             query = query.filter(historical)
 
         total = query.count()
         page = min(max(math.ceil(total / page_size), 1), page)
         players = (
-            query.order_by(func.coalesce(effective_last, PlayerID.created).desc())
+            query.order_by(func.coalesce(effective_sort, created_sort).desc())
             .limit(page_size)
             .offset((page - 1) * page_size)
             # All relations used in PlayerID.to_dict should be loaded here to avoid lazyloading in the for loop below
@@ -716,6 +793,21 @@ def get_players_by_appearance(
                 return -1
             return 1
 
+        def last_seen_metadata(player_id, last, verified_end_us, unverified_end_count):
+            remote = remote_observations.get(player_id)
+            if player_id in online_now_ids:
+                start = max(observed_at.timestamp(), remote.earliest) if remote else observed_at.timestamp()
+                end = max(observed_at.timestamp(), remote.latest) if remote else start
+                return int(start * 1000), ([int(start * 1000), int(end * 1000)] if end > start else None)
+            remote_selected = (remote and last == datetime.datetime.fromtimestamp(remote.earliest)
+                               and not (unverified_end_count == 0 and verified_end_us is not None
+                                        and verified_end_us > int(remote.earliest * 1_000_000)))
+            if remote_selected:
+                return int(remote.earliest * 1000), [int(remote.earliest * 1000), int(remote.latest * 1000)]
+            if unverified_end_count == 0 and verified_end_us is not None:
+                return int(verified_end_us // 1000), None
+            return (int(last.timestamp() * 1000) if last else None), None
+
         return {
             "total": total,
             "local_online_snapshot_available": local_online_snapshot_available,
@@ -729,10 +821,8 @@ def get_players_by_appearance(
                     "first_seen_timestamp_ms": (
                         int(p[1].timestamp() * 1000) if p[1] else None
                     ),
-                    "last_seen_timestamp_ms": (
-                        observed_ms if p[0].player_id in online_now_ids else
-                        int(p[2].timestamp() * 1000) if p[2] else None
-                    ),
+                    "last_seen_timestamp_ms": last_seen_metadata(p[0].player_id, p[2], p[3], p[4])[0],
+                    "last_seen_observation_window_ms": last_seen_metadata(p[0].player_id, p[2], p[3], p[4])[1],
                     "vip_expiration": p[0].vip.expiration if p[0].vip else None,
                 }
                 for p in players

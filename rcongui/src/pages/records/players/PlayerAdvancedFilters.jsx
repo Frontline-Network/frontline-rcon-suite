@@ -207,6 +207,12 @@ export default function PlayerAdvancedFilters({
           </LocalizationProvider>
         </Stack>
 
+        {(formFields.last_seen_from || formFields.last_seen_till) && (
+          <Typography variant="caption" color="text.secondary">
+            {t("records.players.seenFilterLimitations")}
+          </Typography>
+        )}
+
         <Stack
           direction="row"
           spacing={{ xs: 1, md: 2 }}

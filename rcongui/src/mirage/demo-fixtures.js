@@ -182,6 +182,9 @@ export const demoPlayerRecords = demoNames.map((name, index) => ({
   country: index % 2 ? "AT" : "DE",
   first_seen_timestamp_ms: now - (index + 20) * 86400000,
   last_seen_timestamp_ms: now - index * 1800000,
+  last_seen_observation_window_ms: index === 1
+    ? [now - 1800000, now - 1798000]
+    : null,
   created: new Date(now - (index + 20) * 86400000).toISOString(),
   total_playtime_seconds: 28800 + index * 3600,
   current_playtime_seconds: 300 + (index % 18) * 240,
