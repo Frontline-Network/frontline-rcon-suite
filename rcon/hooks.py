@@ -459,7 +459,8 @@ def ban_if_blacklisted(rcon: Rcon, player_id: str, name: str, verified_steam_id:
     def defer(record_id):
         try:
             from rcon.blacklist_sync_journal import enqueue_connect_reconciliation
-            enqueue_connect_reconciliation(int(get_server_number()), verified_steam_id, record_id, started_at)
+            enqueue_connect_reconciliation(int(get_server_number()), verified_steam_id, record_id, started_at,
+                                           connected_eos_id=player_id)
         except Exception:
             logger.exception('Unable to queue unattempted HLLV blacklist reconciliation')
 

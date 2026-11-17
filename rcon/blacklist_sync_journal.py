@@ -68,7 +68,7 @@ def enqueue(session, command: bytes, server_mask: int) -> int:
 
 
 def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id: int,
-                                   started_at: datetime) -> bool:
+                                   started_at: datetime, *, connected_eos_id: str | None = None) -> bool:
     """Persist one retry after an unattempted connect-time identity check.
 
     A matching pending/review item or a completion since this connect started
@@ -82,28 +82,34 @@ def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id
 
     if not 1 <= server_number <= 32 or not player_id or record_id <= 0 or started_at.tzinfo is None:
         raise ValueError('Invalid connect reconciliation')
+    if connected_eos_id is not None and (not isinstance(connected_eos_id, str) or len(connected_eos_id) != 32 or
+            not all(c in '0123456789abcdefABCDEF' for c in connected_eos_id)):
+        raise ValueError('Invalid verified EOS identity')
+    identities = {player_id, connected_eos_id} if connected_eos_id else {player_id}
     mask = 1 << (server_number - 1)
     with get_session_maker()() as session, session.begin():
         session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": 0x464C4E424C53594E})
-        rows = session.execute(select(BlacklistSyncDelivery.command, BlacklistSyncDelivery.status)
+        rows = session.execute(select(BlacklistSyncDelivery.id, BlacklistSyncDelivery.command, BlacklistSyncDelivery.status)
             .where(BlacklistSyncDelivery.server_number == server_number,
                    ((BlacklistSyncDelivery.status.in_(('queued', 'sending', 'review'))) |
                     ((BlacklistSyncDelivery.status == 'done') &
                      (BlacklistSyncDelivery.updated_at >= started_at))))).all()
         overlap = False
+        matching = []
         for row in rows:
             try:
                 existing = BlacklistCommand.decode(row.command)
                 if (existing.command == BlacklistCommandType.CREATE_RECORD
                         and existing.payload.get('record_id') == record_id
                         and existing.payload.get('player_id') == player_id):
-                    return False
+                    matching.append(row)
+                    continue
                 if existing.command == BlacklistCommandType.CREATE_RECORD:
-                    overlap |= existing.payload.get('player_id') == player_id
+                    overlap |= existing.payload.get('player_id') in identities
                 elif existing.command in (BlacklistCommandType.EDIT_RECORD, BlacklistCommandType.DELETE_RECORD):
-                    overlap |= existing.payload['old_record']['player_id'] == player_id
+                    overlap |= existing.payload['old_record']['player_id'] in identities
                 elif existing.command == BlacklistCommandType.EXPIRE_ALL:
-                    overlap |= existing.payload['player_id'] == player_id
+                    overlap |= existing.payload['player_id'] in identities
                 elif existing.command in (BlacklistCommandType.EDIT_LIST, BlacklistCommandType.DELETE_LIST):
                     # A list change may include this player. The worker may
                     # already have passed its overlap check before this new
@@ -111,6 +117,27 @@ def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id
                     overlap = True
             except Exception:
                 overlap = True
+        if matching and not overlap:
+            return False
+        if matching and overlap:
+            need_review_record = False
+            for row in matching:
+                if row.status == 'review':
+                    continue
+                if row.status == 'queued':
+                    locked = session.scalar(select(BlacklistSyncDelivery).where(
+                        BlacklistSyncDelivery.id == row.id).with_for_update(skip_locked=True))
+                    if locked is not None and locked.status == 'queued':
+                        locked.status = 'review'
+                        locked.reason = 'overlapping blacklist changes require reconciliation before connect action'
+                        locked.updated_at = datetime.now(timezone.utc)
+                        continue
+                # Another worker may already be acting or the matching work
+                # may have completed. Preserve a separate review without
+                # waiting on its row while holding the producer lock.
+                need_review_record = True
+            if not need_review_record:
+                return False
         command = BlacklistCommand(command=BlacklistCommandType.CREATE_RECORD, server_mask=mask,
                                    payload={'player_id': player_id, 'record_id': record_id})
         now = datetime.now(timezone.utc)
