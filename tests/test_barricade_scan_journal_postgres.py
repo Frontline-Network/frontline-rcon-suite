@@ -476,12 +476,13 @@ def test_scan_activation_never_automatically_resends_old_or_ambiguous_sessions(d
         rows = session.scalars(select(journal.BarricadeScanDelivery)).all()
         assert {row.player_id: (row.status, row.review_cause) for row in rows} == {
             'legacy': ('review', 'activation_unknown'),
+            'old': ('review', 'activation_before'),
             'ambiguous': ('review', 'activation_ambiguous'),
             'new': ('done', None),
         }
         ambiguous_id = next(row.id for row in rows if row.player_id == 'ambiguous')
     visible = journal.list_reviews(3)
-    assert {row['review_cause'] for row in visible['results']} == {'activation_unknown', 'activation_ambiguous'}
+    assert {row['review_cause'] for row in visible['results']} == {'activation_unknown', 'activation_before', 'activation_ambiguous'}
     assert journal.list_reviews(4)['total'] == 0
     journal.resolve_review(3, namespace, ambiguous_id, decision='retry', actor='operator', reason='synthetic review')
     async def retry():

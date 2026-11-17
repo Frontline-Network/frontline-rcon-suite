@@ -296,7 +296,7 @@ def mark_activation_review(server_number: int, integration_id: str, session_id: 
                            player_id: str, game: str, cause: str) -> None:
     """Record an ambiguous pre-send candidate; no remote action has occurred."""
     _require_scope(server_number, integration_id)
-    if (cause not in ('activation_ambiguous', 'activation_unknown') or
+    if (cause not in ('activation_before', 'activation_ambiguous', 'activation_unknown') or
             game not in ('HLL', 'HLLV') or type(session_id) is not int or session_id <= 0 or
             not isinstance(player_id, str) or not 0 < len(player_id) <= 100):
         raise ValueError('Invalid activation review')
