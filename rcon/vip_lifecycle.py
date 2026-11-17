@@ -377,12 +377,14 @@ def _active_sessions(
                 PlayerID.player_id.in_(player_ids),
                 PlayerSession.server_number == server_number,
                 PlayerSession.end.is_(None),
+                PlayerSession.end_event_us.is_(None),
             )
-            .order_by(PlayerSession.created.desc())
             .all()
         )
         result: dict[str, dict[str, Any]] = {}
-        for player, player_session in rows:
+        for player, player_session in sorted(
+            rows, key=lambda row: PlayerID._session_order_key(row[1]), reverse=True
+        ):
             result.setdefault(
                 player.player_id,
                 {

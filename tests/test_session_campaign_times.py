@@ -1,15 +1,27 @@
 import os
+import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.orm import Session
+from sqlalchemy.schema import CreateSchema, DropSchema
 
 os.environ.setdefault("SERVER_NUMBER", "1")
 os.environ.setdefault("DEBUG", "1")
 
 from rcon import campaign_delivery, vip_lifecycle
+from rcon.models import PlayerID, PlayerSession
 from rcon.user_config.auto_broadcast import AutoBroadcastMessage, VipLifecycleCampaign
+
+
+@compiles(JSONB, 'sqlite')
+def sqlite_jsonb(_element, _compiler, **_kwargs):
+    return 'JSON'
 
 
 @pytest.mark.parametrize("module", [campaign_delivery, vip_lifecycle])
@@ -79,3 +91,78 @@ def test_legacy_session_uses_utc_creation_as_conservative_start(monkeypatch, mod
     assert not eligible(item, start, created_utc + timedelta(minutes=4, seconds=59))
     assert eligible(item, start, created_utc + timedelta(minutes=5))
     assert not eligible(item, None, created_utc + timedelta(days=1))
+
+
+@pytest.mark.parametrize('module', [campaign_delivery, vip_lifecycle])
+def test_delayed_older_session_cannot_override_current_connection(monkeypatch, module):
+    player = SimpleNamespace(id=7, player_id='player-1')
+    earlier = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
+    later = earlier + timedelta(minutes=20)
+    older_replayed = SimpleNamespace(id=12, start=earlier.replace(tzinfo=None),
+        start_event_us=int(earlier.timestamp() * 1_000_000), created=datetime(2026, 1, 1, 12, 25))
+    current = SimpleNamespace(id=11, start=later.replace(tzinfo=None),
+        start_event_us=int(later.timestamp() * 1_000_000), created=datetime(2026, 1, 1, 12, 20))
+
+    class Query:
+        def join(self, *args): return self
+        def filter(self, *args): return self
+        def order_by(self, *args): return self
+        def all(self): return [(player, older_replayed), (player, current)]
+
+    @contextmanager
+    def fake_session():
+        yield SimpleNamespace(query=lambda *args: Query())
+
+    monkeypatch.setattr(module, 'enter_session', fake_session)
+    selected = module._active_sessions({'player-1'}, 1)['player-1']
+    assert selected['session_id'] == 11
+    assert selected['start'] == (later.replace(tzinfo=None) if module is campaign_delivery else later)
+
+
+@pytest.mark.parametrize('module', [campaign_delivery, vip_lifecycle])
+@pytest.mark.parametrize('database', ['sqlite', 'postgres'])
+def test_real_database_selects_latest_open_local_session(monkeypatch, module, database):
+    if database == 'postgres' and not os.getenv('RCON_SEARCH_TEST_DATABASE'):
+        pytest.skip('requires isolated PostgreSQL')
+    base = create_engine(os.environ['RCON_SEARCH_TEST_DATABASE'] if database == 'postgres' else 'sqlite://')
+    schema = 'campaign_session_' + uuid.uuid4().hex if database == 'postgres' else None
+    if schema:
+        with base.begin() as conn:
+            conn.execute(CreateSchema(schema))
+    engine = base.execution_options(schema_translate_map={None: schema}) if schema else base
+    try:
+        for model in (PlayerID, PlayerSession):
+            model.__table__.create(engine)
+        older = datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
+        current = older + timedelta(minutes=20)
+        with Session(engine) as sess:
+            player = PlayerID(player_id='synthetic-player', created=older.replace(tzinfo=None))
+            sess.add(player)
+            sess.flush()
+            def add_session(start, created, server=3, ended=False):
+                entry = PlayerSession(player_id_id=player.id, server_number=server,
+                    start=start.replace(tzinfo=None), created=created.replace(tzinfo=None),
+                    start_event_us=int(start.timestamp() * 1_000_000),
+                    end_event_us=int((start + timedelta(seconds=1)).timestamp() * 1_000_000) if ended else None)
+                sess.add(entry)
+                sess.flush()
+                return entry.id
+            current_id = add_session(current, current)
+            add_session(older, current + timedelta(minutes=5))
+            add_session(current + timedelta(minutes=10), current + timedelta(minutes=10), server=4)
+            add_session(current + timedelta(minutes=15), current + timedelta(minutes=15), ended=True)
+            sess.commit()
+
+        @contextmanager
+        def session_scope():
+            with Session(engine) as sess:
+                yield sess
+        monkeypatch.setattr(module, 'enter_session', session_scope)
+        selected = module._active_sessions({'synthetic-player'}, 3)['synthetic-player']
+        assert selected['session_id'] == current_id
+        assert selected['start'] == (current.replace(tzinfo=None) if module is campaign_delivery else current)
+    finally:
+        if schema:
+            with base.begin() as conn:
+                conn.execute(DropSchema(schema, cascade=True))
+        base.dispose()
