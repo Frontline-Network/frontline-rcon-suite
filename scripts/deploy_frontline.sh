@@ -260,6 +260,7 @@ fi
 
 if [[ "$current_sha" == "$target_sha" ]]; then
   echo "Already deployed at $target_short."
+  python3 scripts/discover_backend_readiness.py
   exit 0
 fi
 

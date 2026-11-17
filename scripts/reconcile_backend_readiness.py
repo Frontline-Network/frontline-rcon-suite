@@ -55,6 +55,8 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument("-f", "--file", action="append", required=True,
                         help="Active Compose file; repeat in the original order")
     parser.add_argument("--profile", action="append", default=[])
+    parser.add_argument("--service", action="append", default=[],
+                        help="Limit reconciliation to the named existing backends")
     parser.add_argument("--wait-timeout", type=int, default=300,
                         help="Readiness timeout in seconds (1–600, default: 300)")
     parser.add_argument("--apply", action="store_true", help="Recreate validated backends")
@@ -85,6 +87,10 @@ def main(argv: list[str] | None = None) -> int:
     # Only the installation's first Compose file defines actual services.
     base_services = set(run(base_compose + ["config", "--services"]).split())
     names = sorted(name for name in services if name in base_services and BACKEND.fullmatch(name))
+    if args.service:
+        if not set(args.service).issubset(names):
+            raise ValueError("Requested backend is absent from the supplied Compose configuration")
+        names = [name for name in names if name in args.service]
     if not names:
         raise ValueError("No configured backend services found")
 
