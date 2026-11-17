@@ -442,6 +442,58 @@ def test_connect_reconciliation_is_deduplicated_across_workers(database):
         assert len(session.scalars(select(journal.BlacklistSyncDelivery)).all()) == 1
 
 
+def test_connect_reconciliation_does_not_hold_global_lock_waiting_for_target(database):
+    from rcon.vip_rewards.locking import lock
+
+    entered, release = Event(), Event()
+    def hold_target():
+        with lock('blacklist-sync:3'):
+            entered.set()
+            assert release.wait(10)
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        holder = executor.submit(hold_target)
+        assert entered.wait(10)
+        deferred = executor.submit(journal.enqueue_connect_reconciliation, 3,
+                                   '76561198036685843', 7, datetime.now(timezone.utc))
+        try:
+            assert deferred.result(timeout=2) is True
+            other_server = executor.submit(queue, database, b'unrelated', 8)
+            assert other_server.result(timeout=2) == 1
+        finally:
+            release.set()
+        holder.result(timeout=10)
+
+
+@pytest.mark.parametrize('uncertain', [False, True])
+def test_connect_reconciliation_deduplicates_against_inflight_delivery(database, uncertain):
+    steam = '76561198036685843'
+    started = datetime.now(timezone.utc)
+    command = blacklist.BlacklistCommand(command=blacklist.BlacklistCommandType.CREATE_RECORD,
+        server_mask=4, payload={'player_id': steam, 'record_id': 7}).encode()
+    queue(database, command, 4)
+    entered, release = Event(), Event()
+    def delivery(_):
+        entered.set()
+        assert release.wait(10)
+        if uncertain:
+            raise TimeoutError('synthetic lost response')
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        worker = executor.submit(journal.process_one, 3, delivery)
+        assert entered.wait(10)
+        try:
+            duplicate = executor.submit(journal.enqueue_connect_reconciliation, 3, steam, 7, started)
+            assert duplicate.result(timeout=2) is False
+            other_server = executor.submit(queue, database, b'unrelated', 8)
+            assert other_server.result(timeout=2) == 1
+        finally:
+            release.set()
+        assert worker.result(timeout=10) == ('review' if uncertain else 'done')
+    with database() as session:
+        rows = session.scalars(select(journal.BlacklistSyncDelivery).where(
+            journal.BlacklistSyncDelivery.server_number == 3)).all()
+        assert len(rows) == 1 and rows[0].status == ('review' if uncertain else 'done')
+
+
 def test_connect_reconciliation_does_not_repeat_recently_completed_delivery(database):
     steam = '76561198036685843'
     start = datetime.now(timezone.utc) - timedelta(seconds=1)
