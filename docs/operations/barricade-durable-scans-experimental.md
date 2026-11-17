@@ -13,6 +13,15 @@ identity uncertainty and transitions from an older scanner must be resolved
 before enabling automatic scans. Unconfirmed sends and ambiguous or recently
 ended sessions require operator review; a retry can create a duplicate alert.
 
+The review page's status distinguishes disabled, unregistered, unavailable,
+missing roster, missing log observation, pending events, and available evidence.
+Available evidence only means the individual observations were readable and
+fresh when checked. It does not establish their relative ordering, a current
+Barricade connection, complete game logs, or successful scan delivery. A new
+collector pass attempts to invalidate its prior success until that pass
+completes. If the collector cannot reach Redis, the previous observation may
+remain readable until it expires; the marker is not a completeness guarantee.
+
 With the new consumer, an explicit `frontline_integration` connection is
 rejected if durable scanning is disabled or the binding is invalid. A peer
 without that parameter keeps the legacy path. **Older application versions do

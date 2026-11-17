@@ -48,6 +48,8 @@ def test_aggregate_status_requires_registration_roster_and_current_log_observati
         assert status.scan_status(3) == {'state': 'pending_logs'}
         assert publish(0)
         assert status.scan_status(3) == {'state': 'evidence_available'}
+        observation.invalidate(client, scope=scope, server_number=3)
+        assert status.scan_status(3) == {'state': 'waiting_logs'}
         monkeypatch.setattr(status, 'get_redis_client', lambda **_kwargs: (_ for _ in ()).throw(OSError('secret')))
         assert status.scan_status(3) == {'state': 'unavailable'}
     finally:
