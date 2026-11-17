@@ -34,9 +34,19 @@ async def scan_once(server_number, integration_id, game, sender, is_present, *, 
                                        include_start=True)
         if not rows:
             return
-        for session_id, player_id, start_event_us in rows:
+        for session_id, player_id, start_event_us, delivery_status in rows:
             after_id = session_id
-            if journal.classify_activation_start(boundary, start_event_us) != 'after':
+            classification = journal.classify_activation_start(boundary, start_event_us)
+            if delivery_status != 'queued' and classification in ('ambiguous', 'unknown'):
+                def record_review():
+                    with journal.delivery_scope(server_number, integration_id):
+                        if (journal.credential_is_registered(server_number, integration_id, credential_id)
+                                and key_is_live(credential_id) is True):
+                            journal.mark_activation_review(server_number, integration_id, session_id, player_id,
+                                                           game, 'activation_' + classification)
+                await asyncio.to_thread(record_review)
+                continue
+            if delivery_status != 'queued' and classification != 'after':
                 continue
             await dispatch(server_number, integration_id, session_id, player_id, game, sender,
                            credential_id=credential_id, verify_session=is_present)

@@ -53,6 +53,7 @@ def upgrade():
         sa.Column('player_id', sa.String(100), nullable=False),
         sa.Column('game', sa.String(8), nullable=False),
         sa.Column('status', sa.String(16), nullable=False),
+        sa.Column('review_cause', sa.String(32), nullable=True),
         sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
         sa.UniqueConstraint('server_number', 'integration_id', 'player_session_id', name='uq_barricade_scan_session'),
