@@ -1,8 +1,8 @@
 """Experimental, bounded evidence for a Barricade scan candidate.
 
-Not connected to the live consumer. A fresh log poll is not a guarantee that
-the game server has already exposed every event; this cannot establish that
-an unobserved reconnect did not occur.
+Used only by the opt-in consumer. A fresh log poll is not a guarantee that the
+game server has already exposed every event; an unobserved reconnect remains
+possible.
 """
 import time
 
