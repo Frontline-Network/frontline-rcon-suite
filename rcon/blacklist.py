@@ -19,7 +19,8 @@ from rcon.barricade import (
     ServerRequestType,
     send_to_barricade,
 )
-from rcon.barricade_hllv_identity import prepare_online_steam_identity, verified_steam_id
+from rcon.barricade_hllv_identity import (prepare_online_identity_snapshot,
+                                          prepare_online_steam_identity, verified_steam_id)
 from rcon.cache_utils import get_redis_client
 from rcon.automods import action_guard
 from rcon.commands import HLLCommandFailedError
@@ -1144,6 +1145,20 @@ class BlacklistCommandHandler:
             # Leave malformed entries to normal dispatch, which moves them to
             # review instead of deferring them forever as a failed live read.
             return None
+        if (cmd.command == BlacklistCommandType.EDIT_LIST
+                and getattr(getattr(self.rcon, 'game_profile', None), 'game', None) == GameEnum.HLL_VIETNAM):
+            try:
+                payload = BlacklistEditListCommand.model_validate(cmd.payload)
+                if self._hllv_kick_list_newly_enabled(payload):
+                    return {'kick_list_players': prepare_online_identity_snapshot(self.rcon)}
+            except (ValueError, KeyError, TypeError):
+                # Snapshot failures must remain queued; malformed command
+                # payloads are handled by normal dispatch and review.
+                try:
+                    BlacklistEditListCommand.model_validate(cmd.payload)
+                except Exception:
+                    return None
+                raise
         if cmd.command == BlacklistCommandType.CREATE_RECORD:
             player_id = cmd.payload.get('player_id')
         elif cmd.command in (BlacklistCommandType.EDIT_RECORD, BlacklistCommandType.DELETE_RECORD):
@@ -1177,7 +1192,7 @@ class BlacklistCommandHandler:
         logger.info("Handling %s command", cmd.command.name)
         payload = schema.model_validate(cmd.payload)
         if cmd.command in (BlacklistCommandType.CREATE_RECORD, BlacklistCommandType.EDIT_RECORD,
-                           BlacklistCommandType.DELETE_RECORD):
+                           BlacklistCommandType.DELETE_RECORD, BlacklistCommandType.EDIT_LIST):
             handler(payload, prepared=prepared)
         else:
             handler(payload)
@@ -1343,13 +1358,72 @@ class BlacklistCommandHandler:
                     old_state=get_ban_state_from_record(old_record),
                 )
 
-    def handle_edit_list(self, payload: BlacklistEditListCommand):
+    @staticmethod
+    def _hllv_kick_list_newly_enabled(payload):
+        old, new = payload.old_blacklist, payload.new_blacklist
+        old_applies = old['servers'] is None or SERVER_NUMBER in old['servers']
+        new_applies = new['servers'] is None or SERVER_NUMBER in new['servers']
+        return not old_applies and new_applies and new['sync'] == BlacklistSyncMethod.KICK_ONLY
+
+    def _apply_new_hllv_kick_list(self, payload, prepared):
+        if not isinstance(prepared, dict) or not isinstance(prepared.get('kick_list_players'), dict):
+            raise HLLVSteamIdentityUnverified('New kick-only list needs a verified roster')
+        players = prepared['kick_list_players']
+        list_id = payload.new_blacklist['id']
+        with blacklist_change_session() as sess:
+            current = get_blacklist(sess, list_id)
+            if (current is None or current.sync != BlacklistSyncMethod.KICK_ONLY
+                    or (current.servers is not None and not current.servers & get_server_number_mask())):
+                raise RuntimeError('Blacklist configuration changed before reconciliation')
+            def live_details(eos, identity):
+                steam = identity['steam_id']
+                with self.rcon.without_retries():
+                    details = self.rcon.get_uncached_detailed_player_info(player_id=eos)
+                if (not isinstance(details, dict) or details.get('player_id') != eos
+                        or details.get('eos_id') != eos
+                        or str(details.get('platform') or '').strip().lower() != identity['platform']
+                        or (steam and verified_steam_id(self.rcon, eos, details) != steam)
+                        or (not steam and details.get('steam_id'))):
+                    raise HLLVSteamIdentityUnverified('Player identity changed before list reconciliation')
+                return details
+
+            actions = []
+            for eos, identity in players.items():
+                records = [is_player_blacklisted(sess, eos)]
+                steam = identity['steam_id']
+                if steam:
+                    records.append(is_player_blacklisted(sess, steam))
+                records = [entry for entry in records if entry is not None]
+                effective = get_highest_priority_record(records) if records else None
+                if effective is None or effective.blacklist_id != list_id:
+                    continue
+                # Prepare the whole batch before sending the first action.
+                live_details(eos, identity)
+                actions.append((eos, identity, effective))
+            for eos, identity, effective in actions:
+                try:
+                    details = live_details(eos, identity)
+                except Exception as exc:
+                    # An earlier player may already have been acted upon.
+                    raise RuntimeError('Identity changed during kick-only list reconciliation') from exc
+                result = apply_blacklist_punishment(self.rcon, effective, player_id=eos,
+                                                    player_name=details.get('name'))
+                if result is not True and result is not _BLACKLIST_ACTION_EXPIRED:
+                    # Earlier players may already have been acted upon; do not
+                    # identify this as a wholly unattempted identity failure.
+                    raise RuntimeError('Could not confirm kick-only list reconciliation')
+
+    def handle_edit_list(self, payload: BlacklistEditListCommand, prepared=None):
         """Handle a blacklist being edited.
 
         This must be called only on servers targeted by the blacklist
         before and/or after editing."""
         old_blacklist = payload.old_blacklist
         new_blacklist = payload.new_blacklist
+
+        if (getattr(getattr(self.rcon, 'game_profile', None), 'game', None) == GameEnum.HLL_VIETNAM
+                and self._hllv_kick_list_newly_enabled(payload)):
+            return self._apply_new_hllv_kick_list(payload, prepared)
 
         was_banning = (
             old_blacklist["servers"] is None

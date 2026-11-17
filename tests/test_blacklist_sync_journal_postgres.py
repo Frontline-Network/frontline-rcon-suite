@@ -483,6 +483,135 @@ def test_hllv_kick_only_newly_applies_on_server_through_journal(database, existi
     api.remove_perma_ban.assert_not_called()
 
 
+def test_hllv_new_kick_list_deduplicates_verified_steam_and_eos(database, existing_blacklist, monkeypatch):
+    from contextlib import nullcontext
+    from rcon.types import GameEnum
+
+    record_id, list_id, _ = existing_blacklist
+    steam, eos = '76561198036685843', '0123456789abcdef0123456789abcdef'
+    with database() as session, session.begin():
+        entry = session.get(BlacklistRecord, record_id)
+        entry.player.player_id = steam
+        entry.blacklist.sync = BlacklistSyncMethod.KICK_ONLY
+        entry.blacklist.servers = 2
+        old = entry.blacklist.to_dict()
+        entry.blacklist.servers = 4
+        new = entry.blacklist.to_dict()
+        linked = PlayerID(player_id=eos)
+        session.add(linked)
+        session.flush()
+        session.add(BlacklistRecord(player_id_id=linked.id, blacklist_id=list_id,
+                                    reason='synthetic', admin_name='test'))
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', mock.Mock())
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    api.without_retries.return_value = nullcontext()
+    api.get_all_player_info.return_value = [{'iD': eos, 'eosId': eos, 'steamId': steam,
+                                             'platform': 'EPlatformFamily::Steam'}]
+    api.get_uncached_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
+                                                           'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
+    api.kick.return_value = True
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    command = blacklist.BlacklistCommand(command=blacklist.BlacklistCommandType.EDIT_LIST,
+        server_mask=4, payload={'old_blacklist': old, 'new_blacklist': new}).encode()
+    queue(database, command, 4)
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'done'
+    api.kick.assert_called_once()
+    assert api.kick.call_args.kwargs['player_id'] == eos
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'empty'
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
+
+
+def test_hllv_new_kick_list_waits_for_complete_roster(database, existing_blacklist, monkeypatch):
+    from contextlib import nullcontext
+    from rcon.types import GameEnum
+
+    record_id, _, _ = existing_blacklist
+    eos = '0123456789abcdef0123456789abcdef'
+    with database() as session, session.begin():
+        entry = session.get(BlacklistRecord, record_id)
+        entry.player.player_id = '76561198036685843'
+        entry.blacklist.sync = BlacklistSyncMethod.KICK_ONLY
+        entry.blacklist.servers = 2
+        old = entry.blacklist.to_dict()
+        entry.blacklist.servers = 4
+        new = entry.blacklist.to_dict()
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    api.without_retries.return_value = nullcontext()
+    api.get_all_player_info.return_value = [{'iD': eos, 'eosId': eos, 'steamId': None,
+                                             'platform': 'EPlatformFamily::Steam'}]
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    command = blacklist.BlacklistCommand(command=blacklist.BlacklistCommandType.EDIT_LIST,
+        server_mask=4, payload={'old_blacklist': old, 'new_blacklist': new}).encode()
+    queue(database, command, 4)
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'deferred'
+    with database() as session:
+        assert session.scalar(select(journal.BlacklistSyncDelivery.status)) == 'queued'
+    api.kick.assert_not_called()
+
+
+def test_hllv_new_kick_list_partial_timeout_requires_review_without_replay(database, existing_blacklist, monkeypatch):
+    from contextlib import nullcontext
+    from rcon.types import GameEnum
+
+    record_id, list_id, _ = existing_blacklist
+    steam, eos = '76561198036685843', '0123456789abcdef0123456789abcdef'
+    console = 'fedcba9876543210fedcba9876543210'
+    with database() as session, session.begin():
+        entry = session.get(BlacklistRecord, record_id)
+        entry.player.player_id = steam
+        entry.blacklist.sync = BlacklistSyncMethod.KICK_ONLY
+        entry.blacklist.servers = 2
+        old = entry.blacklist.to_dict()
+        entry.blacklist.servers = 4
+        new = entry.blacklist.to_dict()
+        second = PlayerID(player_id=console)
+        session.add(second)
+        session.flush()
+        session.add(BlacklistRecord(player_id_id=second.id, blacklist_id=list_id,
+                                    reason='synthetic', admin_name='test'))
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', mock.Mock())
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    api.without_retries.return_value = nullcontext()
+    api.get_all_player_info.return_value = [
+        {'iD': eos, 'eosId': eos, 'steamId': steam, 'platform': 'EPlatformFamily::Steam'},
+        {'iD': console, 'eosId': console, 'steamId': None, 'platform': 'EPlatformFamily::PS5'},
+    ]
+    def details(player_id):
+        return {'player_id': player_id, 'eos_id': player_id, 'name': 'synthetic',
+                'steam_id': steam if player_id == eos else None,
+                'platform': 'EPlatformFamily::Steam' if player_id == eos else 'EPlatformFamily::PS5'}
+    api.get_uncached_detailed_player_info.side_effect = details
+    api.kick.side_effect = [True, TimeoutError('synthetic lost response')]
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    command = blacklist.BlacklistCommand(command=blacklist.BlacklistCommandType.EDIT_LIST,
+        server_mask=4, payload={'old_blacklist': old, 'new_blacklist': new}).encode()
+    queue(database, command, 4)
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'review'
+    assert api.kick.call_count == 2
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'review'
+    assert api.kick.call_count == 2
+    with database() as session:
+        delivery = session.scalar(select(journal.BlacklistSyncDelivery))
+        assert delivery.reason == 'unconfirmed: RuntimeError'
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
+
+
 @pytest.mark.parametrize('missing', ['name', 'steamId', 'platform'])
 def test_hllv_malformed_roster_defers_then_recovers_without_losing_delivery(database, existing_blacklist, monkeypatch, missing):
     from contextlib import nullcontext

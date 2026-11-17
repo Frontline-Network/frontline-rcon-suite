@@ -27,6 +27,42 @@ def verified_steam_id(rcon, player_id: str, player_info: dict | None) -> str | N
     return steam_id
 
 
+def prepare_online_identity_snapshot(rcon) -> dict:
+    """Return one fresh, self-consistent HLLV roster keyed by EOS identity."""
+    with rcon.without_retries():
+        rows = rcon.get_all_player_info(strict=True, fresh=True)
+    if not isinstance(rows, list):
+        raise ValueError('Invalid player snapshot')
+    players = {}
+    seen_steam = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError('Invalid player snapshot row')
+        eos = row.get('iD')
+        if (not isinstance(eos, str) or len(eos) != 32
+                or not all(c in '0123456789abcdefABCDEF' for c in eos)
+                or row.get('eosId') != eos or eos in players):
+            raise ValueError('Invalid or duplicate EOS identity in player snapshot')
+        platform = str(row.get('platform') or '').strip().lower()
+        steam = row.get('steamId')
+        if platform == 'eplatformfamily::steam':
+            details = {'player_id': eos, 'eos_id': row.get('eosId'),
+                       'steam_id': steam, 'platform': row.get('platform')}
+            if verified_steam_id(rcon, eos, details) is None or steam in seen_steam:
+                raise ValueError('Invalid or duplicate Steam identity in player snapshot')
+            seen_steam.add(steam)
+        elif platform not in NON_STEAM_FAMILIES:
+            raise ValueError('Unknown online platform in identity snapshot')
+        else:
+            # A Steam alias on a console row cannot establish the ownership
+            # relationship needed to combine records without guessing.
+            if steam:
+                raise ValueError('Unexpected Steam identity on non-Steam platform')
+            steam = None
+        players[eos] = {'steam_id': steam, 'platform': platform}
+    return players
+
+
 def prepare_online_steam_identity(rcon, steam_id: str) -> dict:
     """Read a fresh roster; an absent account is not an invented EOS ID."""
     if not is_steam_id_64(steam_id):
