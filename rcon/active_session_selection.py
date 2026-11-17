@@ -1,5 +1,5 @@
 """Select the newest local session before checking whether it remains open."""
-from sqlalchemy import BigInteger, cast, func
+from sqlalchemy import BigInteger, String, cast, func
 from rcon.models import PlayerID, PlayerSession
 
 
@@ -7,7 +7,14 @@ def latest_open_sessions(session, player_ids, server_number):
     if not player_ids:
         return []
     if session.get_bind().dialect.name == 'sqlite':
-        created_us = cast(func.strftime('%s', PlayerSession.created), BigInteger) * 1_000_000
+        # SQLite's %s discards the fractional second. The serialized datetime
+        # keeps six digits after the decimal; include them before comparing.
+        created_text = cast(PlayerSession.created, String)
+        fraction = cast(func.substr(created_text, 21, 6), BigInteger)
+        # Strip the fraction before strftime: SQLite can round .999999 up to
+        # the next second, which would otherwise count that fraction twice.
+        created_us = (cast(func.strftime('%s', func.substr(created_text, 1, 19)), BigInteger) * 1_000_000
+                      + func.coalesce(fraction, 0))
     else:
         created_us = cast(func.extract('epoch', PlayerSession.created) * 1_000_000, BigInteger)
     order = func.coalesce(PlayerSession.start_event_us, created_us, -(2**63))

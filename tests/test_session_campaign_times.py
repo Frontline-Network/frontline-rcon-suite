@@ -179,3 +179,45 @@ def test_real_database_never_uses_stale_open_session_after_newer_local_end(monke
             with base.begin() as conn:
                 conn.execute(DropSchema(schema, cascade=True))
         base.dispose()
+
+
+@pytest.mark.parametrize('module', [campaign_delivery, vip_lifecycle])
+@pytest.mark.parametrize('database', ['sqlite', 'postgres'])
+@pytest.mark.parametrize('older_us,newer_us', [(100000, 900000), (999999, 1000000)])
+def test_legacy_sessions_within_same_second_use_precise_creation_order(monkeypatch, module, database, older_us, newer_us):
+    if database == 'postgres' and not os.getenv('RCON_SEARCH_TEST_DATABASE'):
+        pytest.skip('requires isolated PostgreSQL')
+    base = create_engine(os.environ['RCON_SEARCH_TEST_DATABASE'] if database == 'postgres' else 'sqlite://')
+    schema = 'campaign_same_second_' + uuid.uuid4().hex if database == 'postgres' else None
+    if schema:
+        with base.begin() as conn:
+            conn.execute(CreateSchema(schema))
+    engine = base.execution_options(schema_translate_map={None: schema}) if schema else base
+    try:
+        for model in (PlayerID, PlayerSession):
+            model.__table__.create(engine)
+        with Session(engine) as sess:
+            player = PlayerID(player_id='synthetic-player')
+            sess.add(player)
+            sess.flush()
+            # The older open row deliberately has the higher ID.
+            base_time = datetime(2026, 1, 1, 12, 0, 0)
+            newer = base_time + timedelta(microseconds=newer_us)
+            older = base_time + timedelta(microseconds=older_us)
+            sess.add_all([
+                PlayerSession(player_id_id=player.id, server_number=3, start=newer,
+                              created=newer, end=newer + timedelta(seconds=1)),
+                PlayerSession(player_id_id=player.id, server_number=3, start=older, created=older),
+            ])
+            sess.commit()
+        @contextmanager
+        def session_scope():
+            with Session(engine) as sess:
+                yield sess
+        monkeypatch.setattr(module, 'enter_session', session_scope)
+        assert module._active_sessions({'synthetic-player'}, 3) == {}
+    finally:
+        if schema:
+            with base.begin() as conn:
+                conn.execute(DropSchema(schema, cascade=True))
+        base.dispose()
