@@ -447,6 +447,48 @@ def test_hllv_online_steam_record_journal_targets_eos_once(database, existing_bl
     assert action_guard.pending_players(3, 'BlacklistEnforcement') == set()
 
 
+def test_hllv_malformed_roster_defers_then_recovers_without_losing_delivery(database, existing_blacklist, monkeypatch):
+    from contextlib import nullcontext
+    from rcon.game.hllv.player_adapter import HLLVPlayerInfoAdapter
+    from rcon.rcon import Rcon
+    from rcon.types import GameEnum
+
+    record_id, _, _ = existing_blacklist
+    steam = '76561198036685843'
+    eos = '0123456789abcdef0123456789abcdef'
+    with database() as session, session.begin():
+        record = session.get(BlacklistRecord, record_id)
+        record.player.player_id = steam
+        record.blacklist.servers = 4
+        record.blacklist.sync = BlacklistSyncMethod.KICK_ONLY
+        session.add(PlayerID(player_id=eos))
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', mock.Mock())
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    api.game_profile.player_adapter = HLLVPlayerInfoAdapter()
+    api.without_retries.side_effect = nullcontext
+    raw = {'iD': eos, 'eosId': eos, 'steamId': steam, 'platform': 'EPlatformFamily::Steam'}
+    api.get_raw_player_snapshot.side_effect = [{'players': [raw]}, {'players': [{**raw, 'name': 'synthetic'}]}]
+    api.get_all_player_info.side_effect = lambda **kwargs: Rcon.get_all_player_info(api, **kwargs)
+    api.get_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
+                                                 'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
+    api.kick.return_value = True
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    command = blacklist.BlacklistCommand(command=blacklist.BlacklistCommandType.CREATE_RECORD,
+        server_mask=4, payload={'record_id': record_id, 'player_id': steam}).encode()
+    queue(database, command, 4)
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'deferred'
+    with database() as session:
+        assert session.scalar(select(journal.BlacklistSyncDelivery)).status == 'queued'
+    api.kick.assert_not_called()
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'done'
+    assert api.kick.call_count == 1 and api.kick.call_args.kwargs['player_id'] == eos
+
+
 def test_hllv_online_uncertain_kick_is_never_replayed(database, existing_blacklist, monkeypatch):
     from contextlib import nullcontext
     from rcon.types import GameEnum
