@@ -43,6 +43,24 @@ path again. Therefore a failed or missing response must not be replayed
 automatically. This source inspection and isolated contract test do not prove
 which Barricade version is running for a particular deployment.
 
+At the same public Barricade revision, Custom integrations use the configured
+WebSocket address directly and preserve its query string. Community RCON
+integrations instead append `/ws/barricade` to the configured base URL. Adding
+the integration query to that base URL therefore does not produce the intended
+WebSocket path and query. The current explicit-query binding must not be
+advertised as compatible with the Community RCON integration until an explicit,
+safe peer identity mechanism is designed and tested for it. Do not infer a
+unique peer from a potentially shared API key. The isolated contract test
+exercises both published URL adapters, not the version in actual use.
+To repeat the optional offline contract test, obtain the four public files at
+that revision (`integrations/custom/websocket.py`, `integrations/custom/integration.py`,
+`integrations/crcon/integration.py`, and `integrations/websocket.py`). Set
+`BARRICADE_PEER_SOURCE` to the first file and `BARRICADE_PEER_URL_SOURCES` to a
+directory containing the latter three as `custom.py`, `crcon.py`, and
+`websocket.py`. Run `pytest tests/test_barricade_public_peer_contract.py` in an
+isolated test environment. The test checks the pinned Git blob hashes and
+substitutes the alert callback; it does not contact Barricade or Discord.
+
 With the new consumer, an explicit `frontline_integration` connection is
 rejected if durable scanning is disabled or the binding is invalid. A peer
 without that parameter keeps the legacy path. **Older application versions do
