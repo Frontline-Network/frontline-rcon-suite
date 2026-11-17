@@ -7,6 +7,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from django.conf import settings as django_settings
+from rcon.types import GameEnum
 
 _standalone_channel_layer = None
 
@@ -61,6 +62,7 @@ class ResponseBody(pydantic.BaseModel):
 
 class UnbanPlayersRequestConfigPayload(pydantic.BaseModel):
     banlist_id: str
+    game: str | None = None
 
 
 class BanPlayersRequestConfigPayload(UnbanPlayersRequestConfigPayload):
@@ -74,6 +76,7 @@ class BanPlayersRequestPayload(pydantic.BaseModel):
 
 class ScanPlayersRequestPayload(pydantic.BaseModel):
     player_ids: list[str]
+    game: str
 
 
 class UnbanPlayersRequestPayload(pydantic.BaseModel):
@@ -90,6 +93,7 @@ class NewReportRequestPayloadPlayer(pydantic.BaseModel):
 
 
 class NewReportRequestPayload(pydantic.BaseModel):
+    game: str | None = None
     created_at: datetime
     body: str
     reasons: list[str]
@@ -104,6 +108,18 @@ class BarricadeRequestError(Exception):
 
     def __str__(self) -> str:
         return self.error
+
+
+def barricade_game_for_server() -> str:
+    """Map the configured game to Barricade's public protocol values."""
+    game = GameEnum(os.getenv('HLL_GAME') or GameEnum.HLL_WW2)
+    return 'HLLV' if game == GameEnum.HLL_VIETNAM else 'HLL'
+
+
+def validate_barricade_game(game: str | None) -> None:
+    """Reject an explicitly different game; retain legacy peers without one."""
+    if game is not None and game != barricade_game_for_server():
+        raise BarricadeRequestError('Request game does not match this server')
 
 
 def send_to_barricade(request_type: ServerRequestType, payload: dict | None):
