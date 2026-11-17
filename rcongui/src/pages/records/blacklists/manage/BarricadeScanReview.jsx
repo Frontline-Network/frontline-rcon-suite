@@ -14,11 +14,11 @@ function ReviewRow({ row, canReview, busy, onSave }) {
     <Stack spacing={1}>
       <Typography variant="body2">{t("barricadeScanReview.player")}: {row.player_id} · {row.game} · {new Date(row.updated_at).toLocaleString(i18n.resolvedLanguage)}</Typography>
       <Typography variant="body2">{t("barricadeScanReview.integration")}: {row.integration_id}</Typography>
-      <Alert severity="info">{t(`barricadeScanReview.cause.${["activation_before", "activation_ambiguous", "activation_unknown"].includes(row.review_cause) ? row.review_cause : "uncertain_delivery"}`)}</Alert>
+      <Alert severity="info">{t(`barricadeScanReview.cause.${["activation_before", "activation_ambiguous", "activation_unknown", "session_ended_before_scan"].includes(row.review_cause) ? row.review_cause : "uncertain_delivery"}`)}</Alert>
       {canReview && <>
         <TextField select size="small" label={t("barricadeScanReview.decision")} value={decision} onChange={(event) => setDecision(event.target.value)}>
           <MenuItem value="" disabled>{t("barricadeScanReview.choose")}</MenuItem>
-          {["confirmed", "dismissed", "retry"].map((value) => <MenuItem key={value} value={value}>{t(`barricadeScanReview.${value}`)}</MenuItem>)}
+          {(row.review_cause === "session_ended_before_scan" ? ["confirmed", "dismissed"] : ["confirmed", "dismissed", "retry"]).map((value) => <MenuItem key={value} value={value}>{t(`barricadeScanReview.${value}`)}</MenuItem>)}
         </TextField>
         {decision === "retry" && <Alert severity="warning">{t("barricadeScanReview.retryWarning")}</Alert>}
         <TextField size="small" label={t("barricadeScanReview.reason")} value={reason} onChange={(event) => setReason(event.target.value)} inputProps={{ maxLength: 1000 }} />
