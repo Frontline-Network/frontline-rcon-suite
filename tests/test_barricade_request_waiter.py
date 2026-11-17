@@ -188,3 +188,21 @@ def test_scan_cursor_can_distinguish_sessions_with_equal_start_time():
         assert {player_id for player_id, _ in result} == {'later-commit'}
     finally:
         engine.dispose()
+
+
+@pytest.mark.xfail(strict=True, reason='Reconnect skips sessions created while disconnected; see issue #397')
+def test_reconnect_does_not_skip_unscanned_sessions():
+    async def run():
+        consumer = BarricadeConsumer()
+        last_confirmed = datetime(2026, 1, 1, 12)
+        joined_while_disconnected = datetime(2026, 1, 1, 12, 1)
+        consumer._last_seen_session = last_confirmed
+        read = AsyncMock(return_value=[])
+        with patch.object(barricade, 'get_most_recent_session_date', AsyncMock(return_value=joined_while_disconnected)), \
+             patch.object(barricade, 'get_joined_players_since', read), \
+             patch.object(barricade.asyncio, 'sleep', AsyncMock(side_effect=[None, asyncio.CancelledError])):
+            with pytest.raises(asyncio.CancelledError):
+                await consumer._scan_players_loop()
+        assert read.await_args.args[0] == last_confirmed
+
+    asyncio.run(run())
