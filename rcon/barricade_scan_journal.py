@@ -11,7 +11,7 @@ from threading import get_ident
 import asyncio
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, String, TIMESTAMP, UniqueConstraint, and_, func, or_, select, update
+from sqlalchemy import BigInteger, CheckConstraint, String, TIMESTAMP, UniqueConstraint, and_, func, or_, select, union_all, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -336,20 +336,28 @@ def find_unreserved_recent_closed_sessions(server_number: int, integration_id: s
             type(after_id) is not int or after_id < 0 or type(limit) is not int or not 1 <= limit <= 1000):
         raise ValueError('Invalid Barricade closed session query')
     floor = boundary_us // 1_000_000 * 1_000_000
-    stmt = (select(PlayerSession.id, PlayerID.player_id)
+    matching_delivery = select(BarricadeScanDelivery.id).where(
+        BarricadeScanDelivery.player_session_id == PlayerSession.id,
+        BarricadeScanDelivery.server_number == server_number,
+        BarricadeScanDelivery.integration_id == integration_id).exists()
+    closed = or_(PlayerSession.end.is_not(None), PlayerSession.end_event_us.is_not(None))
+    recent = (select(PlayerSession.id.label('session_id'), PlayerID.player_id)
         .join(PlayerID, PlayerID.id == PlayerSession.player_id_id)
-        .outerjoin(BarricadeScanDelivery, and_(
-            BarricadeScanDelivery.player_session_id == PlayerSession.id,
-            BarricadeScanDelivery.server_number == server_number,
-            BarricadeScanDelivery.integration_id == integration_id))
-        .where(PlayerSession.server_number == server_number, PlayerSession.id > after_id,
-            or_(PlayerSession.end.is_not(None), PlayerSession.end_event_us.is_not(None)),
-            or_(PlayerSession.start_event_us >= floor, PlayerSession.end_event_us >= floor,
-                BarricadeScanDelivery.status == 'queued'),
-            or_(BarricadeScanDelivery.id.is_(None), BarricadeScanDelivery.status == 'queued'))
-        .order_by(PlayerSession.id).limit(limit))
+        .where(PlayerSession.server_number == server_number, PlayerSession.id > after_id, closed,
+            or_(PlayerSession.start_event_us >= floor, PlayerSession.end_event_us >= floor),
+            ~matching_delivery))
+    queued = (select(PlayerSession.id.label('session_id'), PlayerID.player_id)
+        .select_from(BarricadeScanDelivery)
+        .join(PlayerSession, PlayerSession.id == BarricadeScanDelivery.player_session_id)
+        .join(PlayerID, PlayerID.id == PlayerSession.player_id_id)
+        .where(BarricadeScanDelivery.server_number == server_number,
+            BarricadeScanDelivery.integration_id == integration_id,
+            BarricadeScanDelivery.status == 'queued', PlayerSession.server_number == server_number,
+            PlayerSession.id > after_id, closed))
+    candidates = union_all(recent, queued).subquery()
+    stmt = select(candidates.c.session_id, candidates.c.player_id).order_by(candidates.c.session_id).limit(limit)
     with get_session_maker()() as session:
-        return [(row.id, row.player_id) for row in session.execute(stmt)]
+        return [(row.session_id, row.player_id) for row in session.execute(stmt)]
 
 
 def reserve(server_number: int, integration_id: str, session_id: int, player_id: str, game: str) -> int | None:

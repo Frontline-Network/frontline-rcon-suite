@@ -697,6 +697,37 @@ def test_disconnected_sessions_are_visible_without_replaying_ended_session(datab
         journal.resolve_review(3, namespace, delivery, decision='retry', actor='operator', reason='synthetic')
 
 
+def test_closed_discovery_combines_recent_and_queued_without_duplicates(database, monkeypatch):
+    prepare_adapter(database, monkeypatch)
+    engine = database.kw['bind']
+    PlayerID.__table__.create(engine)
+    PlayerSession.__table__.create(engine)
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    identifiers = {}
+    with database.begin() as session:
+        for name in ('queued-old', 'queued-recent', 'done-recent', 'review-recent', 'fresh-recent', 'fresh-old'):
+            player = PlayerID(player_id=name)
+            session.add(player)
+            session.flush()
+            event = 1_000_000 if name.endswith('old') else 3_000_000
+            row = PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2026, 1, 1),
+                                start_event_us=event, end=datetime(2026, 1, 1), end_event_us=event)
+            session.add(row)
+            session.flush()
+            identifiers[name] = row.id
+    for name in ('queued-old', 'queued-recent', 'done-recent', 'review-recent'):
+        with journal.delivery_scope(3, namespace):
+            delivery = journal.reserve(3, namespace, identifiers[name], name, 'HLLV')
+            assert journal.finish(delivery, 3, namespace, confirmed=name == 'done-recent')
+        if name.startswith('queued'):
+            journal.resolve_review(3, namespace, delivery, decision='retry', actor='test', reason='synthetic')
+    rows = journal.find_unreserved_recent_closed_sessions(3, namespace, 2_000_100)
+    assert rows == [(identifiers[name], name) for name in ('queued-old', 'queued-recent', 'fresh-recent')]
+    first = journal.find_unreserved_recent_closed_sessions(3, namespace, 2_000_100, limit=1)
+    rest = journal.find_unreserved_recent_closed_sessions(3, namespace, 2_000_100, after_id=first[0][0])
+    assert first + rest == rows
+
+
 def test_async_dispatch_cancellation_before_lock_does_not_send(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     async def run():
