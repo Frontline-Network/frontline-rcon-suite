@@ -22,12 +22,12 @@ from rcon.models import (
     BlacklistRecord,
     CampaignDelivery,
     PlayerID,
-    PlayerSession,
     VipLifecycleDelivery,
     enter_session,
 )
 from rcon.user_config.auto_broadcast import VipLifecycleCampaign, VipLifecycleConfig
 from rcon.user_config.auto_mod_seeding import AutoModSeedingUserConfig
+from rcon.active_session_selection import latest_open_sessions
 from rcon.utils import get_server_number
 
 logger = logging.getLogger(__name__)
@@ -370,17 +370,7 @@ def _active_sessions(
     if not player_ids:
         return {}
     with enter_session() as sess:
-        rows = (
-            sess.query(PlayerID, PlayerSession)
-            .join(PlayerSession, PlayerSession.player_id_id == PlayerID.id)
-            .filter(
-                PlayerID.player_id.in_(player_ids),
-                PlayerSession.server_number == server_number,
-                PlayerSession.end.is_(None),
-                PlayerSession.end_event_us.is_(None),
-            )
-            .all()
-        )
+        rows = latest_open_sessions(sess, player_ids, server_number)
         result: dict[str, dict[str, Any]] = {}
         for player, player_session in sorted(
             rows, key=lambda row: PlayerID._session_order_key(row[1]), reverse=True

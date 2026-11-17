@@ -48,6 +48,7 @@ def test_active_session_uses_absolute_start_across_dst(monkeypatch, module, star
         yield SimpleNamespace(query=lambda *args: Query())
 
     monkeypatch.setattr(module, "enter_session", fake_session)
+    monkeypatch.setattr(module, "latest_open_sessions", lambda *_: [(player, session)])
     result = module._active_sessions({"player-1"}, 1)["player-1"]
     if module is campaign_delivery:
         item = AutoBroadcastMessage(id="dst", message="hello", time_sec=60, min_session_minutes=30)
@@ -80,6 +81,7 @@ def test_legacy_session_uses_utc_creation_as_conservative_start(monkeypatch, mod
         yield SimpleNamespace(query=lambda *args: Query())
 
     monkeypatch.setattr(module, "enter_session", fake_session)
+    monkeypatch.setattr(module, "latest_open_sessions", lambda *_: [(player, session)])
     start = module._active_sessions({"player-1"}, 1)["player-1"]["start"]
     assert start == created_utc
     if module is campaign_delivery:
@@ -114,6 +116,7 @@ def test_delayed_older_session_cannot_override_current_connection(monkeypatch, m
         yield SimpleNamespace(query=lambda *args: Query())
 
     monkeypatch.setattr(module, 'enter_session', fake_session)
+    monkeypatch.setattr(module, 'latest_open_sessions', lambda *_: [(player, older_replayed), (player, current)])
     selected = module._active_sessions({'player-1'}, 1)['player-1']
     assert selected['session_id'] == 11
     assert selected['start'] == (later.replace(tzinfo=None) if module is campaign_delivery else later)
@@ -121,7 +124,8 @@ def test_delayed_older_session_cannot_override_current_connection(monkeypatch, m
 
 @pytest.mark.parametrize('module', [campaign_delivery, vip_lifecycle])
 @pytest.mark.parametrize('database', ['sqlite', 'postgres'])
-def test_real_database_selects_latest_open_local_session(monkeypatch, module, database):
+@pytest.mark.parametrize('end_style', ['absolute', 'legacy', 'both'])
+def test_real_database_never_uses_stale_open_session_after_newer_local_end(monkeypatch, module, database, end_style):
     if database == 'postgres' and not os.getenv('RCON_SEARCH_TEST_DATABASE'):
         pytest.skip('requires isolated PostgreSQL')
     base = create_engine(os.environ['RCON_SEARCH_TEST_DATABASE'] if database == 'postgres' else 'sqlite://')
@@ -139,6 +143,7 @@ def test_real_database_selects_latest_open_local_session(monkeypatch, module, da
             player = PlayerID(player_id='synthetic-player', created=older.replace(tzinfo=None))
             sess.add(player)
             sess.flush()
+            player_db_id = player.id
             def add_session(start, created, server=3, ended=False):
                 entry = PlayerSession(player_id_id=player.id, server_number=server,
                     start=start.replace(tzinfo=None), created=created.replace(tzinfo=None),
@@ -150,7 +155,6 @@ def test_real_database_selects_latest_open_local_session(monkeypatch, module, da
             current_id = add_session(current, current)
             add_session(older, current + timedelta(minutes=5))
             add_session(current + timedelta(minutes=10), current + timedelta(minutes=10), server=4)
-            add_session(current + timedelta(minutes=15), current + timedelta(minutes=15), ended=True)
             sess.commit()
 
         @contextmanager
@@ -161,6 +165,15 @@ def test_real_database_selects_latest_open_local_session(monkeypatch, module, da
         selected = module._active_sessions({'synthetic-player'}, 3)['synthetic-player']
         assert selected['session_id'] == current_id
         assert selected['start'] == (current.replace(tzinfo=None) if module is campaign_delivery else current)
+        with Session(engine) as sess:
+            later = current + timedelta(minutes=15)
+            sess.add(PlayerSession(player_id_id=player_db_id, server_number=3,
+                start=later.replace(tzinfo=None), created=later.replace(tzinfo=None),
+                start_event_us=int(later.timestamp() * 1_000_000),
+                end=(later + timedelta(seconds=1)).replace(tzinfo=None) if end_style in ('legacy', 'both') else None,
+                end_event_us=int((later + timedelta(seconds=1)).timestamp() * 1_000_000) if end_style in ('absolute', 'both') else None))
+            sess.commit()
+        assert module._active_sessions({'synthetic-player'}, 3) == {}
     finally:
         if schema:
             with base.begin() as conn:
