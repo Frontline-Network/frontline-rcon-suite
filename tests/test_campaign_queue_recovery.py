@@ -168,6 +168,49 @@ def test_worker_recovers_again_even_when_campaigns_are_disabled(monkeypatch):
     assert calls == [start, start + timedelta(seconds=31), start + timedelta(seconds=62)]
 
 
+@pytest.mark.parametrize('result,expected', [
+    (True, 'sent'), (False, 'queued'), (None, 'failed'), ('', 'failed'), (1, 'failed'),
+    (TimeoutError('response lost'), 'failed'),
+])
+def test_worker_retries_only_explicit_message_rejection(store, monkeypatch, result, expected):
+    now = datetime.utcnow()
+    with Session(store) as session, session.begin():
+        session.add(CampaignDelivery(id=1, server_number=1, campaign_id='synthetic',
+            player_id_id=1, player_session_id=1, player_name='synthetic', message='synthetic',
+            status='sending', attempt_count=1, eligible_at=now, created_at=now,
+            updated_at=now, last_attempt_at=now))
+    ctl = Mock()
+    if isinstance(result, Exception):
+        ctl.message_player_info.side_effect = result
+    else:
+        ctl.message_player_info.return_value = result
+    campaign = Mock(pause_during_seeding=False)
+    config = Mock(enabled=True)
+    monkeypatch.setattr('rcon.rcon.get_rcon', lambda: ctl)
+    monkeypatch.setattr('rcon.vip_lifecycle.feature_enabled', lambda: False)
+    monkeypatch.setattr(cd, 'get_server_number', lambda: 1)
+    monkeypatch.setattr(cd, '_recover_interrupted_deliveries', Mock())
+    monkeypatch.setattr(cd, 'expire_old_deliveries', Mock())
+    monkeypatch.setattr(cd.AutoBroadcastUserConfig, 'load_from_db', lambda: config)
+    monkeypatch.setattr(cd, '_all_direct_campaigns', lambda _: [campaign])
+    monkeypatch.setattr(cd, '_direct_campaigns', lambda _: [campaign])
+    monkeypatch.setattr(cd, '_online_players', lambda _: {})
+    monkeypatch.setattr(cd, '_active_sessions', lambda *_: {})
+    monkeypatch.setattr(cd, 'enqueue_eligible_deliveries', Mock())
+    monkeypatch.setattr(cd, 'claim_next_delivery', lambda **_: {
+        'id': 1, 'player_id': 'synthetic', 'player_name': 'synthetic',
+        'campaign_id': 'synthetic', 'campaign_title': 'synthetic', 'message': 'synthetic',
+    })
+    monkeypatch.setattr(cd, 'format_message', lambda *_, **__: 'synthetic')
+    monkeypatch.setattr(cd, 'wait', lambda *_: True)
+    cd.run()
+    ctl.message_player_info.assert_called_once()
+    with Session(store) as session:
+        delivery = session.get(CampaignDelivery, 1)
+        assert delivery.status == expected
+        assert (delivery.next_attempt_at is not None) == (expected == 'queued')
+
+
 def test_late_rejection_waits_for_concurrent_recovery_and_does_not_requeue(monkeypatch):
     dsn = os.environ.get("TEST_POSTGRES_DSN")
     if not dsn:
