@@ -73,3 +73,51 @@ def test_anonymous_log_is_retained_for_review_without_creating_a_session(tmp_pat
     assert instance.session_journal.list_unidentified(3) == [("disconnect", 2000000, "", "DISCONNECTED ()")]
     record.assert_called_once_with(3, "disconnect", 2000000, "", "DISCONNECTED ()")
     end.assert_not_called()
+
+
+def test_optional_backlog_observation_runs_after_log_processing(tmp_path, monkeypatch):
+    from rcon import session_journal_observation as observations
+    instance = make_loop(tmp_path, monkeypatch, [])
+    monkeypatch.setenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS', '1')
+    monkeypatch.setenv('HLL_DB_URL', 'postgresql://synthetic@localhost/test')
+    red = object()
+    publish = Mock()
+    monkeypatch.setattr(log_loop, 'get_redis_client', lambda **_kwargs: red)
+    monkeypatch.setattr(observations, 'publish', publish)
+    instance.process_logs()
+    publish.assert_called_once()
+    assert publish.call_args.args == (red, instance.session_journal)
+    assert publish.call_args.kwargs['server_number'] == 3
+
+
+def test_backlog_observation_is_disabled_by_default(tmp_path, monkeypatch):
+    instance = make_loop(tmp_path, monkeypatch, [])
+    monkeypatch.delenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS', raising=False)
+    redis_client = Mock(side_effect=AssertionError('must not access Redis'))
+    monkeypatch.setattr(log_loop, 'get_redis_client', redis_client)
+    instance.process_logs()
+    redis_client.assert_not_called()
+
+
+def test_observation_failure_never_interrupts_log_processing(tmp_path, monkeypatch, caplog):
+    from rcon import session_journal_observation as observations
+    instance = make_loop(tmp_path, monkeypatch, [])
+    monkeypatch.setenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS', '1')
+    monkeypatch.setenv('HLL_DB_URL', 'postgresql://synthetic@localhost/test')
+    monkeypatch.setattr(log_loop, 'get_redis_client', lambda **_kwargs: object())
+    publish = Mock(side_effect=OSError('sensitive synthetic detail'))
+    monkeypatch.setattr(observations, 'publish', publish)
+    instance.process_logs()
+    instance.process_logs()
+    assert publish.call_count == 2
+    assert 'sensitive synthetic detail' not in caplog.text
+    assert caplog.text.count('Session journal observation unavailable') == 1
+
+
+def test_failed_log_fetch_does_not_publish_new_observation(tmp_path, monkeypatch):
+    instance = make_loop(tmp_path, monkeypatch, [])
+    instance.rcon.get_structured_logs.side_effect = OSError('synthetic outage')
+    instance._publish_session_journal_observation = Mock()
+    with pytest.raises(OSError):
+        instance.process_logs()
+    instance._publish_session_journal_observation.assert_not_called()

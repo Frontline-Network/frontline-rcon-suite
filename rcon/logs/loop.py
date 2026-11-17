@@ -436,6 +436,7 @@ class LogLoop:
             if line:
                 self.process_hooks(line)
         self._drain_session_events()
+        self._publish_session_journal_observation()
 
     def _drain_session_events(self):
         # A retry must never rerun the general hooks, which can send messages
@@ -464,6 +465,24 @@ class LogLoop:
             # The local journal retains the entry until a later successful
             # attempt, including when PostgreSQL is temporarily unavailable.
             logger.exception("Unable to process queued session events; will retry")
+
+    def _publish_session_journal_observation(self):
+        """Best-effort experimental backlog observation, never a log watermark."""
+        if os.getenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS') != '1':
+            return
+        try:
+            from rcon.player_presence import database_scope
+            from rcon.session_journal_observation import publish
+            publish(get_redis_client(global_pool=True), self.session_journal,
+                    scope=database_scope(os.environ['HLL_DB_URL']), server_number=self.session_server_number)
+        except Exception as exc:
+            # This optional observation must not stop the log loop or expose
+            # Redis/database URLs or player identifiers in its error message.
+            now = time.monotonic()
+            last = getattr(self, '_journal_observation_error_at', None)
+            if last is None or now - last >= 300:
+                logger.warning('Session journal observation unavailable (%s)', type(exc).__name__)
+                self._journal_observation_error_at = now
 
     def get_detailed_players(self) -> GetDetailedPlayers:
         started = time.perf_counter()
