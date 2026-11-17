@@ -20,7 +20,7 @@ def api_with_players(players):
     api.game_profile.game = GameEnum.HLL_VIETNAM
     api.without_retries.return_value = nullcontext()
     api.get_all_player_info.return_value = players
-    api.get_detailed_player_info.return_value = {
+    api.get_uncached_detailed_player_info.return_value = {
         'player_id': EOS, 'eos_id': EOS, 'steam_id': STEAM,
         'platform': 'EPlatformFamily::Steam', 'name': 'synthetic',
     }
@@ -39,20 +39,30 @@ def record(sync=BlacklistSyncMethod.KICK_ONLY, expires=None, created=None, recor
 def test_preparation_uses_fresh_verified_steam_eos_and_ignores_console():
     api = api_with_players([row(platform='EPlatformFamily::Xbox', steam=None), row()])
     assert prepare_online_steam_identity(api, STEAM) == {'steam_id': STEAM, 'eos_id': EOS}
-    api.get_raw_player_snapshot.clear_for.assert_called_once_with()
-    api.get_all_player_info.assert_called_once_with(strict=True)
+    api.get_all_player_info.assert_called_once_with(strict=True, fresh=True)
 
 
 def test_malformed_online_roster_is_not_treated_as_offline():
     api = api_with_players([])
     api.game_profile.player_adapter = HLLVPlayerInfoAdapter()
-    api.get_raw_player_snapshot.return_value = {
+    api.get_uncached_player_snapshot.return_value = {
         'players': [{'iD': EOS, 'eosId': EOS, 'steamId': STEAM,
                      'platform': 'EPlatformFamily::Steam'}],  # Missing name.
     }
     api.get_all_player_info.side_effect = lambda **kwargs: Rcon.get_all_player_info(api, **kwargs)
     with pytest.raises(PlayerResponseAdapterError):
         prepare_online_steam_identity(api, STEAM)
+
+
+def test_preparation_bypasses_a_stale_cached_roster():
+    api = api_with_players([])
+    api.game_profile.player_adapter = HLLVPlayerInfoAdapter()
+    api.get_raw_player_snapshot.return_value = {'players': [{**row(), 'name': 'cached'}]}
+    api.get_uncached_player_snapshot.return_value = {'players': [{**row(steam=None), 'name': 'live'}]}
+    api.get_all_player_info.side_effect = lambda **kwargs: Rcon.get_all_player_info(api, **kwargs)
+    with pytest.raises(ValueError, match='Incomplete online Steam identity'):
+        prepare_online_steam_identity(api, STEAM)
+    api.get_raw_player_snapshot.assert_not_called()
 
 
 def test_regular_roster_consumers_keep_skipping_invalid_rows():
@@ -109,12 +119,14 @@ def test_new_online_restriction_uses_eos_for_every_sync_mode(sync):
          patch.object(blacklist, 'apply_blacklist_punishment', return_value=True) as apply:
         handler.handle_create_record(payload, {'steam_id': STEAM, 'eos_id': EOS})
     assert apply.call_args.kwargs['player_id'] == EOS
-    api.get_detailed_player_info.assert_called_once_with(player_id=EOS)
+    api.get_uncached_detailed_player_info.assert_called_once_with(player_id=EOS)
 
 
 def test_changed_identity_never_causes_a_sanction():
     api, entry = api_with_players([row()]), record()
-    api.get_detailed_player_info.return_value['steam_id'] = '76561198036685844'
+    api.get_uncached_detailed_player_info.return_value['steam_id'] = '76561198036685844'
+    api.get_detailed_player_info.return_value = {'player_id': EOS, 'eos_id': EOS, 'steam_id': STEAM,
+                                                 'platform': 'EPlatformFamily::Steam'}
     handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
     handler.rcon = api
     payload = blacklist.BlacklistCreateRecordCommand(player_id=STEAM, record_id=1)
@@ -124,6 +136,7 @@ def test_changed_identity_never_causes_a_sanction():
         with pytest.raises(RuntimeError, match='association changed'):
             handler.handle_create_record(payload, {'steam_id': STEAM, 'eos_id': EOS})
     apply.assert_not_called()
+    api.get_detailed_player_info.assert_not_called()
 
 
 @pytest.mark.parametrize('sync,raises', [(BlacklistSyncMethod.KICK_ONLY, False),

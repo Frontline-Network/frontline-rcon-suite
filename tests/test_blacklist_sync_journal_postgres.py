@@ -431,7 +431,7 @@ def test_hllv_online_steam_record_journal_targets_eos_once(database, existing_bl
     api.without_retries.return_value = nullcontext()
     api.get_all_player_info.return_value = [{'iD': eos, 'eosId': eos, 'steamId': steam,
                                              'platform': 'EPlatformFamily::Steam'}]
-    api.get_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
+    api.get_uncached_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
                                                  'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
     api.kick.return_value = True
     receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
@@ -468,7 +468,7 @@ def test_hllv_kick_only_newly_applies_on_server_through_journal(database, existi
     api.without_retries.return_value = nullcontext()
     api.get_all_player_info.return_value = [{'iD': eos, 'eosId': eos, 'steamId': steam,
                                              'platform': 'EPlatformFamily::Steam'}]
-    api.get_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
+    api.get_uncached_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
                                                  'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
     api.kick.return_value = True
     receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
@@ -507,9 +507,9 @@ def test_hllv_malformed_roster_defers_then_recovers_without_losing_delivery(data
     api.without_retries.side_effect = nullcontext
     raw = {'iD': eos, 'eosId': eos, 'steamId': steam, 'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
     incomplete = {key: value for key, value in raw.items() if key != missing}
-    api.get_raw_player_snapshot.side_effect = [{'players': [incomplete]}, {'players': [raw]}]
+    api.get_uncached_player_snapshot.side_effect = [{'players': [incomplete]}, {'players': [raw]}]
     api.get_all_player_info.side_effect = lambda **kwargs: Rcon.get_all_player_info(api, **kwargs)
-    api.get_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
+    api.get_uncached_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
                                                  'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
     api.kick.return_value = True
     receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
@@ -546,7 +546,7 @@ def test_hllv_online_uncertain_kick_is_never_replayed(database, existing_blackli
     api.without_retries.return_value = nullcontext()
     api.get_all_player_info.return_value = [{'iD': eos, 'eosId': eos, 'steamId': steam,
                                              'platform': 'EPlatformFamily::Steam'}]
-    api.get_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
+    api.get_uncached_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
                                                  'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
     api.kick.side_effect = TimeoutError('synthetic lost response')
     receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
@@ -620,7 +620,7 @@ def test_hllv_list_move_from_kick_to_ban_targets_verified_eos(database, existing
     api.without_retries.return_value = nullcontext()
     api.get_all_player_info.return_value = [{'iD': eos, 'eosId': eos, 'steamId': steam,
                                              'platform': 'EPlatformFamily::Steam'}]
-    api.get_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
+    api.get_uncached_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
                                                  'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
     api.perma_ban.return_value = True
     receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)

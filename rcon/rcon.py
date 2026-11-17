@@ -349,17 +349,22 @@ class Rcon(ServerCtl):
     @ttl_cache(ttl=2, cache_falsy=False)
     def get_raw_player_snapshot(self) -> dict:
         """One bulk sample shared by roster consumers and the tactical collector."""
+        return self.get_uncached_player_snapshot()
+
+    def get_uncached_player_snapshot(self) -> dict:
+        """Read the game server directly for decisions requiring fresh identity."""
         rows = super().get_all_player_info()
         return {"captured_at": datetime.now(timezone.utc).timestamp(), "players": rows}
 
-    def get_all_player_info(self, *, strict: bool = False) -> list[CanonicalPlayerInfo]:
+    def get_all_player_info(self, *, strict: bool = False, fresh: bool = False) -> list[CanonicalPlayerInfo]:
         """Expose only validated, game-neutral player DTOs above the RCON boundary."""
         adapter = self.game_profile.player_adapter
         if adapter is None:  # Defensive guard for third-party game profiles.
             raise RuntimeError(f"No player adapter configured for {self.config.game!r}")
 
         players: list[CanonicalPlayerInfo] = []
-        for raw in self.get_raw_player_snapshot()["players"]:
+        snapshot = self.get_uncached_player_snapshot() if fresh else self.get_raw_player_snapshot()
+        for raw in snapshot["players"]:
             try:
                 players.append(adapter.adapt(raw))
             except PlayerResponseAdapterError as exc:
@@ -631,6 +636,11 @@ class Rcon(ServerCtl):
 
     @ttl_cache(ttl=2, cache_falsy=False)
     def get_detailed_player_info(
+        self, player_id: str, player: GetPlayersType | None = None
+    ) -> GetDetailedPlayer:
+        return self.get_uncached_detailed_player_info(player_id, player)
+
+    def get_uncached_detailed_player_info(
         self, player_id: str, player: GetPlayersType | None = None
     ) -> GetDetailedPlayer:
         try:
