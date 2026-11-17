@@ -612,6 +612,43 @@ def test_hllv_new_kick_list_partial_timeout_requires_review_without_replay(datab
     api.remove_perma_ban.assert_not_called()
 
 
+@pytest.mark.parametrize('ban_mask', [None, 4, 8])
+def test_hllv_expire_all_only_skips_unban_for_proven_kick_only_records(
+        database, existing_blacklist, monkeypatch, ban_mask):
+    from rcon.types import GameEnum
+
+    record_id, _, second_id = existing_blacklist
+    steam = '76561198036685843'
+    with database() as session, session.begin():
+        entry = session.get(BlacklistRecord, record_id)
+        entry.player.player_id = steam
+        entry.blacklist.sync = BlacklistSyncMethod.KICK_ONLY
+        entry.blacklist.servers = 4
+        if ban_mask is not None:
+            second = session.get(Blacklist, second_id)
+            second.servers = ban_mask
+            session.add(BlacklistRecord(player_id_id=entry.player_id_id, blacklist_id=second.id,
+                                        reason='synthetic', admin_name='test'))
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    blacklist.expire_all_player_blacklists(steam)
+    with database() as session:
+        delivery = session.scalar(select(journal.BlacklistSyncDelivery).where(
+            journal.BlacklistSyncDelivery.server_number == 3))
+        command = blacklist.BlacklistCommand.decode(delivery.command)
+        assert command.payload['kick_only_server_mask'] == (0 if ban_mask == 4 else 4)
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    result = journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                                 prepare=receiver._prepare_delivery)
+    assert result == ('review' if ban_mask == 4 else 'done')
+    api.get_temp_bans.assert_not_called()
+    api.get_perma_bans.assert_not_called()
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
+
+
 @pytest.mark.parametrize('missing', ['name', 'steamId', 'platform'])
 def test_hllv_malformed_roster_defers_then_recovers_without_losing_delivery(database, existing_blacklist, monkeypatch, missing):
     from contextlib import nullcontext

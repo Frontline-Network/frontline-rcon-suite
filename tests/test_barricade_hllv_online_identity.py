@@ -336,6 +336,25 @@ def test_list_delete_and_expire_do_not_guess_steam_ban_ownership():
     api.remove_perma_ban.assert_not_called()
 
 
+def test_kick_only_expiry_with_new_active_record_stays_for_review():
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api_with_players([])
+    payload = blacklist.BlacklistExpireAllCommand(player_id=STEAM, kick_only_server_mask=4)
+    with patch.object(blacklist, 'SERVER_NUMBER', 3), \
+         patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
+         patch.object(blacklist, 'is_player_blacklisted', return_value=record()):
+        with pytest.raises(blacklist.HLLVSteamIdentityUnverified):
+            handler.handle_expire_all(payload)
+    handler.rcon.remove_temp_ban.assert_not_called()
+    handler.rcon.remove_perma_ban.assert_not_called()
+
+
+@pytest.mark.parametrize('mask', [-1, 2**32])
+def test_expiry_rejects_invalid_kick_only_server_masks(mask):
+    with pytest.raises(ValueError):
+        blacklist.BlacklistExpireAllCommand(player_id=STEAM, kick_only_server_mask=mask)
+
+
 def test_deleting_kick_only_steam_list_without_remaining_record_never_unbans():
     api = api_with_players([])
     handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
