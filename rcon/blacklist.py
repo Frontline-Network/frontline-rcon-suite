@@ -654,8 +654,12 @@ def add_record_to_blacklist(
     reason: str,
     expires_at: datetime | None = None,
     admin_name: str = "",
+    *, barricade_owner: tuple[int, str, int] | None = None,
 ):
     with blacklist_change_session() as sess:
+        if barricade_owner is not None:
+            from rcon.barricade_blacklist_ownership import lock_current_binding
+            lock_current_binding(sess, barricade_owner)
         player = _get_set_player(sess, player_id)
         player_names = [n.name for n in player.names]
         if not player:
@@ -674,6 +678,13 @@ def add_record_to_blacklist(
         )
         sess.add(record)
         sess.flush()
+
+        if barricade_owner is not None:
+            from rcon.barricade_blacklist_ownership import BarricadeBlacklistOwnership
+            server_number, integration_id, _ = barricade_owner
+            sess.add(BarricadeBlacklistOwnership(record_id=record.id,
+                server_number=server_number, integration_id=integration_id))
+            sess.flush()
 
         res = record.to_dict()
 
@@ -797,8 +808,12 @@ def edit_record_from_blacklist(
         return new_record
 
 
-def remove_record_from_blacklist(record_id: int, *, expected_blacklist_id: int | None = None):
+def remove_record_from_blacklist(record_id: int, *, expected_blacklist_id: int | None = None,
+                                 barricade_owner: tuple[int, str, int] | None = None):
     with blacklist_change_session() as sess:
+        if barricade_owner is not None:
+            from rcon.barricade_blacklist_ownership import lock_current_binding
+            lock_current_binding(sess, barricade_owner)
         # Lock while checking the requested list and deleting so a concurrent
         # move to another list cannot turn an authorized removal into a
         # deletion from that other list.
@@ -806,6 +821,11 @@ def remove_record_from_blacklist(record_id: int, *, expected_blacklist_id: int |
         if not record or (expected_blacklist_id is not None
                           and record.blacklist_id != expected_blacklist_id):
             return False
+
+        if barricade_owner is not None:
+            from rcon.barricade_blacklist_ownership import is_owned
+            if not is_owned(sess, record_id, *barricade_owner[:2]):
+                return False
 
         res = record.to_dict()
 

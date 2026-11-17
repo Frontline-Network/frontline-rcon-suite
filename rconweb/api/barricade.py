@@ -51,12 +51,16 @@ def assert_blacklist_exists(blacklist_id: int):
 
 
 @database_sync_to_async
-def ban_player(player_id: str, blacklist_id: int, reason: str) -> int | None:
+def ban_player(player_id: str, blacklist_id: int, reason: str,
+               owner: tuple[int, str, int] | None = None) -> int | None:
     try:
         # Concurrent requests/retries for the same player and list must not
         # both create a record after observing an empty result.
         with lock(f"barricade-ban:{blacklist_id}:{player_id}"):
             with models.enter_session() as sess:
+                if owner is not None:
+                    from rcon.barricade_blacklist_ownership import lock_current_binding
+                    lock_current_binding(sess, owner)
                 current_records = get_player_blacklist_records(
                     sess=sess,
                     player_id=player_id,
@@ -66,6 +70,10 @@ def ban_player(player_id: str, blacklist_id: int, reason: str) -> int | None:
                 matching = next((record for record in current_records
                                  if record.blacklist_id == blacklist_id), None)
                 if matching is not None:
+                    if owner is not None:
+                        from rcon.barricade_blacklist_ownership import is_owned
+                        if not is_owned(sess, matching.id, *owner[:2]):
+                            return None
                     return matching.id
 
             record = add_record_to_blacklist(
@@ -73,6 +81,7 @@ def ban_player(player_id: str, blacklist_id: int, reason: str) -> int | None:
                 blacklist_id=blacklist_id,
                 reason=reason,
                 admin_name="Barricade",
+                **({'barricade_owner': owner} if owner is not None else {}),
             )
     except:
         logger.exception("Failed to blacklist player %s", player_id)
@@ -82,14 +91,29 @@ def ban_player(player_id: str, blacklist_id: int, reason: str) -> int | None:
 
 
 @database_sync_to_async
-def unban_player(record_id: int, blacklist_id: int):
+def unban_player(record_id: int, blacklist_id: int, owner: tuple[int, str, int] | None = None):
     try:
         return remove_record_from_blacklist(
-            record_id=record_id, expected_blacklist_id=blacklist_id
+            record_id=record_id, expected_blacklist_id=blacklist_id,
+            **({'barricade_owner': owner} if owner is not None else {})
         ) is True
     except:
         logger.exception("Failed to remove blacklist record #%s", record_id)
         return False
+
+
+@database_sync_to_async
+def resolve_blacklist_owner(query_string, credential_id):
+    """Recheck the peer binding and permissions before a durable mutation."""
+    from rcon.barricade_scan_identity import integration_namespace
+    from api.barricade_scan_auth import current_credential_is_authorized
+    server = int(get_server_number())
+    if not current_credential_is_authorized(credential_id):
+        return None
+    namespace = integration_namespace(query_string, server_number=server, credential_id=credential_id)
+    if not namespace or not namespace.startswith('integration:'):
+        return None
+    return server, namespace.removeprefix('integration:'), credential_id
 
 
 @database_sync_to_async
@@ -369,6 +393,18 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
             # These are already logged by send_request
             pass
 
+    async def _blacklist_owner(self):
+        scope = getattr(self, 'scope', {})
+        query = scope.get('query_string', b'')
+        if not _explicit_durable_request(query):
+            return None  # legacy integration; no implicit ownership claim
+        if os.getenv('HLL_BARRICADE_BLACKLIST_OWNERSHIP') != '1':
+            raise BarricadeRequestError('Blacklist ownership protection is not enabled')
+        owner = await resolve_blacklist_owner(query, scope.get('barricade_credential_id'))
+        if owner is None:
+            raise BarricadeRequestError('Blacklist integration binding is not authorized')
+        return owner
+
     async def ban_players(self, payload: BanPlayersRequestPayload):
         validate_barricade_game(payload.config.game)
         if payload.config.banlist_id is None:
@@ -381,11 +417,14 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
 
         await assert_blacklist_exists(blacklist_id)
 
+        owner = await self._blacklist_owner()
+
         ids = await asyncio.gather(*[
                 ban_player(
                     player_id=player_id,
                     blacklist_id=blacklist_id,
                     reason=reason or payload.config.reason,
+                    **({'owner': owner} if owner is not None else {}),
                 )
                 for player_id, reason in payload.player_ids.items()
             ])
@@ -405,6 +444,7 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         except ValueError:
             raise BarricadeRequestError("Invalid banlist ID")
         await assert_blacklist_exists(blacklist_id)
+        owner = await self._blacklist_owner()
 
         record_ids: list[int] = []
         for record_id in payload.record_ids:
@@ -415,7 +455,8 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
             record_ids.append(record_id)
 
         successes = await asyncio.gather(
-            *[unban_player(record_id, blacklist_id) for record_id in record_ids]
+            *[unban_player(record_id, blacklist_id, **({'owner': owner} if owner is not None else {}))
+              for record_id in record_ids]
         )
 
         successful_record_ids = [

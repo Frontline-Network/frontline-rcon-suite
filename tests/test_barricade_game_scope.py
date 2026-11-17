@@ -112,6 +112,29 @@ def test_matching_or_legacy_ban_keeps_existing_behavior(monkeypatch, configured,
     asyncio.run(run())
 
 
+def test_explicit_peer_requires_protection_and_passes_bound_owner(monkeypatch):
+    monkeypatch.setenv('HLL_GAME', 'hllv')
+    peer = '01234567-89ab-4def-8012-0123456789ab'
+    async def run():
+        consumer = barricade.BarricadeConsumer()
+        consumer.scope = {'query_string': f'frontline_integration={peer}'.encode(),
+                          'barricade_credential_id': 23}
+        payload = BanPlayersRequestPayload.model_validate({
+            'player_ids': {'synthetic-eos': None},
+            'config': {'game': 'HLLV', 'banlist_id': '1', 'reason': 'synthetic'}})
+        with patch.object(barricade, 'assert_blacklist_exists', AsyncMock()), \
+             patch.object(barricade, 'ban_player', AsyncMock(return_value=42)) as ban, \
+             patch.object(barricade, 'resolve_blacklist_owner', AsyncMock(return_value=(3, peer, 23))):
+            monkeypatch.delenv('HLL_BARRICADE_BLACKLIST_OWNERSHIP', raising=False)
+            with pytest.raises(barricade.BarricadeRequestError, match='not enabled'):
+                await consumer.ban_players(payload)
+            ban.assert_not_awaited()
+            monkeypatch.setenv('HLL_BARRICADE_BLACKLIST_OWNERSHIP', '1')
+            assert await consumer.ban_players(payload) == {'ban_ids': {'synthetic-eos': '42'}}
+            assert ban.await_args.kwargs['owner'] == (3, peer, 23)
+    asyncio.run(run())
+
+
 def test_scan_queries_only_its_own_server(monkeypatch):
     monkeypatch.setenv('SERVER_NUMBER', '3')
     engine = create_engine('sqlite://')

@@ -67,14 +67,18 @@ unrecognized active record; it protects the record but does not constitute a
 successful synchronization. Do not enable this experimental route as a
 production-ready integration while these conditions remain unresolved.
 
-The current WebSocket ban handler can also return the ID of an already active
-record in the chosen list, regardless of who created that record. A subsequent
-unban for that ID can remove the record. A list ID or the `admin_name` text
-does not prove integration ownership. The isolated PostgreSQL test
-`test_manual_record_must_not_be_claimed_as_barricade_owned` documents this
-unresolved condition as a strict expected failure. Do not infer permission to
-delete old records from a successful ban request; a durable ownership model
-and a safe policy for pre-existing records are needed before activation.
+The legacy WebSocket handler can return an existing manual record's ID, which
+can later permit its removal. The experimental explicitly bound path has an
+additional, disabled-by-default ownership guard
+(`HLL_BARRICADE_BLACKLIST_OWNERSHIP=1`). It records provenance atomically with
+new records and the delivery journal, refuses to adopt unowned existing bans,
+and requires the same integration and current credential for removal. Old
+records are not automatically assigned to any integration. The legacy path is
+unchanged, and the PostgreSQL test
+`test_manual_record_must_not_be_claimed_as_barricade_owned` documents its gap
+as a strict expected failure. Do not enable the guard on an existing connection
+without first resolving existing records and the CRCON synchronization issue.
+The feature flag and isolated tests do not certify the entire peer workflow.
 To repeat the optional offline contract test, obtain the four public files at
 that revision (`integrations/custom/websocket.py`, `integrations/custom/integration.py`,
 `integrations/crcon/integration.py`, and `integrations/websocket.py`). Set
