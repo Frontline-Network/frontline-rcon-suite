@@ -4,6 +4,14 @@ from rcon.steam_utils import is_steam_id_64
 from rcon.types import GameEnum
 
 
+# Only these observed families prove that a row without a Steam ID is not a
+# Steam account. Unknown or newly introduced platforms require a fresh read.
+NON_STEAM_FAMILIES = frozenset({
+    'eplatformfamily::xbox', 'eplatformfamily::xboxseries',
+    'eplatformfamily::ps5', 'eplatformfamily::wingdk',
+})
+
+
 def verified_steam_id(rcon, player_id: str, player_info: dict | None) -> str | None:
     if (getattr(getattr(rcon, 'game_profile', None), 'game', None) != GameEnum.HLL_VIETNAM
             or not isinstance(player_info, dict)
@@ -39,6 +47,12 @@ def prepare_online_steam_identity(rcon, steam_id: str) -> dict:
             raise ValueError('Player snapshot has no identity')
         details = {'player_id': eos, 'eos_id': row.get('eosId'),
                    'steam_id': row.get('steamId'), 'platform': row.get('platform')}
+        platform = str(row.get('platform') or '').strip().lower()
+        if platform == 'eplatformfamily::steam':
+            if verified_steam_id(rcon, eos, details) is None:
+                raise ValueError('Incomplete online Steam identity')
+        elif platform not in NON_STEAM_FAMILIES:
+            raise ValueError('Unknown online platform in identity snapshot')
         if row.get('steamId') == steam_id:
             if verified_steam_id(rcon, eos, details) != steam_id:
                 raise ValueError('Inconsistent online Steam identity')

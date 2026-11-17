@@ -447,7 +447,8 @@ def test_hllv_online_steam_record_journal_targets_eos_once(database, existing_bl
     assert action_guard.pending_players(3, 'BlacklistEnforcement') == set()
 
 
-def test_hllv_malformed_roster_defers_then_recovers_without_losing_delivery(database, existing_blacklist, monkeypatch):
+@pytest.mark.parametrize('missing', ['name', 'steamId', 'platform'])
+def test_hllv_malformed_roster_defers_then_recovers_without_losing_delivery(database, existing_blacklist, monkeypatch, missing):
     from contextlib import nullcontext
     from rcon.game.hllv.player_adapter import HLLVPlayerInfoAdapter
     from rcon.rcon import Rcon
@@ -468,8 +469,9 @@ def test_hllv_malformed_roster_defers_then_recovers_without_losing_delivery(data
     api.game_profile.game = GameEnum.HLL_VIETNAM
     api.game_profile.player_adapter = HLLVPlayerInfoAdapter()
     api.without_retries.side_effect = nullcontext
-    raw = {'iD': eos, 'eosId': eos, 'steamId': steam, 'platform': 'EPlatformFamily::Steam'}
-    api.get_raw_player_snapshot.side_effect = [{'players': [raw]}, {'players': [{**raw, 'name': 'synthetic'}]}]
+    raw = {'iD': eos, 'eosId': eos, 'steamId': steam, 'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
+    incomplete = {key: value for key, value in raw.items() if key != missing}
+    api.get_raw_player_snapshot.side_effect = [{'players': [incomplete]}, {'players': [raw]}]
     api.get_all_player_info.side_effect = lambda **kwargs: Rcon.get_all_player_info(api, **kwargs)
     api.get_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
                                                  'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
