@@ -201,20 +201,41 @@ def kick_reason(sess, payload):
 
 
 def session_token(sess, server, pid, stamp):
-    row = sess.scalar(
+    # A moderation decision must bind to an actual connection instant; naive
+    # legacy wall times cannot prove identity across a repeated DST hour.
+    rows = sess.scalars(
         select(PlayerSession)
         .join(PlayerID)
         .where(
             PlayerID.player_id == pid,
             PlayerSession.server_number == server,
+            PlayerSession.start_event_us.is_not(None),
         )
-        .order_by(PlayerSession.start.desc(), PlayerSession.id.desc())
+        .order_by(PlayerSession.start_event_us.desc(), PlayerSession.id.desc())
+        .limit(2)
+    ).all()
+    if len(rows) > 1 and rows[0].start_event_us == rows[1].start_event_us:
+        return None
+    row = rows[0] if rows else None
+    if row is None or row.end is not None or row.end_event_us is not None:
+        return None
+    if row.start_event_us > stamp * 1_000_000:
+        return None
+    verified_start = datetime.fromtimestamp(row.start_event_us / 1_000_000, timezone.utc).replace(tzinfo=None)
+    # An unverified row inserted after the confirmed connection may represent
+    # a later reconnect. Its original timezone is unknown, so do not guess.
+    uncertain = sess.scalar(
+        select(PlayerSession.id)
+        .join(PlayerID)
+        .where(
+            PlayerID.player_id == pid,
+            PlayerSession.server_number == server,
+            PlayerSession.start_event_us.is_(None),
+            or_(PlayerSession.created.is_(None), PlayerSession.created >= verified_start),
+        )
         .limit(1)
     )
-    if row is None or row.end is not None or row.start is None:
-        return None
-    start = row.start.replace(tzinfo=timezone.utc).timestamp()
-    return row.id if start <= stamp else None
+    return None if uncertain is not None else row.id
 
 
 def valid_context(context, now):
