@@ -155,13 +155,14 @@ def list_reviews(server_number: int, offset: int = 0, limit: int = 50) -> dict:
         raise ValueError('Invalid Barricade scan review pagination')
     with get_session_maker()() as session:
         conditions = (BarricadeScanDelivery.server_number == server_number,
-                      BarricadeScanDelivery.status == 'review')
+                      BarricadeScanDelivery.status.in_(('review', 'sending')))
         total = session.scalar(select(func.count()).select_from(BarricadeScanDelivery).where(*conditions))
         rows = session.scalars(select(BarricadeScanDelivery).where(*conditions)
                                .order_by(BarricadeScanDelivery.id).offset(offset).limit(limit)).all()
         return {'total': total, 'results': [
             {'id': row.id, 'integration_id': row.integration_id, 'player_id': row.player_id,
              'player_session_id': row.player_session_id, 'game': row.game, 'review_cause': row.review_cause,
+             'status': row.status,
              'updated_at': row.updated_at.isoformat()} for row in rows]}
 
 
@@ -170,8 +171,10 @@ def resolve_review(server_number: int, integration_id: str, delivery_id: int, *,
 
     A retry is permitted only after an explicit decision; callers must explain
     that an earlier scan could have completed despite its missing response.
+    ``recover`` only moves an interrupted send to review under the sender lock;
+    it does not resend or assert that the prior request failed.
     """
-    if (type(delivery_id) is not int or delivery_id <= 0 or decision not in ('confirmed', 'dismissed', 'retry') or
+    if (type(delivery_id) is not int or delivery_id <= 0 or decision not in ('confirmed', 'dismissed', 'retry', 'recover') or
             not isinstance(actor, str) or not actor.strip() or len(actor) > 150 or
             not isinstance(reason, str) or not reason.strip() or len(reason) > 1000):
         raise ValueError('Invalid Barricade scan review')
@@ -181,11 +184,14 @@ def resolve_review(server_number: int, integration_id: str, delivery_id: int, *,
                 BarricadeScanDelivery.id == delivery_id,
                 BarricadeScanDelivery.server_number == server_number,
                 BarricadeScanDelivery.integration_id == integration_id).with_for_update())
-            if row is None or row.status != 'review':
+            expected_status = 'sending' if decision == 'recover' else 'review'
+            if row is None or row.status != expected_status:
                 raise ValueError('Barricade scan is not awaiting review')
             if row.review_cause == 'session_ended_before_scan' and decision == 'retry':
                 raise ValueError('The session ended; an automatic retry cannot verify this session')
-            row.status = {'confirmed': 'done', 'dismissed': 'reviewed', 'retry': 'queued'}[decision]
+            row.status = {'confirmed': 'done', 'dismissed': 'reviewed', 'retry': 'queued', 'recover': 'review'}[decision]
+            if decision == 'recover':
+                row.review_cause = 'uncertain_delivery'
             row.updated_at = datetime.now(timezone.utc)
             session.add(BarricadeScanReviewAudit(delivery_id=delivery_id, server_number=server_number,
                 integration_id=integration_id, decision=decision, actor=actor.strip(), reason=reason.strip(),
