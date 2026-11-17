@@ -6,7 +6,7 @@ import time
 from contextlib import nullcontext
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 import django
@@ -19,16 +19,18 @@ from sqlalchemy import select
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rconweb.rconweb.test_settings')
 django.setup()
 from api import auth, barricade
-from rcon import barricade_scan_dispatch as adapter, barricade_scan_journal as journal
+from rcon import barricade_scan_journal as journal
 from rcon import barricade_scan_presence as presence, session_journal_observation as observations
-from rcon.barricade import ServerRequestType
+from rcon import player_history
+from rcon.logs import loop as log_loop
 from rcon.models import PlayerID, PlayerSession, PendingPlayerConnect, PendingPlayerDisconnect, UnidentifiedSessionEvent
-from rcon.player_presence import capture_observation, redis_time, snapshot_key
-from rcon.session_event_journal import SessionEventJournal
+from rcon.player_presence import capture_observation, snapshot_key
 from tests.test_barricade_scan_journal_postgres import database, prepare_adapter
+from tests.test_log_loop_session_journal import make_loop
 
 
-@pytest.mark.parametrize('scenario', ['confirmed', 'lost_response', 'pending_event'])
+@pytest.mark.parametrize('scenario', ['confirmed', 'lost_response', 'pending_event', 'no_marker', 'failed_poll',
+                                      'stale_after_failure', 'stale_after_journal_failure'])
 def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_path, scenario):
     url = os.environ.get('TEST_REDIS_URL')
     if not url:
@@ -55,6 +57,7 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
     namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
     monkeypatch.setenv('HLL_DB_URL', 'postgresql://synthetic@localhost/synthetic')
     monkeypatch.setattr('rcon.cache_utils.get_redis_client', lambda **_kwargs: red)
+    monkeypatch.setattr(log_loop, 'get_redis_client', lambda **_kwargs: red)
     monkeypatch.setattr('rcon.player_presence.database_scope', lambda _url: scope)
     monkeypatch.setattr(barricade, 'get_server_number', lambda: '3')
     monkeypatch.setattr(barricade, 'barricade_game_for_server', lambda: 'HLLV')
@@ -62,12 +65,35 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
         api = SimpleNamespace(without_retries=lambda: nullcontext(),
                               get_player_ids=lambda: [('synthetic', 'synthetic-eos')])
         assert capture_observation(red, api, scope=scope, server_number=3)
-        local = SessionEventJournal(tmp_path / 'session.sqlite')
+        monkeypatch.setenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS', '1')
+        collector = make_loop(tmp_path, monkeypatch, [])
         if scenario == 'pending_event':
-            local.remember(3, 'synthetic-eos', 'disconnect', int(time.time() * 1_000_000))
-        poll_start, poll_end = redis_time(red), redis_time(red)
-        assert observations.publish(red, local, scope=scope, server_number=3,
-                                    poll_started_at=poll_start, poll_finished_at=poll_end)
+            collector.session_journal.remember(3, 'synthetic-eos', 'disconnect', int(time.time() * 1_000_000))
+            monkeypatch.setattr(player_history, 'save_end_player_session', Mock(side_effect=OSError('synthetic outage')))
+        if scenario == 'failed_poll':
+            collector.rcon.get_structured_logs.side_effect = OSError('synthetic poll failure')
+            with pytest.raises(OSError):
+                collector.process_logs()
+        elif scenario == 'stale_after_failure':
+            collector.process_logs()
+            assert observations.read(red, scope=scope, server_number=3) is not None
+            collector.rcon.get_structured_logs.side_effect = OSError('synthetic poll failure')
+            with pytest.raises(OSError):
+                collector.process_logs()
+        elif scenario == 'stale_after_journal_failure':
+            collector.process_logs()
+            assert observations.read(red, scope=scope, server_number=3) is not None
+            collector.session_journal.remember_batch = Mock(side_effect=OSError('synthetic disk failure'))
+            with pytest.raises(OSError):
+                collector.process_logs()
+        elif scenario != 'no_marker':
+            collector.process_logs()
+        observation = observations.read(red, scope=scope, server_number=3)
+        if scenario in ('no_marker', 'failed_poll', 'stale_after_failure', 'stale_after_journal_failure'):
+            assert observation is None
+        else:
+            assert observation is not None
+            assert observation.pending == (1 if scenario == 'pending_event' else 0)
 
         async def run():
             results = asyncio.Queue()
@@ -92,7 +118,7 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
                 socket = ApplicationCommunicator(app, ws_scope)
                 await socket.send_input({'type': 'websocket.connect'})
                 assert (await socket.receive_output(timeout=5))['type'] == 'websocket.accept'
-                if scenario != 'pending_event':
+                if scenario in ('confirmed', 'lost_response'):
                     request = json.loads((await socket.receive_output(timeout=5))['text'])
                     assert request['request'] == 'scan_players'
                     assert request['payload'] == {'player_ids': ['synthetic-eos'], 'game': 'HLLV'}
@@ -105,7 +131,9 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
         asyncio.run(run())
         with database() as session:
             statuses = session.scalars(select(journal.BarricadeScanDelivery.status)).all()
-            assert statuses == {'confirmed': ['done'], 'lost_response': ['review'], 'pending_event': []}[scenario]
+            assert statuses == {'confirmed': ['done'], 'lost_response': ['review'], 'pending_event': [],
+                                'no_marker': [], 'failed_poll': [], 'stale_after_failure': [],
+                                'stale_after_journal_failure': []}[scenario]
     finally:
         red.delete(snapshot_key(scope, 3), observations.observation_key(scope, 3))
         red.close()

@@ -1,6 +1,6 @@
 """Short-lived aggregate journal observations, not a game-log completeness proof.
 
-Experimental; not used by any safety decision.
+Experimental evidence used only by the opt-in Barricade path.
 """
 import json
 import math
@@ -21,6 +21,19 @@ end
 redis.call('SET', KEYS[1], ARGV[2], 'EX', ARGV[3])
 return 1
 """
+_INVALIDATE = """
+local clock = redis.call('TIME')
+local stamp = tonumber(clock[1]) + tonumber(clock[2]) / 1000000
+local previous = redis.call('GET', KEYS[1])
+if previous then
+  local ok, value = pcall(cjson.decode, previous)
+  if ok and type(value) == 'table' and type(value.poll_started_at) == 'number'
+      and value.poll_started_at > stamp then stamp = value.poll_started_at end
+end
+local tombstone = '{"version":0,"poll_started_at":' .. string.format('%.6f', stamp) .. '}'
+redis.call('SET', KEYS[1], tombstone, 'EX', ARGV[1])
+return 1
+"""
 
 
 @dataclass(frozen=True)
@@ -37,6 +50,11 @@ def observation_key(scope: str, server_number: int) -> str:
     # Reuse the namespace validation used by presence snapshots.
     snapshot_key(scope, server_number)
     return f'frontline:session-journal-observation:v1:{scope}:{server_number}'
+
+
+def invalidate(red, *, scope: str, server_number: int) -> None:
+    """Invalidate prior evidence and fence out older in-flight polls."""
+    red.eval(_INVALIDATE, 1, observation_key(scope, server_number), TTL_SECONDS)
 
 
 def validate(payload, *, server_number: int, now: float) -> JournalObservation | None:

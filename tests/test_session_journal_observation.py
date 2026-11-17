@@ -56,3 +56,27 @@ def test_real_redis_isolates_servers_and_retains_only_newer_observations():
     finally:
         client.delete(key3, key4)
         client.close()
+
+
+@pytest.mark.skipif(not os.environ.get('TEST_REDIS_URL'), reason='requires isolated Redis')
+def test_invalidation_prevents_late_older_poll_from_restoring_success():
+    client = redis.Redis.from_url(os.environ['TEST_REDIS_URL'], decode_responses=True)
+    scope = uuid4().hex * 2
+    key = observation.observation_key(scope, 3)
+    journal = SimpleNamespace(pending_counts=lambda _server: (0, 0))
+    try:
+        now = observation.redis_time(client)
+        old_start, old_finish = now - 2, now - 1
+        observation.invalidate(client, scope=scope, server_number=3)
+        assert observation.read(client, scope=scope, server_number=3) is None
+        assert not observation.publish(client, journal, scope=scope, server_number=3,
+                                       poll_started_at=old_start, poll_finished_at=old_finish)
+        assert observation.read(client, scope=scope, server_number=3) is None
+        fresh_start = observation.redis_time(client)
+        fresh_finish = observation.redis_time(client)
+        assert observation.publish(client, journal, scope=scope, server_number=3,
+                                   poll_started_at=fresh_start, poll_finished_at=fresh_finish)
+        assert observation.read(client, scope=scope, server_number=3) is not None
+    finally:
+        client.delete(key)
+        client.close()

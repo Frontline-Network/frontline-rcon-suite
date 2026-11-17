@@ -402,6 +402,7 @@ class LogLoop:
         return curr_map_time_elapsed
 
     def process_logs(self):
+        self._invalidate_session_journal_observation()
         self._drain_session_events()
         observation = self._start_session_journal_observation()
         started = time.perf_counter()
@@ -439,6 +440,19 @@ class LogLoop:
                 self.process_hooks(line)
         self._drain_session_events()
         self._publish_session_journal_observation(observation)
+
+    def _invalidate_session_journal_observation(self):
+        """A failed pass must not leave a previous success as fresh evidence."""
+        if os.getenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS') != '1':
+            return
+        try:
+            from rcon.player_presence import database_scope
+            from rcon.session_journal_observation import invalidate
+            red = get_redis_client(global_pool=True)
+            invalidate(red, scope=database_scope(os.environ['HLL_DB_URL']),
+                       server_number=self.session_server_number)
+        except Exception as exc:
+            self._log_journal_observation_error(exc)
 
     def _drain_session_events(self):
         # A retry must never rerun the general hooks, which can send messages
