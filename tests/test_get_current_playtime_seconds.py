@@ -1,12 +1,13 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from rcon.models import PlayerID, PlayerSession
 
-def test_get_current_playtime_seconds():
+def test_get_current_playtime_seconds(monkeypatch):
+    monkeypatch.setenv('SERVER_NUMBER', '1')
     now = datetime.now()
 
     # Create mock sessions
-    active_session = PlayerSession(start=now - timedelta(minutes=30), end=None)  # No end -> Active
-    ended_session = PlayerSession(start=now - timedelta(hours=2), end=now - timedelta(hours=1))  # Has end -> Ended
+    active_session = PlayerSession(start=now - timedelta(minutes=30), end=None, server_number=1)
+    ended_session = PlayerSession(start=now - timedelta(hours=2), end=now - timedelta(hours=1), server_number=1)
 
     # Create a PlayerID object with mock sessions
     player = PlayerID()
@@ -22,3 +23,51 @@ def test_get_current_playtime_seconds():
     playtime = player.get_current_playtime_seconds()
     print(f"Playtime for ended session: {playtime} seconds")
     assert playtime == 0, "Playtime should be 0 for ended sessions"
+
+
+def test_late_older_session_does_not_hide_current_or_total_playtime(monkeypatch):
+    monkeypatch.setenv('SERVER_NUMBER', '1')
+    now = datetime.now(timezone.utc)
+    old = now - timedelta(hours=1)
+    recent = now - timedelta(minutes=5)
+    player = PlayerID()
+    player.sessions = [
+        PlayerSession(start=old.replace(tzinfo=None), end=(old + timedelta(minutes=10)).replace(tzinfo=None),
+                      start_event_us=int(old.timestamp() * 1_000_000),
+                      end_event_us=int((old + timedelta(minutes=10)).timestamp() * 1_000_000),
+                      created=now.replace(tzinfo=None), server_number=1),
+        PlayerSession(start=recent.replace(tzinfo=None), end=None,
+                      start_event_us=int(recent.timestamp() * 1_000_000),
+                      created=(now - timedelta(minutes=4)).replace(tzinfo=None), server_number=1),
+    ]
+    assert 295 <= player.get_current_playtime_seconds() <= 310
+    assert 895 <= player.get_total_playtime_seconds() <= 910
+
+
+def test_current_playtime_uses_local_server_session(monkeypatch):
+    monkeypatch.setenv('SERVER_NUMBER', '1')
+    now = datetime.now(timezone.utc)
+    player = PlayerID()
+    local = now - timedelta(minutes=5)
+    other = now - timedelta(minutes=2)
+    player.sessions = [
+        PlayerSession(start=other.replace(tzinfo=None), end=now.replace(tzinfo=None),
+                      start_event_us=int(other.timestamp() * 1_000_000),
+                      created=other.replace(tzinfo=None), server_number=2),
+        PlayerSession(start=local.replace(tzinfo=None), end=None,
+                      start_event_us=int(local.timestamp() * 1_000_000),
+                      created=local.replace(tzinfo=None), server_number=1),
+    ]
+    assert 295 <= player.get_current_playtime_seconds() <= 310
+
+
+def test_remote_or_unidentified_session_is_not_treated_as_local(monkeypatch):
+    monkeypatch.setenv('SERVER_NUMBER', '1')
+    now = datetime.now(timezone.utc)
+    player = PlayerID()
+    player.sessions = [
+        PlayerSession(start=now.replace(tzinfo=None), end=None,
+                      start_event_us=int(now.timestamp() * 1_000_000), server_number=2),
+        PlayerSession(start=now.replace(tzinfo=None), end=None, server_number=None),
+    ]
+    assert player.get_current_playtime_seconds() == 0
