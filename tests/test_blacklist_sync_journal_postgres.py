@@ -447,6 +447,42 @@ def test_hllv_online_steam_record_journal_targets_eos_once(database, existing_bl
     assert action_guard.pending_players(3, 'BlacklistEnforcement') == set()
 
 
+def test_hllv_kick_only_newly_applies_on_server_through_journal(database, existing_blacklist, monkeypatch):
+    from contextlib import nullcontext
+    from rcon.types import GameEnum
+
+    record_id, _, _ = existing_blacklist
+    steam, eos = '76561198036685843', '0123456789abcdef0123456789abcdef'
+    with database() as session, session.begin():
+        record = session.get(BlacklistRecord, record_id)
+        record.player.player_id = steam
+        record.blacklist.sync = BlacklistSyncMethod.KICK_ONLY
+        record.blacklist.servers = 2
+        old = record.to_dict()
+        record.blacklist.servers = 4
+        session.add(PlayerID(player_id=eos))
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', mock.Mock())
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    api.without_retries.return_value = nullcontext()
+    api.get_all_player_info.return_value = [{'iD': eos, 'eosId': eos, 'steamId': steam,
+                                             'platform': 'EPlatformFamily::Steam'}]
+    api.get_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
+                                                 'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
+    api.kick.return_value = True
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    command = blacklist.BlacklistCommand(command=blacklist.BlacklistCommandType.EDIT_RECORD,
+        server_mask=4, payload={'old_record': old}).encode()
+    queue(database, command, 4)
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'done'
+    assert api.kick.call_count == 1 and api.kick.call_args.kwargs['player_id'] == eos
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
+
+
 @pytest.mark.parametrize('missing', ['name', 'steamId', 'platform'])
 def test_hllv_malformed_roster_defers_then_recovers_without_losing_delivery(database, existing_blacklist, monkeypatch, missing):
     from contextlib import nullcontext

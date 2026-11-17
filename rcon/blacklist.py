@@ -1248,8 +1248,22 @@ class BlacklistCommandHandler:
             # existing EOS ban came from this record. Never remove or replace
             # a possibly independent ban based on a Steam-only identifier.
             raise HLLVSteamBanOwnershipUnverified('Existing EOS game-ban ownership needs review')
-        if new_record is None or new_record.blacklist.sync == BlacklistSyncMethod.KICK_ONLY:
+        if new_record is None:
             return
+        if new_record.blacklist.sync == BlacklistSyncMethod.KICK_ONLY:
+            # A newly applicable kick-only record, or a remaining record that
+            # becomes effective when the old one disappears, must still be
+            # applied to a verified online player. Unchanged/lower-priority
+            # edits must not generate another kick.
+            same_record = new_record.id == old_record['id']
+            became_effective = (not old_applies and same_record) or (
+                old_applies and not same_record and _is_higher_priority_record(
+                    old_record['created_at'], old_record['expires_at'],
+                    new_record.created_at, new_record.expires_at,
+                )
+            )
+            if not became_effective:
+                return
         self._apply_hllv_steam_record(sess, old_record['player_id'], new_record, prepared)
 
     def handle_edit_record(self, payload: BlacklistEditRecordCommand, prepared=None):
