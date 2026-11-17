@@ -124,7 +124,21 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
             self._scan_players_task.cancel()
 
     async def _scan_players_loop(self):
-        self._last_seen_session = await get_most_recent_session_date()
+        # Session starts are stored as local wall time. Keep a non-null cursor
+        # for a new database and retry initialization if the database is down.
+        started = datetime.now()
+        initialization_failed = False
+        while True:
+            try:
+                latest = await get_most_recent_session_date()
+                # Preserve the start boundary if initialization had to wait,
+                # so connections during that outage are not silently skipped.
+                self._last_seen_session = started if initialization_failed else (latest or started)
+                break
+            except Exception as exc:
+                initialization_failed = True
+                logger.warning("Unable to initialize Barricade player scan (%s); retrying", type(exc).__name__)
+                await asyncio.sleep(60)
 
         while True:
             await asyncio.sleep(60)
