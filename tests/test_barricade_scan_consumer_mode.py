@@ -77,6 +77,23 @@ def test_requested_unregistered_integration_is_rejected_instead_of_legacy(monkey
     asyncio.run(run())
 
 
+def test_disabled_durable_namespace_does_not_fall_back_to_legacy(monkeypatch):
+    monkeypatch.setenv('HLL_BARRICADE_DURABLE_SCANS', '0')
+    async def run():
+        consumer = BarricadeConsumer()
+        consumer.scope = {'query_string': b'frontline_integration=synthetic',
+                          'barricade_scan_namespace': 'integration:synthetic',
+                          'barricade_credential_id': 1}
+        consumer.accept = AsyncMock()
+        consumer.close = AsyncMock()
+        consumer._scan_players_loop = AsyncMock()
+        await consumer.connect()
+        consumer.close.assert_awaited_once_with(code=4403)
+        consumer.accept.assert_not_awaited()
+        consumer._scan_players_loop.assert_not_called()
+    asyncio.run(run())
+
+
 def test_authenticated_websocket_rejects_unregistered_requested_integration(monkeypatch):
     monkeypatch.setenv('HLL_BARRICADE_DURABLE_SCANS', '1')
     async def run():
