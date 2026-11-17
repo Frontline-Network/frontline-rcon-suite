@@ -39,7 +39,9 @@ def test_vac_blacklist_record_is_not_reported_as_game_server_ban(caplog):
     with caplog.at_level(logging.INFO, logger='rcon.hooks'), \
          patch('rcon.hooks.VacGameBansUserConfig.load_from_db', return_value=config), \
          patch('rcon.hooks.enter_session'), patch('rcon.hooks.get_player', return_value=player), \
-         patch('rcon.hooks.blacklist_or_ban', return_value={'id': 42}):
+         patch('rcon.hooks.blacklist_or_ban', return_value={
+             'id': 42, 'player_id': 'synthetic-player', 'blacklist': {'id': 1},
+         }):
         ban_if_has_vac_bans(Mock(), 'synthetic-player', 'synthetic-name')
     assert 'was banned due VAC history' not in caplog.text
     assert 'blacklist record' in caplog.text
