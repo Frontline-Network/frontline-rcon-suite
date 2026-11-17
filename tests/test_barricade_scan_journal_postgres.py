@@ -6,6 +6,7 @@ from pathlib import Path
 from contextvars import copy_context
 import asyncio
 from datetime import datetime
+import time
 
 import pytest
 from alembic.migration import MigrationContext
@@ -43,8 +44,12 @@ def test_key_rotation_preserves_registered_namespace_and_rejects_other_keys(data
     peer = '01234567-89ab-4def-8012-0123456789ab'
     query = f'frontline_integration={peer}'.encode()
     assert integration_namespace(query, server_number=3, credential_id=1) is None
+    before_registration = time.time_ns() // 1000
     assert journal.set_integration_credential(3, peer, expected_credential_id=None, new_credential_id=1,
                                               actor='test-operator', reason='register synthetic peer')
+    with database() as session:
+        registered_at = session.get(journal.BarricadeScanIntegration, (3, peer)).registered_at_us
+    assert before_registration <= registered_at <= time.time_ns() // 1000
     namespace = integration_namespace(query, server_number=3, credential_id=1)
     assert namespace == f'integration:{peer}'
     assert integration_namespace(query, server_number=3, credential_id=2) is None
@@ -56,6 +61,8 @@ def test_key_rotation_preserves_registered_namespace_and_rejects_other_keys(data
     # Caller authorization must be enforced at the management boundary.
     assert journal.set_integration_credential(3, peer, expected_credential_id=1, new_credential_id=2,
                                               actor='test-operator', reason='synthetic rotation')
+    with database() as session:
+        assert session.get(journal.BarricadeScanIntegration, (3, peer)).registered_at_us == registered_at
     assert integration_namespace(query, server_number=3, credential_id=1) is None
     assert integration_namespace(query, server_number=3, credential_id=2) == namespace
     with journal.delivery_scope(3, namespace):
@@ -177,6 +184,24 @@ def test_discovery_rejects_session_with_absolute_disconnect_even_if_legacy_end_i
         session.add(PlayerSession(player_id_id=player.id, server_number=3,
                                   start=datetime(2026, 1, 1), end=None, end_event_us=1234567))
     assert journal.find_unreserved_open_sessions(3, 'integration-a') == []
+
+
+def test_explicit_boundary_excludes_legacy_and_pre_activation_sessions(database, monkeypatch):
+    prepare(database, monkeypatch)
+    engine = database.kw['bind']
+    PlayerID.__table__.create(engine)
+    PlayerSession.__table__.create(engine)
+    with database.begin() as session:
+        for pid, event_us in [('legacy', None), ('old', 99), ('boundary', 100), ('new', 101)]:
+            player = PlayerID(player_id=pid)
+            session.add(player)
+            session.flush()
+            session.add(PlayerSession(player_id_id=player.id, server_number=3,
+                                      start=datetime(2026, 1, 1), start_event_us=event_us))
+    found = journal.find_unreserved_open_sessions(3, 'integration-a', after_event_us=100)
+    assert [player for _, player in found] == ['new']
+    with pytest.raises(ValueError):
+        journal.find_unreserved_open_sessions(3, 'integration-a', after_event_us=True)
 
 
 def test_unconfirmed_and_crashed_reservations_are_never_replayed(database, monkeypatch):

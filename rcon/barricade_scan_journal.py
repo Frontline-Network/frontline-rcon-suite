@@ -11,7 +11,7 @@ from threading import get_ident
 import asyncio
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, String, TIMESTAMP, UniqueConstraint, and_, func, or_, select, update
+from sqlalchemy import BigInteger, CheckConstraint, String, TIMESTAMP, UniqueConstraint, and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -91,6 +91,9 @@ class BarricadeScanIntegration(Base):
     server_number: Mapped[int] = mapped_column(primary_key=True)
     integration_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     credential_id: Mapped[int] = mapped_column(nullable=False)
+    # Registration is a proposed activation boundary, not proof that old
+    # sessions were previously scanned or that game clocks are synchronized.
+    registered_at_us: Mapped[int] = mapped_column(BigInteger, nullable=False)
     __table_args__ = (
         CheckConstraint('server_number BETWEEN 1 AND 32', name='ck_barricade_integration_server'),
         CheckConstraint('credential_id > 0', name='ck_barricade_integration_credential'),
@@ -191,7 +194,8 @@ def set_integration_credential(server_number: int, integration_id: str, *, expec
                 return False
             if row is None:
                 session.add(BarricadeScanIntegration(server_number=server_number, integration_id=integration_id,
-                                                     credential_id=new_credential_id))
+                    credential_id=new_credential_id,
+                    registered_at_us=int(datetime.now(timezone.utc).timestamp() * 1_000_000)))
             else:
                 row.credential_id = new_credential_id
             session.add(BarricadeScanIntegrationAudit(server_number=server_number, integration_id=integration_id,
@@ -216,7 +220,8 @@ def credential_is_registered(server_number: int, namespace: str, credential_id: 
         return row is not None and row.credential_id == credential_id
 
 
-def find_unreserved_open_sessions(server_number: int, integration_id: str, *, after_id: int = 0, limit: int = 100):
+def find_unreserved_open_sessions(server_number: int, integration_id: str, *, after_id: int = 0,
+                                  limit: int = 100, after_event_us: int | None = None):
     """Find candidates without a high-water mark; an open row is not proof of presence.
 
     The page position is valid only within one traversal; restart from zero
@@ -225,7 +230,8 @@ def find_unreserved_open_sessions(server_number: int, integration_id: str, *, af
     Results may change concurrently and must never be treated as exclusive.
     """
     if (not 1 <= server_number <= 32 or not integration_id or len(integration_id) > 128 or
-            after_id < 0 or not 1 <= limit <= 1000):
+            after_id < 0 or not 1 <= limit <= 1000 or
+            (after_event_us is not None and (type(after_event_us) is not int or after_event_us < 0))):
         raise ValueError('Invalid Barricade scan query')
     stmt = (select(PlayerSession.id, PlayerID.player_id)
             .join(PlayerID, PlayerID.id == PlayerSession.player_id_id)
@@ -237,6 +243,9 @@ def find_unreserved_open_sessions(server_number: int, integration_id: str, *, af
                    PlayerSession.end_event_us.is_(None), PlayerSession.id > after_id,
                    or_(BarricadeScanDelivery.id.is_(None), BarricadeScanDelivery.status == 'queued'))
             .order_by(PlayerSession.id).limit(limit))
+    if after_event_us is not None:
+        # Unknown starts are not assumed to be newer than the boundary.
+        stmt = stmt.where(PlayerSession.start_event_us > after_event_us)
     with get_session_maker()() as session:
         return [(row.id, row.player_id) for row in session.execute(stmt)]
 
