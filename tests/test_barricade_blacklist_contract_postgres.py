@@ -69,6 +69,24 @@ def test_real_list_scope_expiry_and_durable_delivery(database, existing_blacklis
     assert replacement not in (record_id, created)
 
 
+@pytest.mark.xfail(strict=True, reason='Barricade ownership of an existing manual record is not yet tracked')
+def test_manual_record_must_not_be_claimed_as_barricade_owned(database, existing_blacklist, monkeypatch):
+    record_id, first, _ = existing_blacklist
+
+    @contextmanager
+    def session_scope():
+        with database() as session:
+            yield session
+
+    monkeypatch.setattr(barricade.models, 'enter_session', session_scope)
+    # A pre-existing manual ban cannot safely become a Barricade-owned ban:
+    # Barricade would otherwise be able to delete it on a later unban.
+    result = barricade.ban_player.func('synthetic-player', first, 'test')
+    assert result is None
+    with database() as session:
+        assert session.get(BlacklistRecord, record_id) is not None
+
+
 def test_concurrent_requests_create_one_record_and_one_delivery(database, existing_blacklist, monkeypatch):
     _, _, second = existing_blacklist
 

@@ -235,3 +235,26 @@ def test_public_crcon_profile_lookup_never_returns_vietnam_eos():
     peer = SimpleNamespace(_make_request=request, logger=Mock())
     assert asyncio.run(method(peer, 123)) == ('synthetic-eos', None)
     request.assert_awaited_once_with('GET', '/get_player_profile', data={'player_id': 123})
+
+
+def test_public_forwarding_uses_vietnam_game_id_as_eos():
+    path = os.environ.get('BARRICADE_PEER_FORWARDING_SOURCE')
+    if not path:
+        pytest.skip('requires pinned public Barricade forwarding source')
+    source_bytes = Path(path).read_bytes().replace(b'\r\n', b'\n')
+    header = b'blob ' + str(len(source_bytes)).encode() + b'\0'
+    assert hashlib.sha1(header + source_bytes).hexdigest() == 'f08718099b4fae1dfbdf9af9c274586c49137f22'
+    tree = ast.parse(source_bytes.decode())
+    function = next(node for node in tree.body
+                    if isinstance(node, ast.FunctionDef) and node.name == 'is_eos_id_necessary')
+    module = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0),
+                              function], type_ignores=[])
+    ast.fix_missing_locations(module)
+    env = {'Game': Game, 'might_forward_to_staff': lambda _: True,
+           'get_player_id_type': lambda value: 'steam' if value == 'synthetic-steam-id' else 'other',
+           'PlayerIDType': SimpleNamespace(STEAM_64_ID='steam')}
+    exec(compile(module, '<pinned-forwarding>', 'exec'), env)
+    check = env['is_eos_id_necessary']
+    assert check(SimpleNamespace(game=Game.HLLV), 'synthetic-vietnam-eos') is False
+    assert check(SimpleNamespace(game=Game.HLL), 'synthetic-steam-id') is False
+    assert check(SimpleNamespace(game=Game.HLL), 'synthetic-console-id') is True

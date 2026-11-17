@@ -56,22 +56,33 @@ this route until the API contract and blacklist ownership behavior have been
 validated and protected. Do not infer a unique peer from a potentially shared
 API key. The isolated contract test exercises published peer code with
 synthetic data, not the version in actual use.
-The pinned public CRCON peer's `get_player_eos_ids` also returns `None` for
-its Hell Let Loose Vietnam EOS-ID slot even when the profile contains an EOS
-ID. The separate compatibility version cannot change that peer behavior. This
-is specifically a limitation of that lookup method; it does not by itself
-prove that every other Vietnam operation fails. Verify and correct the peer's
-lookup before claiming full Vietnam compatibility. The protective 403 for
+The pinned public CRCON peer's `get_player_eos_ids` returns `None` for its
+Hell Let Loose Vietnam EOS-ID slot even when a profile contains an EOS ID.
+Its report-forwarding code explicitly treats the Vietnam game ID itself as
+the EOS ID, so that lookup result does not establish a Vietnam scan or report
+failure. The isolated contract tests exercise both code paths; the installed
+peer and a live Vietnam connection have not been verified. The protective 403 for
 automatic record expiry can interrupt synchronization when Barricade sees an
 unrecognized active record; it protects the record but does not constitute a
 successful synchronization. Do not enable this experimental route as a
 production-ready integration while these conditions remain unresolved.
+
+The current WebSocket ban handler can also return the ID of an already active
+record in the chosen list, regardless of who created that record. A subsequent
+unban for that ID can remove the record. A list ID or the `admin_name` text
+does not prove integration ownership. The isolated PostgreSQL test
+`test_manual_record_must_not_be_claimed_as_barricade_owned` documents this
+unresolved condition as a strict expected failure. Do not infer permission to
+delete old records from a successful ban request; a durable ownership model
+and a safe policy for pre-existing records are needed before activation.
 To repeat the optional offline contract test, obtain the four public files at
 that revision (`integrations/custom/websocket.py`, `integrations/custom/integration.py`,
 `integrations/crcon/integration.py`, and `integrations/websocket.py`). Set
 `BARRICADE_PEER_SOURCE` to the first file and `BARRICADE_PEER_URL_SOURCES` to a
 directory containing the latter three as `custom.py`, `crcon.py`, and
-`websocket.py`. Run `pytest tests/test_barricade_public_peer_contract.py` in an
+`websocket.py`. To check the Vietnam report path, also set
+`BARRICADE_PEER_FORWARDING_SOURCE` to the pinned `barricade/forwarding.py`.
+Run `pytest tests/test_barricade_public_peer_contract.py` in an
 isolated test environment. The test checks the pinned Git blob hashes and
 substitutes the alert callback; it does not contact Barricade or Discord.
 
