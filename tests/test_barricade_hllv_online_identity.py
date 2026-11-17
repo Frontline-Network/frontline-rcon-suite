@@ -92,6 +92,29 @@ def test_observed_epic_family_does_not_block_verified_steam_matching():
     assert prepare_online_identity_snapshot(api)[epic]['steam_id'] is None
 
 
+@pytest.mark.parametrize('platform,platform_id', [
+    ('EPlatformFamily::PS5', 'synthetic-psn-id-123'),
+    ('EPlatformFamily::XboxSeries', 'synthetic-xbox-1'),
+    ('EPlatformFamily::EGS', 'e' * 65),
+    ('EPlatformFamily::WinGDK', 'synthetic-wingdk-id'),
+])
+def test_non_steam_platform_identifier_does_not_block_steam_reconciliation(platform, platform_id):
+    other_eos = 'fedcba9876543210fedcba9876543210'
+    api = api_with_players([row(other_eos, platform=platform, steam=platform_id), row()])
+    assert prepare_online_steam_identity(api, STEAM) == {'steam_id': STEAM, 'eos_id': EOS}
+    assert prepare_online_identity_snapshot(api)[other_eos] == {
+        'steam_id': None, 'platform': platform.lower()}
+
+
+@pytest.mark.parametrize('platform_id', ['76561198036685844', 76561198036685844, True, ['unexpected']])
+def test_ambiguous_non_steam_platform_identifier_remains_blocked(platform_id):
+    api = api_with_players([row(platform='EPlatformFamily::PS5', steam=platform_id)])
+    with pytest.raises(ValueError):
+        prepare_online_steam_identity(api, STEAM)
+    with pytest.raises(ValueError):
+        prepare_online_identity_snapshot(api)
+
+
 @pytest.mark.parametrize('invalid', [
     {**row(platform='EPlatformFamily::EGS', steam=None), 'eosId': 'different'},
     row('invalid', platform='EPlatformFamily::EGS', steam=None),

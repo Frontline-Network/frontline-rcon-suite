@@ -4,12 +4,22 @@ from rcon.steam_utils import is_steam_id_64
 from rcon.types import GameEnum
 
 
-# Only these observed families prove that a row without a Steam ID is not a
-# Steam account. Unknown or newly introduced platforms require a fresh read.
+# Only these observed families establish the platform family of a roster row.
+# Unknown or newly introduced platforms require a fresh read.
 NON_STEAM_FAMILIES = frozenset({
     'eplatformfamily::xbox', 'eplatformfamily::xboxseries',
     'eplatformfamily::ps5', 'eplatformfamily::wingdk', 'eplatformfamily::egs',
 })
+
+
+def _non_steam_platform_id_is_safe(value):
+    """Do not mistake opaque platform IDs for Steam64 associations.
+
+    HLLV also fills the `steamId` field with platform-specific identifiers
+    for non-Steam families. Values that could be a Steam64 ID, or are not
+    strings, remain ambiguous and must fail closed.
+    """
+    return value is None or (isinstance(value, str) and not is_steam_id_64(value))
 
 
 def verified_steam_id(rcon, player_id: str, player_info: dict | None) -> str | None:
@@ -54,9 +64,9 @@ def prepare_online_identity_snapshot(rcon) -> dict:
         elif platform not in NON_STEAM_FAMILIES:
             raise ValueError('Unknown online platform in identity snapshot')
         else:
-            # A Steam alias on a console row cannot establish the ownership
-            # relationship needed to combine records without guessing.
-            if steam:
+            # An opaque platform ID is not a verified Steam association.
+            # A Steam64-shaped value is ambiguous and must still fail closed.
+            if not _non_steam_platform_id_is_safe(steam):
                 raise ValueError('Unexpected Steam identity on non-Steam platform')
             steam = None
         players[eos] = {'steam_id': steam, 'platform': platform}
@@ -90,7 +100,7 @@ def prepare_online_steam_identity(rcon, steam_id: str) -> dict:
                 raise ValueError('Incomplete online Steam identity')
         elif platform not in NON_STEAM_FAMILIES:
             raise ValueError('Unknown online platform in identity snapshot')
-        elif row.get('steamId'):
+        elif not _non_steam_platform_id_is_safe(row.get('steamId')):
             raise ValueError('Inconsistent online Steam identity')
         if (len(eos) != 32 or not all(c in '0123456789abcdefABCDEF' for c in eos)
                 or row.get('eosId') != eos or eos in seen_eos):
