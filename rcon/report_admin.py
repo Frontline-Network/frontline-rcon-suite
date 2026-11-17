@@ -21,6 +21,8 @@ from rcon.models import (
     AdminIncidentDiscordDelivery,
     PlayerID,
     PlayerSession,
+    PendingPlayerConnect,
+    PendingPlayerDisconnect,
     UserConfig,
     MessageTemplate,
     LeadershipVote,
@@ -203,6 +205,13 @@ def kick_reason(sess, payload):
 def session_token(sess, server, pid, stamp):
     # A moderation decision must bind to an actual connection instant; naive
     # legacy wall times cannot prove identity across a repeated DST hour.
+    # An unresolved event for this player may refer to a newer connection or
+    # an already-ended one. Do not act on an older still-open session while
+    # session reconciliation is pending.
+    for model in (PendingPlayerConnect, PendingPlayerDisconnect):
+        if sess.scalar(select(model.player_id).where(
+                model.server_number == server, model.player_id == pid).limit(1)) is not None:
+            return None
     rows = sess.scalars(
         select(PlayerSession)
         .join(PlayerID)

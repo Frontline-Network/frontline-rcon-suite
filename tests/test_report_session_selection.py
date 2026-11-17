@@ -11,7 +11,7 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
-from rcon.models import PlayerID, PlayerSession
+from rcon.models import PlayerID, PlayerSession, PendingPlayerConnect, PendingPlayerDisconnect
 from rcon.report_admin import session_token
 
 
@@ -32,7 +32,7 @@ def database(request):
             conn.execute(CreateSchema(schema))
     engine = base.execution_options(schema_translate_map={None: schema}) if schema else base
     try:
-        for model in (PlayerID, PlayerSession):
+        for model in (PlayerID, PlayerSession, PendingPlayerConnect, PendingPlayerDisconnect):
             model.__table__.create(engine)
         yield engine
     finally:
@@ -57,6 +57,32 @@ def berlin_time():
         else:
             os.environ['TZ'] = previous
         time.tzset()
+
+
+@pytest.mark.parametrize('kind', ['connect', 'disconnect'])
+def test_unresolved_same_player_event_prevents_report_session_selection(database, kind):
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    with Session(database) as sess:
+        player = PlayerID(player_id='synthetic-report-player')
+        sess.add(player)
+        sess.flush()
+        active = PlayerSession(player_id_id=player.id, server_number=3,
+            start=datetime.fromtimestamp(now.timestamp()), start_event_us=int(now.timestamp() * 1_000_000))
+        sess.add(active)
+        event = (PendingPlayerConnect(server_number=3, player_id=player.player_id,
+                    started_at=datetime.fromtimestamp(now.timestamp() + 1),
+                    started_event_us=int((now.timestamp() + 1) * 1_000_000))
+                 if kind == 'connect' else
+                 PendingPlayerDisconnect(server_number=3, player_id=player.player_id,
+                    ended_at=datetime.fromtimestamp(now.timestamp() + 1),
+                    ended_event_us=int((now.timestamp() + 1) * 1_000_000)))
+        sess.add(event)
+        sess.flush()
+        assert session_token(sess, 3, player.player_id, now.timestamp() + 2) is None
+        # The same unresolved event must not block an unrelated server.
+        event.server_number = 4
+        sess.flush()
+        assert session_token(sess, 3, player.player_id, now.timestamp() + 2) == active.id
 
 
 def test_latest_absolute_session_and_uncertain_legacy_are_safe(database, berlin_time):
