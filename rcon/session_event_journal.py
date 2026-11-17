@@ -108,6 +108,22 @@ class SessionEventJournal:
                               "WHERE server = ? AND resolved_at IS NULL ORDER BY event_us, kind, player_name LIMIT ?",
                               (server, limit)).fetchall()
 
+    def pending_counts(self, server: int) -> tuple[int, int]:
+        """Count locally pending and untransferred anonymous events for one server.
+
+        This is a local backlog observation, not proof that the game server
+        has already exposed every event. Published anonymous events must be
+        checked separately in the shared review store.
+        """
+        if type(server) is not int or not 1 <= server <= 32:
+            raise ValueError('Invalid server number')
+        with self._connect() as db:
+            pending, anonymous = db.execute(
+                'SELECT (SELECT COUNT(*) FROM session_events WHERE server = ? AND completed_at IS NULL), '
+                '(SELECT COUNT(*) FROM unidentified_session_events WHERE server = ? '
+                'AND resolved_at IS NULL AND published_at IS NULL)', (server, server)).fetchone()
+            return pending, anonymous
+
     def discard_unidentified(self, server: int, event_id: int, actor: str, reason: str) -> bool:
         """Record an explicit decision without guessing a player identity."""
         if (server < 1 or event_id < 1 or not actor or not actor.strip() or len(actor) > 150
