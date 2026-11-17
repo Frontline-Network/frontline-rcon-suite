@@ -412,7 +412,7 @@ while IFS= read -r backend_image; do
     -v "$target_source_archive:/tmp/frontline-target-source.tar:ro" \
     -v "$repo_root/scripts/verify_backend_source.py:/tmp/frontline-verify-source.py:ro" \
     "$backend_image" /tmp/frontline-verify-source.py /tmp/frontline-target-source.tar; then
-    echo "Backend image $backend_image does not match target $target_short." >&2
+    echo "Backend image $backend_image does not match target $target_short; see docs/operations/backend-source-verification.md." >&2
     abort_before_service_change
   fi
 done <<< "$backend_images"
