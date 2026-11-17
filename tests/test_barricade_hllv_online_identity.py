@@ -285,6 +285,35 @@ def test_list_edit_checks_all_identities_before_any_game_action():
     sync.assert_not_called()
 
 
+@pytest.mark.parametrize('game,has_record,expected_review', [
+    (GameEnum.HLL_VIETNAM, True, True),
+    (GameEnum.HLL_VIETNAM, False, False),
+    (GameEnum.HLL_WW2, True, False),
+])
+def test_immediate_to_connect_list_change_never_silently_ignores_hllv_ban_ownership(
+        game, has_record, expected_review):
+    api = api_with_players([])
+    api.game_profile.game = game
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api
+    payload = SimpleNamespace(
+        old_blacklist={'id': 7, 'servers': [3], 'sync': BlacklistSyncMethod.BAN_IMMEDIATELY},
+        new_blacklist={'id': 7, 'servers': [3], 'sync': BlacklistSyncMethod.BAN_ON_CONNECT},
+    )
+    with patch.object(blacklist, 'SERVER_NUMBER', 3), \
+         patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
+         patch.object(blacklist, 'get_active_blacklist_records', return_value=iter([record()] if has_record else [])), \
+         patch.object(blacklist, 'synchronize_ban') as sync:
+        if expected_review:
+            with pytest.raises(blacklist.HLLVBanOwnershipUnverified):
+                handler.handle_edit_list(payload)
+        else:
+            handler.handle_edit_list(payload)
+    sync.assert_not_called()
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
+
+
 @pytest.mark.parametrize('changed,uncertain', [(True, False), (False, True)])
 def test_list_reconciliation_preflights_all_and_does_not_retry_partial_failure(changed, uncertain):
     console = 'fedcba9876543210fedcba9876543210'

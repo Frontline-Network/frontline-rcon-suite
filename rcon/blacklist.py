@@ -62,6 +62,10 @@ class HLLVSteamBanOwnershipUnverified(RuntimeError):
     """An existing EOS game ban cannot safely be attributed to this record."""
 
 
+class HLLVBanOwnershipUnverified(RuntimeError):
+    """An existing HLLV game ban cannot safely be attributed to this list."""
+
+
 class HLLVSteamIdentityUnverified(RuntimeError):
     """An action was not attempted because its Steam/EOS link is unverified."""
 
@@ -1459,6 +1463,16 @@ class BlacklistCommandHandler:
             and new_blacklist["sync"] == BlacklistSyncMethod.BAN_IMMEDIATELY
         )
         if was_banning == is_banning and not enable_immediate:
+            if (was_banning and old_blacklist['sync'] == BlacklistSyncMethod.BAN_IMMEDIATELY
+                    and new_blacklist['sync'] == BlacklistSyncMethod.BAN_ON_CONNECT
+                    and getattr(getattr(self.rcon, 'game_profile', None), 'game', None) == GameEnum.HLL_VIETNAM):
+                # Existing game bans may keep players out before the new
+                # connect-only rule can show its message. Their ownership is
+                # not established, so never silently acknowledge or remove
+                # them. Perform this check before any game-server action.
+                with blacklist_change_session() as sess:
+                    if next(iter(get_active_blacklist_records(sess, new_blacklist['id'])), None) is not None:
+                        raise HLLVBanOwnershipUnverified('List mode change needs game-ban ownership review')
             return
 
         with blacklist_change_session() as sess:
