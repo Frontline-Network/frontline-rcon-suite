@@ -1,6 +1,7 @@
 import asyncio
 import itertools
 import os
+import time
 from datetime import datetime
 from logging import getLogger
 from urllib.parse import parse_qsl
@@ -162,13 +163,23 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
             return await asyncio.to_thread(barricade_scan_presence.session_has_bounded_evidence,
                 redis, scope=scope, server_number=server_number, session_id=session_id, player_id=player_id)
 
+        roster = None
+        roster_checked = float('-inf')
+        async def observed_player(_session_id, player_id):
+            nonlocal roster, roster_checked
+            if time.monotonic() - roster_checked >= 5:
+                roster = await asyncio.to_thread(barricade_scan_presence.observed_players,
+                    redis, scope=scope, server_number=server_number)
+                roster_checked = time.monotonic()
+            return player_id in roster if roster is not None else None
+
         async def send_scan(player_id, game):
             return await self.send_request(ServerRequestType.SCAN_PLAYERS,
                 ScanPlayersRequestPayload(player_ids=[player_id], game=game).model_dump())
 
         return await barricade_scan_dispatch.scan_once(server_number,
             self.scope['barricade_scan_namespace'], barricade_game_for_server(), send_scan, verify_session,
-            credential_id=self.scope['barricade_credential_id'])
+            credential_id=self.scope['barricade_credential_id'], is_observed=observed_player)
 
     async def _durable_scan_loop(self):
         while True:

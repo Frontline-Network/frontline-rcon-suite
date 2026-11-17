@@ -477,8 +477,8 @@ def test_scan_activation_never_automatically_resends_old_or_ambiguous_sessions(d
         sent = []
         async def sender(player_id, game):
             sent.append((player_id, game))
-        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, page_size=1)
-        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, page_size=1)
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, is_observed=verified, page_size=1)
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, is_observed=verified, page_size=1)
         assert sent == [('new', 'HLLV')]
         assert await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=2) == 'unauthorized'
     asyncio.run(run())
@@ -505,6 +505,35 @@ def test_scan_activation_never_automatically_resends_old_or_ambiguous_sessions(d
     with database() as session:
         row = session.get(journal.BarricadeScanDelivery, ambiguous_id)
         assert (row.status, row.review_cause) == ('done', None)
+
+
+def test_activation_reviews_defer_unobserved_and_unavailable_roster(database, monkeypatch):
+    prepare_adapter(database, monkeypatch)
+    engine = database.kw['bind']
+    PlayerID.__table__.create(engine)
+    PlayerSession.__table__.create(engine)
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    with database.begin() as session:
+        for pid in ('offline-stale', 'later-observed'):
+            player = PlayerID(player_id=pid)
+            session.add(player)
+            session.flush()
+            session.add(PlayerSession(player_id_id=player.id, server_number=3,
+                                      start=datetime(2020, 1, 1), start_event_us=None))
+    async def run():
+        async def sender(*_args):
+            pytest.fail('historical session must not be sent')
+        async def unavailable(_session_id, _player_id):
+            return None
+        async def one_online(_session_id, player_id):
+            return player_id == 'later-observed'
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, is_observed=unavailable)
+        assert journal.list_reviews(3)['total'] == 0
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, is_observed=one_online)
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, is_observed=one_online)
+    asyncio.run(run())
+    review = journal.list_reviews(3)
+    assert review['total'] == 1 and review['results'][0]['player_id'] == 'later-observed'
 
 
 def test_scan_revisits_delayed_lower_session_id_after_later_commit(database, monkeypatch):
