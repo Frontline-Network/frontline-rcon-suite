@@ -22,6 +22,7 @@ from rcon.blacklist import (
     remove_record_from_blacklist,
 )
 from rcon.vip_rewards.locking import lock
+from rcon.utils import get_server_number
 
 logger = getLogger("rconweb")
 
@@ -82,6 +83,7 @@ def get_joined_players_since(since: datetime):
         rows = (
             sess.query(models.PlayerID.player_id, models.PlayerSession.start)
             .filter(models.PlayerSession.start > since)
+            .filter(models.PlayerSession.server_number == int(get_server_number()))
             .filter(models.PlayerSession.end.is_(None))
             .order_by(models.PlayerSession.start)
             .join(models.PlayerSession.player)
@@ -93,7 +95,9 @@ def get_joined_players_since(since: datetime):
 @database_sync_to_async
 def get_most_recent_session_date():
     with models.enter_session() as sess:
-        return sess.query(func.max(models.PlayerSession.start)).scalar()
+        return (sess.query(func.max(models.PlayerSession.start))
+                .filter(models.PlayerSession.server_number == int(get_server_number()))
+                .scalar())
 
 
 class BarricadeConsumer(AsyncJsonWebsocketConsumer):
@@ -152,7 +156,7 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
                 await self.send_request(
                     ServerRequestType.SCAN_PLAYERS,
                     ScanPlayersRequestPayload(
-                        player_ids=[row[0] for row in rows]
+                        player_ids=[row[0] for row in rows], game=barricade_game_for_server()
                     ).model_dump(),
                 )
             except Exception:
@@ -301,6 +305,7 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
             pass
 
     async def ban_players(self, payload: BanPlayersRequestPayload):
+        validate_barricade_game(payload.config.game)
         if payload.config.banlist_id is None:
             raise BarricadeRequestError("Missing config.banlist_id")
 
@@ -329,6 +334,7 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         return {"ban_ids": ban_ids}
 
     async def unban_players(self, payload: UnbanPlayersRequestPayload):
+        validate_barricade_game(payload.config.game)
         try:
             blacklist_id = int(payload.config.banlist_id)
         except ValueError:
@@ -362,12 +368,13 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
             return response
 
     async def new_report(self, payload: NewReportRequestPayload):
+        validate_barricade_game(payload.game)
         BlacklistCommandHandler.send(
             BlacklistCommand(
                 command=BlacklistCommandType.BARRICADE_WARN_ONLINE,
                 server_mask=None,
                 payload=BlacklistBarricadeWarnOnlineCommand(
-                    player_ids=[player.player_id for player in payload.players]
+                    player_ids=[player.player_id for player in payload.players], game=payload.game
                 ).model_dump(),
             )
         )

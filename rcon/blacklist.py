@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session, selectinload
 from rcon.barricade import (
     ScanPlayersRequestPayload,
     ServerRequestType,
+    barricade_game_for_server,
     send_to_barricade,
 )
 from rcon.barricade_hllv_identity import (prepare_online_identity_snapshot,
@@ -1071,6 +1072,7 @@ class BlacklistExpireAllCommand(BaseModel):
 
 class BlacklistBarricadeWarnOnlineCommand(BaseModel):
     player_ids: list[str]
+    game: str | None = None
 
 
 @dataclass
@@ -1631,6 +1633,9 @@ class BlacklistCommandHandler:
     def handle_barricade_warn_online(
         self, payload: BlacklistBarricadeWarnOnlineCommand
     ):
+        game = barricade_game_for_server()
+        if payload.game is not None and payload.game != game:
+            return
         online_player_ids = [
             player_id
             for _, player_id in self.rcon.get_player_ids()
@@ -1640,5 +1645,5 @@ class BlacklistCommandHandler:
         if online_player_ids:
             send_to_barricade(
                 request_type=ServerRequestType.SCAN_PLAYERS,
-                payload=ScanPlayersRequestPayload(player_ids=online_player_ids).model_dump(),
+                payload=ScanPlayersRequestPayload(player_ids=online_player_ids, game=game).model_dump(),
             )
