@@ -131,9 +131,8 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         enabled = os.getenv('HLL_BARRICADE_DURABLE_SCANS') == '1'
         durable = (enabled and self.scope.get('barricade_scan_namespace')
                    and self.scope.get('barricade_credential_id'))
-        if (enabled and _explicit_durable_request(self.scope.get('query_string', b''))
-                and not durable):
-            logger.warning('Rejected Barricade connection with unregistered durable integration')
+        if _explicit_durable_request(self.scope.get('query_string', b'')) and not durable:
+            logger.warning('Rejected Barricade durable integration: disabled or not registered')
             await self.close(code=4403)
             return
         logger.info("Accepted connection with Barricade client")
