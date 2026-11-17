@@ -362,6 +362,11 @@ class PlayerID(Base):
     def get_total_playtime_seconds(self) -> int:
         total = 0
         latest = max(self.sessions, key=self._session_order_key, default=None)
+        # A newer, already ended session on another server must not hide a
+        # locally active session. Preserve the existing selection when the
+        # newest global session is itself active.
+        if latest and (latest.end is not None or latest.end_event_us is not None):
+            latest = self.get_current_session() or latest
 
         for s in self.sessions:
             if s.start_event_us is not None and s.end_event_us is not None:

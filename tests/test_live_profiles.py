@@ -135,6 +135,44 @@ def test_empty_live_profile_request_does_not_open_a_database_session(monkeypatch
     assert get_live_profiles([]) == []
 
 
+def test_total_playtime_counts_active_local_session_when_newer_remote_session_ended(monkeypatch):
+    from datetime import timedelta
+    from rcon.models import PlayerID, PlayerSession
+    monkeypatch.setattr('rcon.models.get_server_number', lambda: '3')
+    now = datetime.now(timezone.utc)
+    local_start = now - timedelta(hours=1)
+    remote_start = now - timedelta(minutes=5)
+    remote_end = now - timedelta(minutes=3)
+    player = PlayerID(player_id='synthetic-player')
+    player.sessions = [
+        PlayerSession(id=1, server_number=3, start=local_start.replace(tzinfo=None),
+                      start_event_us=int(local_start.timestamp() * 1_000_000)),
+        PlayerSession(id=2, server_number=4, start=remote_start.replace(tzinfo=None),
+                      end=remote_end.replace(tzinfo=None),
+                      start_event_us=int(remote_start.timestamp() * 1_000_000),
+                      end_event_us=int(remote_end.timestamp() * 1_000_000)),
+    ]
+    # One hour of active local play plus two minutes of completed remote play.
+    assert 3720 <= player.get_total_playtime_seconds() < 3730
+
+
+def test_total_playtime_keeps_newest_active_remote_session_fallback(monkeypatch):
+    from datetime import timedelta
+    from rcon.models import PlayerID, PlayerSession
+    monkeypatch.setattr('rcon.models.get_server_number', lambda: '3')
+    now = datetime.now(timezone.utc)
+    local = now - timedelta(hours=1)
+    remote = now - timedelta(minutes=5)
+    player = PlayerID(player_id='synthetic-player')
+    player.sessions = [
+        PlayerSession(id=1, server_number=3, start=local.replace(tzinfo=None),
+                      start_event_us=int(local.timestamp() * 1_000_000)),
+        PlayerSession(id=2, server_number=4, start=remote.replace(tzinfo=None),
+                      start_event_us=int(remote.timestamp() * 1_000_000)),
+    ]
+    assert 300 <= player.get_total_playtime_seconds() < 310
+
+
 @pytest.fixture
 def live_profile_database(monkeypatch):
     engine = create_engine(
