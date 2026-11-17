@@ -324,6 +324,43 @@ def test_async_dispatch_confirmed_and_unconfirmed_are_not_repeated(database, mon
             journal.BarricadeScanDelivery.player_session_id)).all() == ['done', 'review']
 
 
+def test_revoked_credential_during_presence_check_does_not_send(database, monkeypatch):
+    prepare_adapter(database, monkeypatch)
+    authorized = {'value': True}
+    monkeypatch.setattr(adapter, 'key_is_live', lambda _credential_id: authorized['value'])
+    async def run():
+        async def verify_then_revoke(_session_id, _player_id):
+            authorized['value'] = False
+            return True
+        async def sender(*_args):
+            pytest.fail('a revoked credential must not start a scan')
+        return await adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab',
+            123, 'synthetic-eos', 'HLLV', sender, credential_id=1, verify_session=verify_then_revoke)
+    assert asyncio.run(run()) == 'unauthorized'
+    with database() as session:
+        assert session.scalars(select(journal.BarricadeScanDelivery)).all() == []
+
+
+def test_revoked_credential_during_reservation_requires_review_without_send(database, monkeypatch):
+    prepare_adapter(database, monkeypatch)
+    authorized = {'value': True}
+    monkeypatch.setattr(adapter, 'key_is_live', lambda _credential_id: authorized['value'])
+    reserve = journal.reserve
+    def reserve_then_revoke(*args):
+        result = reserve(*args)
+        authorized['value'] = False
+        return result
+    monkeypatch.setattr(journal, 'reserve', reserve_then_revoke)
+    async def run():
+        async def sender(*_args):
+            pytest.fail('a revoked credential must not start a scan')
+        return await adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab',
+            124, 'synthetic-eos', 'HLLV', sender, credential_id=1, verify_session=verified)
+    assert asyncio.run(run()) == 'review'
+    with database() as session:
+        assert session.scalar(select(journal.BarricadeScanDelivery.status)) == 'review'
+
+
 def test_old_connection_cannot_dispatch_after_key_rotation(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     peer = '01234567-89ab-4def-8012-0123456789ab'
