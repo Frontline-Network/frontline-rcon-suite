@@ -403,6 +403,44 @@ def test_revoked_credential_during_presence_check_does_not_send(database, monkey
         assert session.scalars(select(journal.BarricadeScanDelivery)).all() == []
 
 
+def test_operator_can_surface_interrupted_send_without_connected_peer(database, monkeypatch):
+    prepare(database, monkeypatch)
+    with journal.delivery_scope(3, 'integration-a'):
+        delivery_id = journal.reserve(3, 'integration-a', 123, 'synthetic-eos', 'HLLV')
+    listed = journal.list_reviews(3)
+    assert listed['total'] == 1 and listed['results'][0]['status'] == 'sending'
+    journal.resolve_review(3, 'integration-a', delivery_id, decision='recover',
+                           actor='operator', reason='Peer disconnected; result unknown')
+    listed = journal.list_reviews(3)
+    assert listed['results'][0]['status'] == 'review'
+    assert listed['results'][0]['review_cause'] == 'uncertain_delivery'
+    with database() as session:
+        audit = session.scalar(select(journal.BarricadeScanReviewAudit))
+        assert audit.decision == 'recover' and audit.actor == 'operator'
+
+
+def test_operator_recovery_cannot_override_active_successful_send(database, monkeypatch):
+    prepare(database, monkeypatch)
+    started = Event()
+    def recover(delivery_id):
+        started.set()
+        journal.resolve_review(3, 'integration-a', delivery_id, decision='recover',
+                               actor='operator', reason='Check interrupted send')
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with journal.delivery_scope(3, 'integration-a'):
+            delivery_id = journal.reserve(3, 'integration-a', 123, 'synthetic-eos', 'HLLV')
+            future = pool.submit(recover, delivery_id)
+            assert started.wait(3)
+            with pytest.raises(TimeoutError):
+                future.result(timeout=0.2)
+            assert journal.finish(delivery_id, 3, 'integration-a', confirmed=True)
+        with pytest.raises(ValueError, match='not awaiting review'):
+            future.result(timeout=5)
+    with database() as session:
+        assert session.get(journal.BarricadeScanDelivery, delivery_id).status == 'done'
+        assert session.scalars(select(journal.BarricadeScanReviewAudit)).all() == []
+
+
 def test_revoked_credential_during_reservation_requires_review_without_send(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     authorized = {'value': True}

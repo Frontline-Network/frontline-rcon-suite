@@ -26,6 +26,13 @@ barrier now requires a collector poll to begin after the verification starts;
 an older readable observation alone cannot pass that check. The barrier does
 not prove complete game logs or prevent a disconnect immediately afterward.
 
+The review list includes sends still marked `sending`, even when a peer has not
+reconnected. An authorized operator can request a state check with a reason.
+The check takes the same integration lock as the sender: if the send is still
+active it waits for the sender to finish; if it remains interrupted, it moves
+the entry to review without transmitting again. A completed send is not
+overwritten. A later retry remains a separate, explicitly audited decision.
+
 With the new consumer, an explicit `frontline_integration` connection is
 rejected if durable scanning is disabled or the binding is invalid. A peer
 without that parameter keeps the legacy path. **Older application versions do

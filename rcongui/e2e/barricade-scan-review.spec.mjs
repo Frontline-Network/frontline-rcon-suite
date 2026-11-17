@@ -37,4 +37,19 @@ for (const sample of [
     await panel.getByRole("combobox", { name: sample.decision }).click();
     await expect(page.getByRole("option", { name: sample.retry })).toHaveCount(0);
   });
+  test(`shows interrupted sends without offering immediate retry in ${sample.language}`, async ({ page }) => {
+    const recover = { de: "Versandzustand prüfen", en: "Check delivery state", fr: "Vérifier l’état de l’envoi" }[sample.language];
+    const main = await openDemoPage(page, "/records/blacklists/manage", { language: sample.language,
+      query: { demo_barricade_review: 1, demo_barricade_status: "sending" } });
+    const panel = main.getByTestId("barricade-scan-review");
+    await panel.getByRole("combobox", { name: sample.decision }).click();
+    await expect(page.getByRole("option", { name: sample.retry })).toHaveCount(0);
+    await page.getByRole("option", { name: recover }).click();
+    await panel.getByLabel(sample.reason).fill("Synthetic recovery check");
+    await panel.getByRole("button", { name: sample.save }).click();
+    const uncertain = { de: "Eine Bestätigung fehlt.", en: "Confirmation is missing.", fr: "La confirmation manque." }[sample.language];
+    await expect(panel.getByText(uncertain, { exact: false })).toBeVisible();
+    await panel.getByRole("combobox", { name: sample.decision }).click();
+    await expect(page.getByRole("option", { name: sample.retry })).toBeVisible();
+  });
 }
