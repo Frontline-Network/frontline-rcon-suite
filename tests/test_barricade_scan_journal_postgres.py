@@ -536,6 +536,40 @@ def test_activation_reviews_defer_unobserved_and_unavailable_roster(database, mo
     assert review['total'] == 1 and review['results'][0]['player_id'] == 'later-observed'
 
 
+def test_roster_limits_open_scan_but_preserves_closed_session_review(database, monkeypatch):
+    prepare_adapter(database, monkeypatch)
+    engine = database.kw['bind']
+    PlayerID.__table__.create(engine)
+    PlayerSession.__table__.create(engine)
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    event = (int(time.time()) + 2) * 1_000_000
+    with database.begin() as session:
+        for pid in ('present', 'not-observed', 'ended'):
+            player = PlayerID(player_id=pid)
+            session.add(player)
+            session.flush()
+            session.add(PlayerSession(player_id_id=player.id, server_number=3,
+                start=datetime(2026, 1, 1), start_event_us=event,
+                end=datetime(2026, 1, 1) if pid == 'ended' else None,
+                end_event_us=event + 1_000_000 if pid == 'ended' else None))
+    async def run():
+        sent = []
+        async def sender(player_id, game):
+            sent.append((player_id, game))
+        async def unavailable():
+            return None
+        async def available():
+            return frozenset({'present'})
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, get_roster=unavailable)
+        assert sent == []
+        await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, get_roster=available)
+        assert sent == [('present', 'HLLV')]
+    asyncio.run(run())
+    with database() as session:
+        assert {row.player_id: row.status for row in session.scalars(select(journal.BarricadeScanDelivery))} == {
+            'present': 'done', 'ended': 'review'}
+
+
 def test_scan_revisits_delayed_lower_session_id_after_later_commit(database, monkeypatch):
     """A per-pass page cursor must not become a permanent high-water mark."""
     prepare_adapter(database, monkeypatch)

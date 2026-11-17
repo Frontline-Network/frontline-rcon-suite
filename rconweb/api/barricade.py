@@ -165,12 +165,16 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
 
         roster = None
         roster_checked = float('-inf')
-        async def observed_player(_session_id, player_id):
+        async def get_roster():
             nonlocal roster, roster_checked
             if time.monotonic() - roster_checked >= 5:
                 roster = await asyncio.to_thread(barricade_scan_presence.observed_players,
                     redis, scope=scope, server_number=server_number)
                 roster_checked = time.monotonic()
+            return roster
+
+        async def observed_player(_session_id, player_id):
+            roster = await get_roster()
             return player_id in roster if roster is not None else None
 
         async def send_scan(player_id, game):
@@ -179,7 +183,7 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
 
         return await barricade_scan_dispatch.scan_once(server_number,
             self.scope['barricade_scan_namespace'], barricade_game_for_server(), send_scan, verify_session,
-            credential_id=self.scope['barricade_credential_id'], is_observed=observed_player)
+            credential_id=self.scope['barricade_credential_id'], is_observed=observed_player, get_roster=get_roster)
 
     async def _durable_scan_loop(self):
         while True:
