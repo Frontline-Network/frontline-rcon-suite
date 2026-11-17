@@ -1429,7 +1429,10 @@ class RconAPI(Rcon):
 
     def resolve_barricade_scan_review(self, delivery_id: int, integration_id: str, decision: str, reason: str, by: str):
         from rcon.barricade_scan_journal import resolve_review
-        resolve_review(int(get_server_number()), integration_id, delivery_id, decision=decision, actor=by, reason=reason)
+        try:
+            resolve_review(int(get_server_number()), integration_id, delivery_id, decision=decision, actor=by, reason=reason)
+        except ValueError as exc:
+            raise HLLCommandFailedError(str(exc)) from exc
         return True
 
     def acknowledge_blacklist_sync_review(self, delivery_id: int, by: str):
