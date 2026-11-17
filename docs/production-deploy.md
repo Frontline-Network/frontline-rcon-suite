@@ -64,9 +64,11 @@ before stopping workers; an incompatible image stops the deployment for review. 
 check reflects readiness; it does not prevent a brief interruption while a backend
 container is replaced. A deployment started by an older helper can update backends
 1–4 immediately; additional instances need a later deployment run by the updated
-helper, or the reconciliation procedure below. Running `--deploy` again at the
-same revision is a no-op and does not repair them. Use the bootstrap procedure
-above before the first update to avoid this gap.
+helper, or the reconciliation procedure below. On the same revision, `--deploy`
+checks existing backends and reconciles legacy probes using their recorded Compose
+files. It stops for manual review if the files are missing, the backends disagree
+on the configuration, or the reconciler cannot verify the running configuration.
+Use the bootstrap procedure above before the first update to avoid this gap.
 
 If an older helper has already updated an installation, reconcile its running
 backends explicitly. Obtain the Compose project name and ordered configuration

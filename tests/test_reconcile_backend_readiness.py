@@ -85,6 +85,21 @@ def test_backend_declared_only_by_shared_override_is_never_started(deployment):
     assert set(override['services']) == {'backend_1'}
 
 
+def test_service_selection_never_starts_other_backends(deployment):
+    path, state = deployment
+    assert reconcile.main(args(path, '--service', 'backend_1', '--apply')) == 0
+    ups = [call for call in state['calls'] if 'up' in call]
+    assert len(ups) == 1 and ups[0][-1:] == ['backend_1']
+    assert set(json.loads((path / '.deploy-state/backend-readiness-override.json').read_text())['services']) == {'backend_1'}
+
+
+def test_service_selection_rejects_unknown_backend(deployment):
+    path, state = deployment
+    with pytest.raises(ValueError, match='absent'):
+        reconcile.main(args(path, '--service', 'backend_2', '--apply'))
+    assert not any('up' in call for call in state['calls'])
+
+
 def test_apply_recreates_only_outdated_services_and_persists_override(deployment):
     path, state = deployment
     state['already_correct'].add('backend_1')
