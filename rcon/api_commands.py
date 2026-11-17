@@ -588,6 +588,13 @@ class RconAPI(Rcon):
         except Exception as error:
             logger.warning("Unable to verify online players for history search: %s", type(error).__name__)
             online_now_ids, observed_at = None, None
+        try:
+            from rcon.player_presence import read_other_servers
+
+            remote_observations, _ = read_other_servers(int(get_server_number()))
+        except Exception as error:
+            logger.warning("Other-server player observations unavailable: %s", type(error).__name__)
+            remote_observations = {}
         return get_players_by_appearance(
             page=page,
             page_size=page_size,
@@ -603,6 +610,7 @@ class RconAPI(Rcon):
             country=country,
             online_now_ids=online_now_ids,
             observed_at=observed_at,
+            remote_observations=remote_observations,
         )
 
     def flag_player(

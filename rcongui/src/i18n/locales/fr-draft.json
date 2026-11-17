@@ -741,6 +741,8 @@
       "eyebrow": "Modération",
       "subtitle": "Rechercher, sélectionner et gérer les joueurs sur les serveurs.",
       "liveSnapshotUnavailable": "Le statut actuel des joueurs est indisponible. Les dates de dernière présence peuvent être incomplètes.",
+      "observedApproximately": "environ {{time}}",
+      "seenFilterLimitations": "Les observations des autres serveurs peuvent manquer. Un joueur peut être omis si une limite du filtre se situe dans la période d’observation.",
       "results": "{{count}} résultats",
       "selected": "Sélectionné: {{count}}",
       "created": "Créé",

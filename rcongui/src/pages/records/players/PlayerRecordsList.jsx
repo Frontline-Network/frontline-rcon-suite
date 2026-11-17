@@ -48,9 +48,12 @@ const PlayerRecordsListRow = memo(function PlayerRecordsListRow({
     "???";
   const avatar = player?.steaminfo?.profile?.avatar ?? name;
   const penalties = player?.penalty_count ?? {};
-  const lastSeen = dayjs(player.last_seen_timestamp_ms)
+  const lastSeenRelative = dayjs(player.last_seen_timestamp_ms)
     .locale(i18n.language)
     .fromNow();
+  const lastSeen = player.last_seen_observation_window_ms
+    ? t("records.players.observedApproximately", { time: lastSeenRelative })
+    : lastSeenRelative;
   const totalPlaytime = dayjs
     .duration((player.total_playtime_seconds ?? 0) * 1000)
     .asHours()
@@ -211,9 +214,12 @@ const MobilePlayerRecordsListRow = memo(function MobilePlayerRecordsListRow({
   const avatar = player?.steaminfo?.profile?.avatar ?? name;
   const level = player?.level ?? player?.soldier?.level;
   const platform = player?.platform ?? player?.soldier?.platform;
-  const lastSeen = dayjs(player.last_seen_timestamp_ms)
+  const lastSeenRelative = dayjs(player.last_seen_timestamp_ms)
     .locale(i18n.language)
     .fromNow();
+  const lastSeen = player.last_seen_observation_window_ms
+    ? t("records.players.observedApproximately", { time: lastSeenRelative })
+    : lastSeenRelative;
   const hasLinkedAccounts = Boolean(player?.identity?.linked_accounts?.length);
 
   return (

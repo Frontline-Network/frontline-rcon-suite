@@ -636,6 +636,8 @@ const en = {
       eyebrow: "Moderation",
       subtitle: "Search, select and manage players across servers.",
       liveSnapshotUnavailable: "Current player status is unavailable. Last-seen times may be incomplete.",
+      observedApproximately: "about {{time}}",
+      seenFilterLimitations: "Observations from other servers may be missing. A player may be omitted when a filter boundary falls within the observation window.",
       results: "{{count}} results",
       selected: "Selected: {{count}}",
       created: "Created",

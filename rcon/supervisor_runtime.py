@@ -157,6 +157,12 @@ def _run_population_history(stop_event: threading.Event) -> None:
     run(stop_event=stop_event)
 
 
+def _run_player_presence(stop_event: threading.Event) -> None:
+    from rcon.player_presence import run
+
+    run(stop_event=stop_event)
+
+
 def _run_campaign_messages(stop_event: threading.Event) -> None:
     from rcon import campaign_delivery
 
@@ -224,6 +230,7 @@ def _run_vip_rewards(stop_event: threading.Event) -> None:
 
 DEFAULT_SERVICES: tuple[ServiceSpec, ...] = (
     ServiceSpec("population_history", _run_population_history),
+    ServiceSpec("player_presence", _run_player_presence),
     ServiceSpec("live_map", _run_live_map),
     ServiceSpec("expiring_vips", _run_expiring_vips),
     ServiceSpec("live_stats_refresh", _run_live_stats),

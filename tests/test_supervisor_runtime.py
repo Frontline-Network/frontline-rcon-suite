@@ -36,6 +36,7 @@ class SharedSupervisorRuntimeTests(unittest.TestCase):
             names,
             {
                 "population_history",
+                "player_presence",
                 "live_map",
                 "expiring_vips",
                 "live_stats_refresh",

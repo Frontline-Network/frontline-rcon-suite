@@ -141,7 +141,12 @@ export default function PlayerCard({
   const firstSeen = dayjs(playerProfile.first_seen_timestamp_ms)
     .locale(i18n.language)
     .format("L");
-  const lastSeen = dayjs(playerProfile.last_seen_timestamp_ms).fromNow();
+  const lastSeenRelative = dayjs(playerProfile.last_seen_timestamp_ms)
+    .locale(i18n.language)
+    .fromNow();
+  const lastSeen = playerProfile.last_seen_observation_window_ms
+    ? t("records.players.observedApproximately", { time: lastSeenRelative })
+    : lastSeenRelative;
   const country =
     playerProfile?.country ??
     playerProfile?.account?.country ??
