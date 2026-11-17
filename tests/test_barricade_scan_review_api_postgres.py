@@ -9,6 +9,14 @@ from tests.test_barricade_scan_journal_postgres import database, prepare
 from tests.test_blacklist_sync_api_postgres import invoke
 
 
+def test_status_endpoint_requires_permission_and_reports_disabled(monkeypatch):
+    monkeypatch.setenv('HLL_BARRICADE_DURABLE_SCANS', '0')
+    monkeypatch.setattr('rcon.api_commands.get_server_number', lambda: '3')
+    assert invoke('get_barricade_scan_status', 'GET', set()).status_code == 403
+    response = invoke('get_barricade_scan_status', 'GET', {'api.can_view_blacklists'})
+    assert response.status_code == 200 and json.loads(response.content)['result'] == {'state': 'disabled'}
+
+
 def test_review_permissions_server_isolation_and_operator_audit(database, monkeypatch):
     prepare(database, monkeypatch)
     monkeypatch.setattr('rcon.api_commands.get_server_number', lambda: '3')

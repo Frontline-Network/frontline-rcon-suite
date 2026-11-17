@@ -1428,6 +1428,10 @@ class RconAPI(Rcon):
         from rcon.barricade_scan_journal import list_reviews
         return list_reviews(int(get_server_number()), offset, limit)
 
+    def get_barricade_scan_status(self):
+        from rcon.barricade_scan_status import scan_status
+        return scan_status(int(get_server_number()))
+
     def resolve_barricade_scan_review(self, delivery_id: int, integration_id: str, decision: str, reason: str, by: str):
         from rcon.barricade_scan_journal import resolve_review
         try:
