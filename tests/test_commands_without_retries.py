@@ -11,6 +11,15 @@ from rcon.commands import HLLServerCtl
 from rcon.connection import HLLBrokenConnectionError
 from rcon.types import ServerInfo
 
+SIDE_EFFECT_COMMANDS = [
+    'MessagePlayer', 'MessageAllPlayers', 'PunishPlayer', 'ForceTeamSwitch',
+    'KickPlayer', 'TemporaryBanPlayer', 'PermanentBanPlayer',
+    'RemoveTemporaryBan', 'RemovePermanentBan', 'AddVip', 'RemoveVip',
+    'AddAdmin', 'RemoveAdmin', 'AddMapToRotation', 'RemoveMapFromRotation',
+    'AddMapToSequence', 'RemoveMapFromSequence', 'MoveMapInSequence',
+    'ChangeMap', 'SetWelcomeMessage', 'FutureUnknownCommand',
+]
+
 
 @pytest.fixture
 def controller(monkeypatch):
@@ -82,7 +91,7 @@ def test_disabling_retries_does_not_change_other_supervisor_threads(controller):
     connection.exchange.assert_called_once()
 
 
-@pytest.mark.parametrize("command", ["MessagePlayer", "PunishPlayer", "ForceTeamSwitch", "KickPlayer", "AddMapToRotation", "RemoveMapFromRotation", "AddMapToSequence", "RemoveMapFromSequence", "MoveMapInSequence", "ChangeMap", "RemovePermanentBan", "SetWelcomeMessage", "FutureUnknownCommand"])
+@pytest.mark.parametrize("command", SIDE_EFFECT_COMMANDS)
 @pytest.mark.parametrize("method", ["receive", "receive_optional"])
 def test_side_effect_command_is_not_retried_after_lost_response(command, method):
     api = HLLServerCtl(ServerInfo(host="127.0.0.1", port=12345, password="test"), Mock())
@@ -96,7 +105,7 @@ def test_side_effect_command_is_not_retried_after_lost_response(command, method)
     connection.exchange.assert_not_called()
 
 
-@pytest.mark.parametrize("command", ["MessagePlayer", "PunishPlayer", "ForceTeamSwitch"])
+@pytest.mark.parametrize("command", SIDE_EFFECT_COMMANDS)
 def test_side_effect_command_is_not_retried_after_send_error(command):
     api = HLLServerCtl(ServerInfo(host="127.0.0.1", port=12345, password="test"), Mock())
     connection = Mock()
@@ -105,3 +114,24 @@ def test_side_effect_command_is_not_retried_after_send_error(command):
     with pytest.raises(OSError, match="uncertain send"):
         api.send(command, 2, {})
     connection.send.assert_called_once()
+
+
+@pytest.mark.parametrize('failure_at', ['send', 'receive'])
+def test_known_read_can_still_be_retried_after_transient_transport_failure(monkeypatch, failure_at):
+    from rcon import commands
+
+    monkeypatch.setattr(commands.time, 'sleep', lambda _: None)
+    api = HLLServerCtl(ServerInfo(host='127.0.0.1', port=12345, password='test'), Mock())
+    connection = Mock()
+    api.with_connection = Mock(return_value=nullcontext(connection))
+    handle = Mock()
+    handle.request = SimpleNamespace(name='GetServerInformation', version=2, content={'Name': 'players'})
+    if failure_at == 'send':
+        connection.send.side_effect = [OSError('temporary'), handle]
+        assert api.send('GetServerInformation', 2, {'Name': 'players'}) is handle
+        assert connection.send.call_count == 2
+    else:
+        handle.receive.side_effect = OSError('temporary')
+        response = connection.exchange.return_value
+        assert api.receive(handle) is response
+        connection.exchange.assert_called_once_with('GetServerInformation', 2, {'Name': 'players'})
