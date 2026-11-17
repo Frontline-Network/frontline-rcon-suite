@@ -616,8 +616,10 @@ def run(stop_event=None) -> None:
                         by=f"Campaign: {delivery['campaign_title'] or delivery['campaign_id']}",
                         player_name=delivery["player_name"],
                     )
-                    if not success:
+                    if success is False:
                         raise MessageRejected("RCON rejected the player message")
+                    if success is not True:
+                        raise RuntimeError("RCON did not confirm the player message")
                 except Exception as exc:
                     logger.exception(
                         "Unable to deliver campaign %s to %s",
