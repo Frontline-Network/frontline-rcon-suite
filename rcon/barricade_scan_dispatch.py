@@ -61,10 +61,21 @@ async def dispatch(server_number, integration_id, session_id, player_id, game, s
                 return 'deferred'
             if cancelled.is_set():
                 return 'cancelled'
+            # The asynchronous presence check may take several seconds. A
+            # key or its user's permissions can be revoked while it runs.
+            if (not journal.credential_is_registered(server_number, integration_id, credential_id)
+                    or key_is_live(credential_id) is not True):
+                return 'unauthorized'
             delivery_id = journal.reserve(server_number, integration_id, session_id, player_id, game)
             if delivery_id is None:
                 return 'already_recorded'
             if cancelled.is_set():
+                journal.finish(delivery_id, server_number, integration_id, confirmed=False)
+                return 'review'
+            # A revocation during the database reservation must not start an
+            # external request. Keep the durable record for explicit review.
+            if (not journal.credential_is_registered(server_number, integration_id, credential_id)
+                    or key_is_live(credential_id) is not True):
                 journal.finish(delivery_id, server_number, integration_id, confirmed=False)
                 return 'review'
             response = None
