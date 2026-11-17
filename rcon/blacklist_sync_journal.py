@@ -35,6 +35,13 @@ class BlacklistSyncDelivery(Base):
     )
 
 
+def _lock_targets(session, targets: list[int]) -> None:
+    session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": 0x464C4E424C53594E})
+    for number in targets:
+        key = int.from_bytes(hashlib.sha256(f"blacklist-sync:{number}".encode()).digest()[:8], "big", signed=True)
+        session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+
+
 def enqueue(session, command: bytes, server_mask: int) -> int:
     """Stage one delivery per target; caller commits it with the mutation.
 
@@ -47,13 +54,10 @@ def enqueue(session, command: bytes, server_mask: int) -> int:
     targets = [number for number in range(1, 33) if server_mask & (1 << (number - 1))]
     if not targets:
         return 0
-    session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": 0x464C4E424C53594E})
     # A worker holds the matching session lock while it reads the latest
     # blacklist state and performs RCON work. A producer cannot commit a new
     # state for a target midway through that operation.
-    for number in targets:
-        key = int.from_bytes(hashlib.sha256(f"blacklist-sync:{number}".encode()).digest()[:8], "big", signed=True)
-        session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+    _lock_targets(session, targets)
     now = datetime.now(timezone.utc)
     session.add_all([
         BlacklistSyncDelivery(server_number=number, command=command, status="queued",
@@ -61,6 +65,43 @@ def enqueue(session, command: bytes, server_mask: int) -> int:
         for number in targets
     ])
     return len(targets)
+
+
+def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id: int,
+                                   started_at: datetime) -> bool:
+    """Persist one retry after an unattempted connect-time identity check.
+
+    A matching pending/review item or a completion since this connect started
+    already covers the work. The same target lock as normal producers makes
+    this check atomic against other producers and the delivery worker.
+    """
+    from rcon.blacklist import BlacklistCommand, BlacklistCommandType
+
+    if not 1 <= server_number <= 32 or not player_id or record_id <= 0 or started_at.tzinfo is None:
+        raise ValueError('Invalid connect reconciliation')
+    mask = 1 << (server_number - 1)
+    with get_session_maker()() as session, session.begin():
+        _lock_targets(session, [server_number])
+        rows = session.execute(select(BlacklistSyncDelivery.command, BlacklistSyncDelivery.status)
+            .where(BlacklistSyncDelivery.server_number == server_number,
+                   ((BlacklistSyncDelivery.status.in_(('queued', 'sending', 'review'))) |
+                    ((BlacklistSyncDelivery.status == 'done') &
+                     (BlacklistSyncDelivery.updated_at >= started_at))))).all()
+        for row in rows:
+            try:
+                existing = BlacklistCommand.decode(row.command)
+                if (existing.command == BlacklistCommandType.CREATE_RECORD
+                        and existing.payload.get('record_id') == record_id
+                        and existing.payload.get('player_id') == player_id):
+                    return False
+            except Exception:
+                # Unknown queued work remains an ordering barrier for the
+                # normal journal processor; never silently discard it.
+                continue
+        command = BlacklistCommand(command=BlacklistCommandType.CREATE_RECORD, server_mask=mask,
+                                   payload={'player_id': player_id, 'record_id': record_id})
+        enqueue(session, command.encode(), mask)
+        return True
 
 
 def process_one(server_number: int, handler, *, is_ready=None, prepare=None) -> str:

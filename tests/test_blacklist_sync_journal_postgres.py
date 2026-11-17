@@ -386,10 +386,114 @@ def test_hllv_steam_restriction_targets_verified_eos_with_real_database(database
     monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
     monkeypatch.setattr(blacklist, 'send_to_discord_audit', mock.Mock())
     api = mock.Mock()
+    monkeypatch.setattr(hooks, 'prepare_online_steam_identity', lambda *_: {'steam_id': steam, 'eos_id': eos})
     api.perma_ban.return_value = True
     assert hooks.ban_if_blacklisted(api, eos, 'synthetic', verified_steam_id=steam) == (True, True)
     assert api.perma_ban.call_args.kwargs['player_id'] == eos
     assert action_guard.pending_players(3, 'BlacklistEnforcement') == set()
+
+
+def test_hllv_connect_roster_lookup_does_not_block_other_blacklist_writes(database, existing_blacklist, monkeypatch):
+    from contextlib import contextmanager
+    from rcon import hooks
+
+    eos, steam = '0123456789abcdef0123456789abcdef', '76561198036685843'
+    record_id, _, _ = existing_blacklist
+    with database() as session, session.begin():
+        entry = session.get(BlacklistRecord, record_id)
+        entry.player.player_id = steam
+        entry.blacklist.servers = 4
+        session.add(PlayerID(player_id=eos))
+    @contextmanager
+    def session_scope():
+        with database() as session:
+            yield session
+    entered, release = Event(), Event()
+    def slow_prepare(*_):
+        entered.set()
+        assert release.wait(10)
+        return {'steam_id': steam, 'eos_id': eos}
+    monkeypatch.setattr(hooks, 'enter_session', session_scope)
+    monkeypatch.setattr(hooks, 'get_server_number', lambda: 3)
+    monkeypatch.setattr(hooks, 'prepare_online_steam_identity', slow_prepare)
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', mock.Mock())
+    api = mock.Mock()
+    api.perma_ban.return_value = True
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        worker = executor.submit(hooks.ban_if_blacklisted, api, eos, 'synthetic', steam)
+        assert entered.wait(10)
+        writer = executor.submit(queue, database, b'unrelated synthetic command', 4)
+        try:
+            assert writer.result(timeout=2) == 1
+        finally:
+            release.set()
+        assert worker.result(timeout=10) == (True, True)
+    assert api.perma_ban.call_count == 1
+
+
+def test_connect_reconciliation_is_deduplicated_across_workers(database):
+    steam = '76561198036685843'
+    start = datetime.now(timezone.utc)
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results = list(executor.map(lambda _: journal.enqueue_connect_reconciliation(3, steam, 7, start), range(8)))
+    assert sum(results) == 1
+    with database() as session:
+        assert len(session.scalars(select(journal.BlacklistSyncDelivery)).all()) == 1
+
+
+def test_connect_reconciliation_does_not_repeat_recently_completed_delivery(database):
+    steam = '76561198036685843'
+    start = datetime.now(timezone.utc) - timedelta(seconds=1)
+    assert journal.enqueue_connect_reconciliation(3, steam, 7, start)
+    with database() as session, session.begin():
+        delivery = session.scalar(select(journal.BlacklistSyncDelivery))
+        delivery.status = 'done'
+        delivery.updated_at = datetime.now(timezone.utc)
+    assert not journal.enqueue_connect_reconciliation(3, steam, 7, start)
+    with database() as session:
+        assert len(session.scalars(select(journal.BlacklistSyncDelivery)).all()) == 1
+
+
+def test_unavailable_connect_identity_is_queued_then_enforced_once(database, existing_blacklist, monkeypatch):
+    from contextlib import contextmanager, nullcontext
+    from rcon import hooks
+    from rcon.types import GameEnum
+
+    eos, steam = '0123456789abcdef0123456789abcdef', '76561198036685843'
+    record_id, _, _ = existing_blacklist
+    with database() as session, session.begin():
+        entry = session.get(BlacklistRecord, record_id)
+        entry.player.player_id = steam
+        entry.blacklist.servers = 4
+        entry.blacklist.sync = BlacklistSyncMethod.KICK_ONLY
+        session.add(PlayerID(player_id=eos))
+    @contextmanager
+    def session_scope():
+        with database() as session:
+            yield session
+    monkeypatch.setattr(hooks, 'enter_session', session_scope)
+    monkeypatch.setattr(hooks, 'get_server_number', lambda: 3)
+    monkeypatch.setattr(hooks, 'prepare_online_steam_identity', mock.Mock(side_effect=OSError('offline')))
+    monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 3)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', mock.Mock())
+    api = mock.Mock()
+    api.game_profile.game = GameEnum.HLL_VIETNAM
+    api.without_retries.return_value = nullcontext()
+    api.get_all_player_info.return_value = [{'iD': eos, 'eosId': eos, 'steamId': steam,
+                                             'platform': 'EPlatformFamily::Steam'}]
+    api.get_uncached_detailed_player_info.return_value = {'player_id': eos, 'eos_id': eos, 'steam_id': steam,
+                                                           'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
+    api.kick.return_value = True
+    assert hooks.ban_if_blacklisted(api, eos, 'synthetic', steam) == (True, False)
+    api.kick.assert_not_called()
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = api
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'done'
+    assert api.kick.call_count == 1 and api.kick.call_args.kwargs['player_id'] == eos
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                               prepare=receiver._prepare_delivery) == 'empty'
 
 
 def test_hllv_alias_respects_expiry_and_server_scope(database, existing_blacklist, monkeypatch):
