@@ -49,7 +49,9 @@ def test_ended_session_reason_and_retry_rejection_through_api(database, monkeypa
     body = {'delivery_id': row['id'], 'integration_id': namespace, 'decision': 'retry', 'reason': 'synthetic'}
     with mock.patch('rcon.barricade_scan_dispatch.dispatch') as dispatch:
         response = invoke('resolve_barricade_scan_review', 'POST', {'api.can_change_blacklists'}, body)
+    assert response.status_code == 400
     assert json.loads(response.content)['failed'] is True
+    assert 'session ended' in json.loads(response.content)['error']
     dispatch.assert_not_called()
     with database() as session:
         assert session.get(journal.BarricadeScanDelivery, row['id']).status == 'review'
