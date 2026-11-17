@@ -403,8 +403,10 @@ class LogLoop:
 
     def process_logs(self):
         self._drain_session_events()
+        observation = self._start_session_journal_observation()
         started = time.perf_counter()
         logs = self.rcon.get_structured_logs(since_min_ago=self.GET_LOGS_SINCE_MIN)
+        observation = self._finish_session_log_poll(observation)
         logger.info(
             "RCON log fetch completed in %.3fs (%d logs)",
             time.perf_counter() - started,
@@ -436,7 +438,7 @@ class LogLoop:
             if line:
                 self.process_hooks(line)
         self._drain_session_events()
-        self._publish_session_journal_observation()
+        self._publish_session_journal_observation(observation)
 
     def _drain_session_events(self):
         # A retry must never rerun the general hooks, which can send messages
@@ -466,23 +468,47 @@ class LogLoop:
             # attempt, including when PostgreSQL is temporarily unavailable.
             logger.exception("Unable to process queued session events; will retry")
 
-    def _publish_session_journal_observation(self):
-        """Best-effort experimental backlog observation, never a log watermark."""
+    def _start_session_journal_observation(self):
         if os.getenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS') != '1':
+            return None
+        try:
+            from rcon.player_presence import database_scope, redis_time
+            red = get_redis_client(global_pool=True)
+            return (red, database_scope(os.environ['HLL_DB_URL']), redis_time(red))
+        except Exception as exc:
+            self._log_journal_observation_error(exc)
+            return None
+
+    def _finish_session_log_poll(self, observation):
+        if observation is None:
+            return None
+        try:
+            from rcon.player_presence import redis_time
+            red, scope, started = observation
+            return (red, scope, started, redis_time(red))
+        except Exception as exc:
+            self._log_journal_observation_error(exc)
+            return None
+
+    def _publish_session_journal_observation(self, observation):
+        """Best-effort local backlog observation, never a log watermark."""
+        if observation is None:
             return
         try:
-            from rcon.player_presence import database_scope
             from rcon.session_journal_observation import publish
-            publish(get_redis_client(global_pool=True), self.session_journal,
-                    scope=database_scope(os.environ['HLL_DB_URL']), server_number=self.session_server_number)
+            red, scope, started, finished = observation
+            publish(red, self.session_journal, scope=scope, server_number=self.session_server_number,
+                    poll_started_at=started, poll_finished_at=finished)
         except Exception as exc:
-            # This optional observation must not stop the log loop or expose
-            # Redis/database URLs or player identifiers in its error message.
-            now = time.monotonic()
-            last = getattr(self, '_journal_observation_error_at', None)
-            if last is None or now - last >= 300:
-                logger.warning('Session journal observation unavailable (%s)', type(exc).__name__)
-                self._journal_observation_error_at = now
+            self._log_journal_observation_error(exc)
+
+    def _log_journal_observation_error(self, exc):
+        # Never expose Redis/database URLs or player IDs in this message.
+        now = time.monotonic()
+        last = getattr(self, '_journal_observation_error_at', None)
+        if last is None or now - last >= 300:
+            logger.warning('Session journal observation unavailable (%s)', type(exc).__name__)
+            self._journal_observation_error_at = now
 
     def get_detailed_players(self) -> GetDetailedPlayers:
         started = time.perf_counter()
