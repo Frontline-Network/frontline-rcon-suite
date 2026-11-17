@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from functools import cmp_to_key
 
 from dateutil import parser
-from sqlalchemy import and_, case, func, literal, or_, text
+from sqlalchemy import BigInteger, and_, case, cast, func, literal, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, contains_eager, joinedload, selectinload
 from sqlalchemy.sql.functions import ReturnTypeFromArgs
@@ -312,6 +312,16 @@ def _current_session_summary(sess, player_database_ids, server_number):
     if not player_database_ids:
         return {}
 
+    # New session rows carry the actual connect instant. A delayed replay can
+    # otherwise make an older connection appear newer merely because its row
+    # was inserted later. Legacy rows lack an absolute event time; retain their
+    # previous UTC creation-time fallback without reinterpreting local starts.
+    if sess.get_bind().dialect.name == "sqlite":
+        created_us = cast(func.strftime("%s", PlayerSession.created), BigInteger) * 1_000_000
+    else:
+        created_us = cast(func.extract("epoch", PlayerSession.created) * 1_000_000, BigInteger)
+    session_order = func.coalesce(PlayerSession.start_event_us, created_us)
+
     ranked_sessions = (
         sess.query(
             PlayerSession.player_id_id.label("player_id_id"),
@@ -328,7 +338,7 @@ def _current_session_summary(sess, player_database_ids, server_number):
                 partition_by=PlayerSession.player_id_id,
                 order_by=(
                     case((PlayerSession.server_number == server_number, 0), else_=1),
-                    PlayerSession.created.desc(), PlayerSession.id.desc(),
+                    session_order.desc(), PlayerSession.id.desc(),
                 ),
             )
             .label("session_rank"),
