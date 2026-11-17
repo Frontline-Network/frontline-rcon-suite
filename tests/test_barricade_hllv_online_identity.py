@@ -204,6 +204,35 @@ def test_edit_from_kick_only_to_ban_targets_live_verified_eos():
     api.remove_perma_ban.assert_not_called()
 
 
+@pytest.mark.parametrize('old_servers,old_id,new_id,old_hours,new_hours,expected', [
+    ([4], 1, 1, 2, 2, True),   # Newly applicable on this server.
+    ([4], 1, 2, 2, 3, False),  # An unrelated, existing top record.
+    (None, 1, 1, 2, 2, False), # The same effective kick-only record.
+    (None, 1, 2, 3, 2, True),  # Removing the formerly higher restriction.
+    (None, 1, 2, 2, 3, False), # The old restriction was lower priority.
+])
+def test_kick_only_changes_only_act_on_newly_effective_restrictions(
+        old_servers, old_id, new_id, old_hours, new_hours, expected):
+    api = api_with_players([row()])
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api
+    now = datetime.now(timezone.utc)
+    old = {'id': old_id, 'player_id': STEAM, 'created_at': now,
+           'expires_at': now + timedelta(hours=old_hours),
+           'blacklist': {'sync': BlacklistSyncMethod.KICK_ONLY, 'servers': old_servers}}
+    updated = record(expires=now + timedelta(hours=new_hours), created=now, record_id=new_id)
+    with patch.object(blacklist, 'SERVER_NUMBER', 3), \
+         patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
+         patch.object(blacklist, 'is_player_blacklisted', side_effect=[updated, None]), \
+         patch.object(blacklist, 'apply_blacklist_punishment', return_value=True) as apply:
+        handler.handle_edit_record(SimpleNamespace(old_record=old), {'steam_id': STEAM, 'eos_id': EOS})
+    assert apply.call_count == int(expected)
+    if expected:
+        assert apply.call_args.kwargs['player_id'] == EOS
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
+
+
 def test_list_edit_checks_all_identities_before_any_game_action():
     api = api_with_players([row()])
     handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
