@@ -90,6 +90,7 @@ def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id
                    ((BlacklistSyncDelivery.status.in_(('queued', 'sending', 'review'))) |
                     ((BlacklistSyncDelivery.status == 'done') &
                      (BlacklistSyncDelivery.updated_at >= started_at))))).all()
+        overlap = False
         for row in rows:
             try:
                 existing = BlacklistCommand.decode(row.command)
@@ -97,15 +98,26 @@ def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id
                         and existing.payload.get('record_id') == record_id
                         and existing.payload.get('player_id') == player_id):
                     return False
+                if existing.command == BlacklistCommandType.CREATE_RECORD:
+                    overlap |= existing.payload.get('player_id') == player_id
+                elif existing.command in (BlacklistCommandType.EDIT_RECORD, BlacklistCommandType.DELETE_RECORD):
+                    overlap |= existing.payload['old_record']['player_id'] == player_id
+                elif existing.command == BlacklistCommandType.EXPIRE_ALL:
+                    overlap |= existing.payload['player_id'] == player_id
+                elif existing.command in (BlacklistCommandType.EDIT_LIST, BlacklistCommandType.DELETE_LIST):
+                    # A list change may include this player. The worker may
+                    # already have passed its overlap check before this new
+                    # intent was enqueued, so do not replay it automatically.
+                    overlap = True
             except Exception:
-                # Unknown queued work remains an ordering barrier for the
-                # normal journal processor; never silently discard it.
-                continue
+                overlap = True
         command = BlacklistCommand(command=BlacklistCommandType.CREATE_RECORD, server_mask=mask,
                                    payload={'player_id': player_id, 'record_id': record_id})
         now = datetime.now(timezone.utc)
         session.add(BlacklistSyncDelivery(server_number=server_number, command=command.encode(),
-                                          status='queued', created_at=now, updated_at=now))
+                                          status='review' if overlap else 'queued',
+                                          reason='overlapping blacklist changes require reconciliation before connect action' if overlap else None,
+                                          created_at=now, updated_at=now))
         return True
 
 
