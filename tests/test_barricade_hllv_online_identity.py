@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from rcon import blacklist
-from rcon.barricade_hllv_identity import prepare_online_steam_identity
+from rcon.barricade_hllv_identity import prepare_online_identity_snapshot, prepare_online_steam_identity
 from rcon.types import BlacklistSyncMethod, GameEnum
 from rcon.game.hllv.player_adapter import HLLVPlayerInfoAdapter
 from rcon.game.player_adapter import PlayerResponseAdapterError
@@ -93,6 +93,27 @@ def test_unknown_second_row_does_not_hide_ambiguous_steam_identity():
     api = api_with_players([row(), row(platform='', steam=None)])
     with pytest.raises(ValueError, match='Unknown online platform'):
         prepare_online_steam_identity(api, STEAM)
+
+
+def test_list_roster_preserves_steam_and_console_without_guessing():
+    console = 'fedcba9876543210fedcba9876543210'
+    api = api_with_players([row(), row(console, 'EPlatformFamily::PS5', None)])
+    assert prepare_online_identity_snapshot(api) == {
+        EOS: {'steam_id': STEAM, 'platform': 'eplatformfamily::steam'},
+        console: {'steam_id': None, 'platform': 'eplatformfamily::ps5'},
+    }
+
+
+@pytest.mark.parametrize('rows', [
+    [row(), row()],
+    [row(), row('fedcba9876543210fedcba9876543210')],
+    [row(platform='EPlatformFamily::PS5')],
+    [row(platform='', steam=None)],
+    [row(steam=None)],
+])
+def test_list_roster_rejects_ambiguous_identities(rows):
+    with pytest.raises(ValueError):
+        prepare_online_identity_snapshot(api_with_players(rows))
 
 
 def test_inconsistent_platform_for_same_steam_id_fails_closed():
@@ -262,6 +283,38 @@ def test_list_edit_checks_all_identities_before_any_game_action():
         with pytest.raises(blacklist.HLLVSteamBanOwnershipUnverified):
             handler.handle_edit_list(payload)
     sync.assert_not_called()
+
+
+@pytest.mark.parametrize('changed,uncertain', [(True, False), (False, True)])
+def test_list_reconciliation_preflights_all_and_does_not_retry_partial_failure(changed, uncertain):
+    console = 'fedcba9876543210fedcba9876543210'
+    api = api_with_players([])
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api
+    entries = [SimpleNamespace(id=1, blacklist_id=7), SimpleNamespace(id=2, blacklist_id=7)]
+    payload = SimpleNamespace(new_blacklist={'id': 7})
+    prepared = {'kick_list_players': {
+        EOS: {'steam_id': STEAM, 'platform': 'eplatformfamily::steam'},
+        console: {'steam_id': None, 'platform': 'eplatformfamily::ps5'},
+    }}
+    def details(player_id):
+        if player_id == EOS:
+            return {'player_id': EOS, 'eos_id': EOS, 'steam_id': STEAM,
+                    'platform': 'EPlatformFamily::Steam', 'name': 'synthetic'}
+        return {'player_id': console, 'eos_id': 'wrong' if changed else console, 'steam_id': None,
+                'platform': 'EPlatformFamily::PS5', 'name': 'synthetic'}
+    api.get_uncached_detailed_player_info.side_effect = details
+    with patch.object(blacklist, 'SERVER_NUMBER', 3), \
+         patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
+         patch.object(blacklist, 'get_blacklist', return_value=SimpleNamespace(
+             sync=BlacklistSyncMethod.KICK_ONLY, servers=4)), \
+         patch.object(blacklist, 'is_player_blacklisted', side_effect=[entries[0], None, entries[1]]), \
+         patch.object(blacklist, 'apply_blacklist_punishment', side_effect=[True, None]) as apply:
+        with pytest.raises(RuntimeError):
+            handler._apply_new_hllv_kick_list(payload, prepared)
+    assert apply.call_count == (2 if uncertain else 0)
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
 
 
 def test_list_delete_and_expire_do_not_guess_steam_ban_ownership():
