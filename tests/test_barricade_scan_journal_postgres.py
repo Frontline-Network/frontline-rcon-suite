@@ -19,6 +19,10 @@ from rcon.models import PlayerID, PlayerSession
 from tests.test_blacklist_sync_journal_postgres import database
 
 
+async def verified(_session_id, _player_id):
+    return True
+
+
 def prepare(database, monkeypatch):
     journal.BarricadeScanDelivery.__table__.create(database.kw['bind'])
     journal.BarricadeScanIntegration.__table__.create(database.kw['bind'])
@@ -270,10 +274,10 @@ def test_async_dispatch_confirmed_and_unconfirmed_are_not_repeated(database, mon
             if player_id == 'failed':
                 raise OSError('synthetic response loss')
             return None
-        assert await adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 1, 'eos', 'HLLV', sender, credential_id=1) == 'done'
-        assert await adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 1, 'eos', 'HLLV', sender, credential_id=1) == 'already_recorded'
-        assert await adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 2, 'failed', 'HLLV', sender, credential_id=1) == 'review'
-        assert await adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 2, 'failed', 'HLLV', sender, credential_id=1) == 'already_recorded'
+        assert await adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 1, 'eos', 'HLLV', sender, verify_session=verified, credential_id=1) == 'done'
+        assert await adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 1, 'eos', 'HLLV', sender, verify_session=verified, credential_id=1) == 'already_recorded'
+        assert await adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 2, 'failed', 'HLLV', sender, verify_session=verified, credential_id=1) == 'review'
+        assert await adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 2, 'failed', 'HLLV', sender, verify_session=verified, credential_id=1) == 'already_recorded'
         assert seen == [('eos', 'HLLV'), ('failed', 'HLLV')]
     asyncio.run(run())
     with database() as session:
@@ -291,9 +295,9 @@ def test_old_connection_cannot_dispatch_after_key_rotation(database, monkeypatch
         seen = []
         async def sender(*args):
             seen.append(args)
-        assert await adapter.dispatch(3, namespace, 10, 'synthetic', 'HLLV', sender, credential_id=1) == 'unauthorized'
+        assert await adapter.dispatch(3, namespace, 10, 'synthetic', 'HLLV', sender, verify_session=verified, credential_id=1) == 'unauthorized'
         assert seen == []
-        assert await adapter.dispatch(3, namespace, 10, 'synthetic', 'HLLV', sender, credential_id=2) == 'done'
+        assert await adapter.dispatch(3, namespace, 10, 'synthetic', 'HLLV', sender, verify_session=verified, credential_id=2) == 'done'
         assert seen == [('synthetic', 'HLLV')]
     asyncio.run(run())
 
@@ -305,7 +309,7 @@ def test_revoked_key_does_not_create_or_send_a_delivery(database, monkeypatch):
         async def sender(*_args):
             pytest.fail('revoked key must not send')
         assert await adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab',
-                                      10, 'synthetic', 'HLLV', sender, credential_id=1) == 'unauthorized'
+                                      10, 'synthetic', 'HLLV', sender, verify_session=verified, credential_id=1) == 'unauthorized'
     asyncio.run(run())
     with database() as session:
         assert session.scalars(select(journal.BarricadeScanDelivery)).all() == []
@@ -370,7 +374,7 @@ def test_async_dispatch_cancellation_before_lock_does_not_send(database, monkeyp
         async def sender(*args):
             called.append(args)
         with journal.delivery_scope(3, 'integration:01234567-89ab-4def-8012-0123456789ab'):
-            task = asyncio.create_task(adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 3, 'eos', 'HLLV', sender, credential_id=1))
+            task = asyncio.create_task(adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 3, 'eos', 'HLLV', sender, verify_session=verified, credential_id=1))
             await asyncio.sleep(0.2)
             task.cancel()
             with pytest.raises(asyncio.CancelledError):
@@ -389,12 +393,12 @@ def test_async_dispatch_cancellation_during_send_keeps_lock_until_result(databas
         async def sender(*args):
             started.set()
             await release.wait()
-        first = asyncio.create_task(adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 4, 'eos', 'HLLV', sender, credential_id=1))
+        first = asyncio.create_task(adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 4, 'eos', 'HLLV', sender, verify_session=verified, credential_id=1))
         await asyncio.wait_for(started.wait(), 5)
         first.cancel()
         with pytest.raises(asyncio.CancelledError):
             await first
-        second = asyncio.create_task(adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 4, 'eos', 'HLLV', sender, credential_id=1))
+        second = asyncio.create_task(adapter.dispatch(3, 'integration:01234567-89ab-4def-8012-0123456789ab', 4, 'eos', 'HLLV', sender, verify_session=verified, credential_id=1))
         await asyncio.sleep(0.25)
         assert not second.done()
         release.set()
@@ -402,3 +406,25 @@ def test_async_dispatch_cancellation_during_send_keeps_lock_until_result(databas
     asyncio.run(run())
     with database() as session:
         assert session.scalar(select(journal.BarricadeScanDelivery.status)) == 'done'
+
+
+def test_dispatch_rechecks_session_after_waiting_for_lock(database, monkeypatch):
+    prepare_adapter(database, monkeypatch)
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    async def run():
+        online = True
+        seen = []
+        async def presence(_session_id, _player_id):
+            return online
+        async def sender(*args):
+            seen.append(args)
+        with journal.delivery_scope(3, namespace):
+            task = asyncio.create_task(adapter.dispatch(3, namespace, 5, 'eos', 'HLLV', sender,
+                                                        credential_id=1, verify_session=presence))
+            await asyncio.sleep(0.2)
+            online = False
+        assert await asyncio.wait_for(task, 5) == 'deferred'
+        assert seen == []
+    asyncio.run(run())
+    with database() as session:
+        assert session.scalars(select(journal.BarricadeScanDelivery)).all() == []

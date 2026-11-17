@@ -34,9 +34,11 @@ def test_durable_scan_via_authenticated_websocket(database, monkeypatch, acknowl
                     return await self.send_request(ServerRequestType.SCAN_PLAYERS,
                                                    {'player_ids': [player_id], 'game': game})
                 async def start():
+                    async def verified(_session_id, _player_id):
+                        return True
                     value = await adapter.dispatch(3, self.scope['barricade_scan_namespace'],
                         101, 'synthetic-eos', 'HLLV', sender,
-                        credential_id=self.scope['barricade_credential_id'], timeout=0.5)
+                        credential_id=self.scope['barricade_credential_id'], verify_session=verified, timeout=0.5)
                     await result.put(value)
                 asyncio.create_task(start())
 

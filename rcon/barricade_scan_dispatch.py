@@ -28,16 +28,13 @@ async def scan_once(server_number, integration_id, game, sender, is_present, *, 
             return
         for session_id, player_id in rows:
             after_id = session_id
-            # A live player ID alone does not prove this particular history
-            # session is current: an old orphan may have the same player ID.
-            if await is_present(session_id, player_id) is not True:
-                continue
-            await dispatch(server_number, integration_id, session_id, player_id, game, sender, credential_id=credential_id)
+            await dispatch(server_number, integration_id, session_id, player_id, game, sender,
+                           credential_id=credential_id, verify_session=is_present)
         if len(rows) < page_size:
             return
 
 
-async def dispatch(server_number, integration_id, session_id, player_id, game, sender, *, credential_id, timeout=15):
+async def dispatch(server_number, integration_id, session_id, player_id, game, sender, *, credential_id, verify_session, timeout=15):
     """Send once; a lost response leaves durable review, never an auto-retry."""
     loop = asyncio.get_running_loop()
     cancelled = Event()
@@ -50,6 +47,20 @@ async def dispatch(server_number, integration_id, session_id, player_id, game, s
                     or key_is_live(credential_id) is not True):
                 return 'unauthorized'
             journal.recover_interrupted(server_number, integration_id)
+            # Verify after acquiring the send lock: a previous snapshot may be
+            # stale after waiting for another request or a credential rotation.
+            presence = None
+            try:
+                presence = Context().run(asyncio.run_coroutine_threadsafe,
+                                         verify_session(session_id, player_id), loop)
+                if presence.result(timeout=timeout) is not True:
+                    return 'deferred'
+            except Exception:
+                if presence is not None:
+                    presence.cancel()
+                return 'deferred'
+            if cancelled.is_set():
+                return 'cancelled'
             delivery_id = journal.reserve(server_number, integration_id, session_id, player_id, game)
             if delivery_id is None:
                 return 'already_recorded'
