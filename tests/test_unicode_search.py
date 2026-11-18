@@ -99,6 +99,22 @@ def test_blacklist_search_preserves_non_latin_terms(database):
         assert total == 0 and not records
 
 
+def test_blacklist_pages_have_deterministic_order_when_timestamps_match(database):
+    with Session(database) as sess:
+        from rcon.models import BlacklistRecord
+        records = sess.query(BlacklistRecord).all()
+        for record in records:
+            record.created_at = datetime(2020, 1, 1)
+        sess.commit()
+        expected = sorted((record.id for record in records), reverse=True)
+        observed = []
+        for page in range(1, len(records) + 1):
+            result, total = search_blacklist_records(sess, page_size=1, page=page)
+            assert total == len(records)
+            observed.extend(record.id for record in result)
+        assert observed == expected
+
+
 def test_sort_normalization_does_not_drop_other_scripts():
     assert player_history.remove_accent("玩家Élodie") == "玩家Elodie"
 

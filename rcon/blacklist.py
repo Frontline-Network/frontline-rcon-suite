@@ -290,7 +290,7 @@ def search_blacklist_records(
         select(BlacklistRecord)
         .join(BlacklistRecord.player)
         .filter(*filters)
-        .order_by(BlacklistRecord.created_at.desc())
+        .order_by(BlacklistRecord.created_at.desc(), BlacklistRecord.id.desc())
         .limit(page_size)
         .offset((page - 1) * page_size)
         .options(selectinload(BlacklistRecord.blacklist))
