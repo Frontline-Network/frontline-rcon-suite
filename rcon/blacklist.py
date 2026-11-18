@@ -1409,9 +1409,12 @@ class BlacklistCommandHandler:
                 if (not isinstance(details, dict) or details.get('player_id') != eos
                         or details.get('eos_id') != eos
                         or str(details.get('platform') or '').strip().lower() != identity['platform']
-                        or (steam and verified_steam_id(self.rcon, eos, details) != steam)
-                        or (not steam and details.get('steam_id'))):
+                        or (steam and verified_steam_id(self.rcon, eos, details) != steam)):
                     raise HLLVSteamIdentityUnverified('Player identity changed before list reconciliation')
+                if not steam:
+                    opaque_id = details.get('steam_id')
+                    if (None if opaque_id == '' else opaque_id) != identity.get('platform_id'):
+                        raise HLLVSteamIdentityUnverified('Console identity changed before list reconciliation')
                 return details
 
             actions = []
