@@ -11,6 +11,7 @@ import logging
 import os
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -177,3 +178,51 @@ def test_public_repopulate_reports_success_when_missing_game_id_is_skipped():
 
     assert asyncio.run(namespace['repopulate'](Peer())) == (2, 2)
     assert created == [(1, 'synthetic-record', 'HLLV')]
+
+
+def test_public_sync_can_delete_reference_created_after_a_complete_snapshot():
+    root = os.getenv('BARRICADE_PUBLIC_SOURCE_DIR')
+    if not root:
+        pytest.skip('requires pinned public Barricade integration sources')
+    data = (Path(root) / 'crcon.py').read_bytes().replace(b'\r\n', b'\n')
+    assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == '783e5fe6d52071d68b652e39a1fd8c91990d4b22'
+    tree = ast.parse(data.decode())
+    klass = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CRCONIntegration')
+    function = next(n for n in klass.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'synchronize')
+    function.decorator_list = []
+    module = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), function], type_ignores=[])
+    ast.fix_missing_locations(module)
+    db = SimpleNamespace(delete=AsyncMock())
+    reference = SimpleNamespace(remote_id='new-ban')
+    peer_references = []
+
+    class Factory:
+        def begin(self):
+            return self
+        async def __aenter__(self):
+            return db
+        async def __aexit__(self, *args):
+            pass
+
+    async def community(*args):
+        return object()
+
+    async def local_bans(*args, **kwargs):
+        for item in peer_references:
+            yield item
+
+    async def snapshot(game):
+        # This is a complete, consistent snapshot taken before a new ban.
+        # Another peer request then persists that ban's reference before the
+        # synchronization queries its local references.
+        peer_references.append(reference)
+        return {}
+
+    ns = {'session_factory': Factory(), 'get_community_by_id': community,
+          'schemas': SimpleNamespace(CommunityRef=SimpleNamespace(model_validate=lambda x: x)),
+          'Game': ('HLLV',), 'get_bans_by_integration': local_bans}
+    exec(compile(module, '<pinned-barricade-sync>', 'exec'), ns)
+    peer = SimpleNamespace(config=SimpleNamespace(id=20, community_id=10),
+                           get_blacklist_bans=snapshot, logger=logging.getLogger('synthetic-barricade'))
+    asyncio.run(ns['synchronize'](peer))
+    db.delete.assert_awaited_once_with(reference)
