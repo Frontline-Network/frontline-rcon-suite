@@ -72,6 +72,10 @@ def prepare_online_identity_snapshot(rcon) -> dict:
                 raise ValueError('Unexpected Steam identity on non-Steam platform')
             steam = None
         players[eos] = {'steam_id': steam, 'platform': platform}
+        if steam is None and row.get('steamId'):
+            # Keep the console identifier for the subsequent identity recheck.
+            # It never participates in Steam-ID blacklist lookups.
+            players[eos]['platform_id'] = row['steamId']
     return players
 
 

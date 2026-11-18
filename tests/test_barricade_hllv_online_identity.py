@@ -446,6 +446,35 @@ def test_list_reconciliation_preflights_all_and_does_not_retry_partial_failure(c
     api.remove_perma_ban.assert_not_called()
 
 
+@pytest.mark.parametrize('live_platform_id', ['console-42', 'changed', None, STEAM])
+def test_kick_list_revalidates_console_id_but_only_looks_up_eos(live_platform_id):
+    api = api_with_players([row(EOS, 'EPlatformFamily::PS5', 'console-42')])
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api
+    prepared = {'kick_list_players': prepare_online_identity_snapshot(api)}
+    api.get_uncached_detailed_player_info.return_value = {
+        'player_id': EOS, 'eos_id': EOS, 'platform': 'EPlatformFamily::PS5',
+        'steam_id': live_platform_id, 'name': 'synthetic',
+    }
+    entry = SimpleNamespace(blacklist_id=7)
+    with (
+        patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext('db')),
+        patch.object(blacklist, 'get_blacklist', return_value=SimpleNamespace(
+            sync=BlacklistSyncMethod.KICK_ONLY, servers=None)),
+        patch.object(blacklist, 'is_player_blacklisted', return_value=entry) as lookup,
+        patch.object(blacklist, 'apply_blacklist_punishment', return_value=True) as apply,
+    ):
+        payload = SimpleNamespace(new_blacklist={'id': 7})
+        if live_platform_id == 'console-42':
+            handler._apply_new_hllv_kick_list(payload, prepared)
+            apply.assert_called_once_with(api, entry, player_id=EOS, player_name='synthetic')
+        else:
+            with pytest.raises(blacklist.HLLVSteamIdentityUnverified):
+                handler._apply_new_hllv_kick_list(payload, prepared)
+            apply.assert_not_called()
+        lookup.assert_called_once_with('db', EOS)
+
+
 def test_list_delete_and_expire_do_not_guess_steam_ban_ownership():
     api = api_with_players([row()])
     handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
