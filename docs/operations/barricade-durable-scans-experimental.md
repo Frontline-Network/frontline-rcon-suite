@@ -97,10 +97,11 @@ handler returns the coroutine from `get_bans` without awaiting it. The optional
 offline router contract test verifies the pinned Git blob and reproduces that
 the handler returns a nested coroutine. With FastAPI 0.136.3, Starlette 1.1.0
 and Pydantic 2.13.4 from the public lockfile, a synthetic ASGI route using that
-handler and a dictionary response model produces HTTP 500; a control that awaits
-the nested coroutine produces HTTP 200. Dependencies and data were synthetic;
-the actual Barricade response model and externally operated deployment were not
-exercised. Do not assume that possessing a token alone makes the community-scoped
+handler and both a dictionary model and the pinned public paginator instantiated
+with a synthetic dictionary item type produces HTTP 500; a control that awaits
+the nested coroutine produces HTTP 200. Data were synthetic and empty; the actual
+ban item type and externally operated deployment were not exercised. Do not assume
+that possessing a token alone makes the community-scoped
 snapshot endpoint usable. The unrestricted
 `/bans` endpoint has a different permission scope and must not be assumed to
 be available to a community token.
@@ -124,7 +125,8 @@ Run `pytest tests/test_barricade_public_peer_contract.py` in an
 isolated test environment. The test checks the pinned Git blob hashes and
 substitutes the alert callback; it does not contact Barricade or Discord.
 For the separate community API probe, set `BARRICADE_PEER_BANS_SOURCE` to the
-pinned `barricade/web/routers/bans.py` and run
+pinned `barricade/web/routers/bans.py`, and `BARRICADE_PEER_PAGINATOR_SOURCE`
+to the pinned `barricade/web/paginator.py`, and run
 `pytest tests/test_barricade_public_bans_router_contract.py`.
 
 With the new consumer, an explicit `frontline_integration` connection is

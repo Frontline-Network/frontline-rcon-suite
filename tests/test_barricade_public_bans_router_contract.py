@@ -43,7 +43,8 @@ def test_pinned_community_bans_endpoint_returns_nested_coroutine():
 
 
 @pytest.mark.parametrize("await_nested, expected_status", [(False, 500), (True, 200)])
-def test_pinned_community_bans_handler_with_fastapi_response_model(await_nested, expected_status):
+@pytest.mark.parametrize("model_kind", ["dictionary", "public_paginator"])
+def test_pinned_community_bans_handler_with_fastapi_response_model(await_nested, expected_status, model_kind):
     fastapi = pytest.importorskip("fastapi")
     path = os.environ.get("BARRICADE_PEER_BANS_SOURCE")
     if not path:
@@ -58,13 +59,31 @@ def test_pinned_community_bans_handler_with_fastapi_response_model(await_nested,
     for arg in (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs):
         arg.annotation = None
     module = ast.fix_missing_locations(ast.Module(body=[node], type_ignores=[]))
-    get_bans = AsyncMock(return_value={"synthetic": True})
+    get_bans = AsyncMock(return_value={"limit": 100, "items": [], "links": {"prev": None, "next": None}})
     namespace = {"get_bans": get_bans}
     exec(compile(module, "<pinned-barricade-bans-router>", "exec"), namespace)
     pending = []
     app = fastapi.FastAPI()
+    response_model = dict
+    if model_kind == "public_paginator":
+        paginator_path = os.environ.get("BARRICADE_PEER_PAGINATOR_SOURCE")
+        if not paginator_path:
+            pytest.skip("requires the pinned public Barricade paginator")
+        paginator_source = Path(paginator_path).read_bytes().replace(b"\r\n", b"\n")
+        paginator_blob = b"blob " + str(len(paginator_source)).encode() + b"\0" + paginator_source
+        assert hashlib.sha1(paginator_blob).hexdigest() == "c5c3ea7c9177acd608e2db4e1d585783585db18c"
+        from typing import Generic, TypeVar
+        from pydantic import AnyHttpUrl, BaseModel
+        classes = [item for item in ast.parse(paginator_source.decode()).body
+                   if isinstance(item, ast.ClassDef) and item.name in {"PaginatedResponseLinks", "PaginatedResponse"}]
+        assert len(classes) == 2
+        public_types = {"__name__": "pinned_barricade_paginator", "BaseModel": BaseModel,
+                        "Generic": Generic, "M": TypeVar("M"), "AnyHttpUrl": AnyHttpUrl}
+        exec(compile(ast.fix_missing_locations(ast.Module(body=classes, type_ignores=[])),
+                     "<pinned-barricade-paginator>", "exec"), public_types)
+        response_model = public_types["PaginatedResponse"][dict]
 
-    @app.get("/synthetic", response_model=dict)
+    @app.get("/synthetic", response_model=response_model)
     async def endpoint():
         result = await namespace["get_own_community_bans"](
             object(), object(), SimpleNamespace(community_id=7), integration_id=9
