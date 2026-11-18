@@ -1293,7 +1293,8 @@ class BlacklistCommandHandler:
         eos_id = prepared.get('eos_id')
         if eos_id is None:
             if top_record.blacklist.sync == BlacklistSyncMethod.BAN_IMMEDIATELY:
-                raise HLLVSteamIdentityUnverified('No verified online EOS identity for immediate ban')
+                if top_record.expires_at is None or _blacklist_remaining_hours(top_record) >= 1:
+                    raise HLLVSteamIdentityUnverified('No verified online EOS identity for immediate ban')
             logger.info('Steam restriction retained for the next verified HLLV connection')
             return
         eos_record = is_player_blacklisted(sess, player_id=eos_id)
