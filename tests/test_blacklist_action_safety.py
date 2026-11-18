@@ -47,6 +47,7 @@ def test_blacklist_reports_server_result(monkeypatch, state, method, accepted):
     audit = Mock()
     monkeypatch.setattr(blacklist, "get_ban_state_from_record", lambda _: state)
     monkeypatch.setattr(blacklist, "round_timedelta_to_hours", lambda _: 1)
+    monkeypatch.setattr(blacklist, "_blacklist_remaining_hours", lambda _: 1)
     monkeypatch.setattr(blacklist, "send_to_discord_audit", audit)
     result = blacklist.apply_blacklist_punishment(server, record, player_id="id", player_name="name")
     assert result is accepted
@@ -113,7 +114,67 @@ def test_live_temporary_blacklist_record_accepts_legacy_utc_expiry(monkeypatch, 
     monkeypatch.setattr(blacklist, "get_ban_state_from_record", lambda _: blacklist.BanState.TEMP)
     monkeypatch.setattr(blacklist, "send_to_discord_audit", Mock())
     assert blacklist.apply_blacklist_punishment(server, record, player_id="synthetic", player_name="test") is True
-    assert server.temp_ban.call_args.kwargs["duration_hours"] == 2
+    assert server.temp_ban.call_args.kwargs["duration_hours"] == 1
+
+
+@pytest.mark.parametrize('sync', list(BlacklistSyncMethod))
+def test_short_temporary_record_kicks_online_in_every_sync_mode(monkeypatch, sync):
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
+                             blacklist=Blacklist(name='test', sync=sync))
+    monkeypatch.setattr(record, 'get_formatted_reason', lambda: 'reason')
+    server = Mock()
+    server.kick.return_value = True
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', Mock())
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='id', player_name='name') is True
+    server.kick.assert_called_once()
+    server.temp_ban.assert_not_called()
+
+
+@pytest.mark.parametrize('sync', [BlacklistSyncMethod.BAN_IMMEDIATELY, BlacklistSyncMethod.BAN_ON_CONNECT])
+def test_short_ban_offline_is_deferred_and_never_removes_unrelated_ban(monkeypatch, sync):
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
+                             blacklist=Blacklist(name='test', sync=sync))
+    server = Mock()
+    server.get_detailed_player_info.side_effect = blacklist.HLLCommandFailedError('offline')
+    blacklist.synchronize_ban(server, 'id', record, blacklist.BanState.TEMP)
+    server.kick.assert_not_called()
+    server.temp_ban.assert_not_called()
+    server.remove_temp_ban.assert_not_called()
+
+
+@pytest.mark.parametrize('minutes, expected', [(61, 1), (119, 1), (121, 2), (179, 2)])
+def test_temporary_list_ban_rounds_down(monkeypatch, minutes, expected):
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(minutes=minutes),
+                             blacklist=Blacklist(name='test', sync=BlacklistSyncMethod.BAN_IMMEDIATELY))
+    monkeypatch.setattr(record, 'get_formatted_reason', lambda: 'reason')
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', Mock())
+    server = Mock()
+    server.temp_ban.return_value = True
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='id', player_name='name') is True
+    assert server.temp_ban.call_args.kwargs['duration_hours'] == expected
+    server.kick.assert_not_called()
+
+
+def test_crossing_hour_boundary_reserves_kick_instead_of_ban(monkeypatch):
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
+                             blacklist=Blacklist(name='test', sync=BlacklistSyncMethod.BAN_IMMEDIATELY))
+    monkeypatch.setattr(record, 'get_formatted_reason', lambda: 'reason')
+    server = Mock()
+    server.kick.return_value = True
+    actions = []
+    reserve = blacklist.action_guard.reserve
+    def crosses_boundary(*args):
+        actions.append(args[-1])
+        token = reserve(*args)
+        if args[-1] == 'ban':
+            record.expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+        return token
+    monkeypatch.setattr(blacklist.action_guard, 'reserve', crosses_boundary)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', Mock())
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='id', player_name='name') is True
+    assert actions == ['ban', 'kick']
+    server.kick.assert_called_once()
+    server.temp_ban.assert_not_called()
 
 
 @pytest.mark.parametrize('result', [None, TimeoutError('synthetic lost response')])
