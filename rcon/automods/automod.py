@@ -100,7 +100,11 @@ def _periodic_warning_identity(rcon, aplayer, mods):
                 stages.append((mod.action_author, len(warnings)))
         if not stages:
             return None
-        parts = ['periodic-warning-v1', scope, sorted(stages)]
+        # A different restricted role is a different violation for the level
+        # and seeding rules. No-Leader and Solo-Tank concern the squad itself.
+        role = aplayer.role if any(isinstance(mod, (LevelThresholdsAutomod, SeedingRulesAutomod))
+                                   for mod in _originating_moderators(mods, aplayer)) else None
+        parts = ['periodic-warning-v1', scope, sorted(stages), role]
         key = hashlib.sha256(json.dumps(parts, separators=(',', ':')).encode()).hexdigest()
         return int(datetime.now(timezone.utc).timestamp() * 1000), key, scope
     except Exception:
@@ -108,20 +112,31 @@ def _periodic_warning_identity(rcon, aplayer, mods):
         return None
 
 
+def release_observed_periodic_warning(mod, player_id, team, squad, game_state):
+    """Release only a positively observed rule reset for an identified player."""
+    if player_id not in getattr(mod, '_periodic_warning_candidates', set()):
+        return
+    scope = _periodic_warning_scope(player_id, team, squad, game_state)
+    if scope:
+        try:
+            action_guard.release_periodic_scope(int(get_server_number()), player_id, mod.action_author, scope)
+        except Exception:
+            logger.exception('Unable to release resolved periodic warning')
+
+
 def get_punitions_to_apply(rcon, moderators) -> PunitionsToApply:
     logger.debug("Getting team info")
     team_view = rcon.get_team_view(compact=True)
     gamestate = rcon.get_gamestate()
     punitions_to_apply = PunitionsToApply()
-    scoped_players = {}
     for mod in moderators:
-        if isinstance(mod, NoLeaderAutomod):
+        if isinstance(mod, (NoLeaderAutomod, NoSoloTankAutomod, LevelThresholdsAutomod, SeedingRulesAutomod)):
             try:
-                scoped_players[mod.action_author] = action_guard.periodic_warning_players(
+                mod._periodic_warning_candidates = action_guard.periodic_warning_players(
                     int(get_server_number()), mod.action_author)
             except Exception:
                 logger.exception('Unable to load scoped periodic warnings for reset')
-                scoped_players[mod.action_author] = set()
+                mod._periodic_warning_candidates = set()
 
     for team in ["allies", "axis"]:
         if not team_view.get(team):
@@ -143,22 +158,19 @@ def get_punitions_to_apply(rcon, moderators) -> PunitionsToApply:
 
         for squad_name, squad in team_view[team]["squads"].items():
             for mod in moderators:
-                if isinstance(mod, NoLeaderAutomod) and squad.get('has_leader') is True:
+                if ((isinstance(mod, NoLeaderAutomod) and squad.get('has_leader') is True)
+                    or (isinstance(mod, NoSoloTankAutomod)
+                        and ((squad.get('type') is not None and squad.get('type') != 'armor')
+                             or len({p.get('player_id') for p in squad.get('players', [])
+                                     if isinstance(p.get('player_id'), str) and p['player_id'].strip()}) > 1))):
                     # Only players positively observed in a squad with a leader
                     # have ended this particular violation. Missing roster rows
                     # are not interpreted as proof of departure.
                     for player in squad.get('players', []):
                         player_id = player.get('player_id')
-                        if (not isinstance(player_id, str) or not player_id.strip()
-                                or player_id not in scoped_players.get(mod.action_author, set())):
+                        if not isinstance(player_id, str) or not player_id.strip():
                             continue
-                        scope = _periodic_warning_scope(player_id, team, squad_name, gamestate)
-                        if scope:
-                            try:
-                                action_guard.release_periodic_scope(int(get_server_number()), player_id,
-                                                                    mod.action_author, scope)
-                            except Exception:
-                                logger.exception('Unable to release resolved periodic warning')
+                        release_observed_periodic_warning(mod, player_id, team, squad_name, gamestate)
                 punitions_to_apply.merge(
                     mod.punitions_to_apply(
                         team_view, squad_name, team, squad, gamestate
@@ -183,7 +195,8 @@ def _do_punitions(
         periodic_event = None
         origins = _originating_moderators(mods, aplayer)
         scoped_warning = (event is None and method == ActionMethod.MESSAGE and not aplayer.details.dry_run
-                          and bool(origins) and all(isinstance(mod, NoLeaderAutomod) for mod in origins))
+                          and bool(origins) and all(isinstance(mod, (NoLeaderAutomod, NoSoloTankAutomod,
+                              LevelThresholdsAutomod, SeedingRulesAutomod)) for mod in origins))
         if scoped_warning:
             periodic_event = _periodic_warning_identity(rcon, aplayer, mods)
             if periodic_event is None:
@@ -310,7 +323,10 @@ def _do_punitions(
                 )
         except WarningRejected:
             logger.warning("Game server rejected automod warning")
-            close_unsuccessful_attempt('Game server rejected the warning')
+            if periodic_event is not None:
+                settle_guard('rejected')
+            else:
+                close_unsuccessful_attempt('Game server rejected the warning')
         except PunishmentRejected:
             logger.warning("Game server rejected automod punishment")
             close_unsuccessful_attempt('Game server rejected the punishment')
