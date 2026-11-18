@@ -49,7 +49,9 @@ def test_hllv_eos_ids_do_not_trigger_windows_store_actions(monkeypatch, action, 
 
 @pytest.mark.parametrize('game', [GameEnum.HLL_WW2, GameEnum.HLL_VIETNAM])
 @pytest.mark.parametrize('platform', [None, '', 'xbl', 'xsx', 'ps5', 'EPlatform::Xbox_SeriesX',
-                                       'EPlatform::PS5', 'EPlatform::PC_EGS', 'unknown'])
+                                       'EPlatform::PS5', 'EPlatform::PC_EGS', 'unknown',
+                                       'Unexpected::PC_WinGDK', 'Xbox::WinGDK',
+                                       'Unknown::EPlatformFamily::WinGDK'])
 def test_ambiguous_or_non_windows_platform_never_triggers_actions(monkeypatch, game, platform):
     config = SimpleNamespace(enabled=True, action=WindowsStoreIdActionType.perma_ban,
                              player_message='reason', audit_message='{name}', audit_message_author='admin',
