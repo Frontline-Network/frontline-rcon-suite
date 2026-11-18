@@ -12,9 +12,23 @@ import redis as redis_package
 from rcon.seed_vip import notifications
 
 
+class FakeRedisWithCompletion(fakeredis.FakeStrictRedis):
+    """Test double for fake Redis installations without the Lua extra."""
+
+    def eval(self, script, key_count, key, field, expected, action, queued):
+        assert script == notifications.COMPLETE_CLAIM and key_count == 1
+        if self.hget(key, field) != expected.encode():
+            return 0
+        if action == 'delete':
+            self.hdel(key, field)
+        else:
+            self.hset(key, field, queued)
+        return 1
+
+
 def test_concurrent_consumers_send_a_notice_at_most_once(monkeypatch):
     monkeypatch.setattr(notifications.time, "sleep", lambda _: None)
-    redis = fakeredis.FakeStrictRedis()
+    redis = FakeRedisWithCompletion()
     api = Mock()
     api.without_retries.side_effect = nullcontext
     api.message_player.return_value = True
@@ -49,7 +63,7 @@ def test_concurrent_consumers_send_a_notice_at_most_once(monkeypatch):
 
 def test_clear_during_rejected_send_does_not_resurrect_notice(monkeypatch):
     monkeypatch.setattr(notifications.time, "sleep", lambda _: None)
-    redis = fakeredis.FakeStrictRedis()
+    redis = FakeRedisWithCompletion()
     queue = notifications.NotificationOutbox(redis, "test")
     entered = threading.Event()
     resume = threading.Event()
@@ -120,37 +134,17 @@ def test_real_redis_clear_during_rejected_send_is_not_resurrected(real_redis, mo
         queue.clear()
 
 
-@pytest.mark.parametrize("replacement_mode", ["new_generation", "identical_aba"])
+@pytest.mark.parametrize("mode", ["new_generation", "unrelated", "clear"])
 @pytest.mark.parametrize("accepted", [False, True])
-def test_real_redis_replacement_during_watched_requeue_is_preserved(real_redis, monkeypatch, replacement_mode, accepted):
+def test_real_redis_atomic_completion_handles_concurrent_changes(real_redis, monkeypatch, mode, accepted):
     monkeypatch.setattr(notifications.time, "sleep", lambda _: None)
-    watched_read, resume = threading.Event(), threading.Event()
-    should_block = threading.Event()
-
-    class WatchedPipeline:
-        def __init__(self, inner):
-            self.inner = inner
-
-        def __enter__(self):
-            self.inner.__enter__()
-            return self
-
-        def __exit__(self, *args):
-            return self.inner.__exit__(*args)
-
-        def __getattr__(self, name):
-            return getattr(self.inner, name)
-
-        def hget(self, *args):
-            value = self.inner.hget(*args)
-            if should_block.is_set():
-                watched_read.set()
-                assert resume.wait(5)
-            return value
+    entered, resume = threading.Event(), threading.Event()
 
     class HookedRedis:
-        def pipeline(self, **kwargs):
-            return WatchedPipeline(real_redis.pipeline(**kwargs))
+        def eval(self, *args):
+            entered.set()
+            assert resume.wait(5)
+            return real_redis.eval(*args)
 
         def __getattr__(self, name):
             return getattr(real_redis, name)
@@ -158,42 +152,114 @@ def test_real_redis_replacement_during_watched_requeue_is_preserved(real_redis, 
     queue = notifications.NotificationOutbox(HookedRedis(), "isolated-" + uuid4().hex)
     api = Mock()
     api.without_retries.side_effect = nullcontext
-
-    def reject(**_kwargs):
-        should_block.set()
-        return False
-
-    api.message_player.side_effect = reject
+    api.message_player.return_value = accepted
     try:
-        queue.enqueue({"synthetic-player": "old notice"}, api)
+        queue.enqueue({"synthetic-player": "notice"}, api)
         ident = next(iter(real_redis.hgetall(queue.key)))
         worker = threading.Thread(target=queue.flush, args=(api,))
         worker.start()
         try:
-            assert watched_read.wait(5)
-            claimed = real_redis.hget(queue.key, ident)
-            payload = json.loads(claimed)
-            assert payload['claim_token']
-            if replacement_mode == "new_generation":
-                payload['claim_token'] = uuid4().hex
-                replacement = json.dumps(payload).encode()
+            assert entered.wait(5)
+            claimed = json.loads(real_redis.hget(queue.key, ident))
+            assert claimed["claim_token"]
+            if mode == "new_generation":
+                replacement = {**claimed, "claim_token": uuid4().hex}
+                encoded = json.dumps(replacement).encode()
+                real_redis.hset(queue.key, ident, encoded)
+            elif mode == "unrelated":
+                real_redis.hset(queue.key, "other", "unrelated")
             else:
-                # Even an exact delete/reinsert after WATCH must invalidate
-                # the transaction, not restore the stale queued state.
-                replacement = claimed
                 real_redis.delete(queue.key)
-            real_redis.hset(queue.key, ident, replacement)
-            if replacement_mode == "identical_aba":
-                real_redis.expire(queue.key, notifications.NOTICE_TTL)
         finally:
             resume.set()
             worker.join(timeout=5)
         assert not worker.is_alive()
-        assert real_redis.hget(queue.key, ident) == replacement
-        assert real_redis.ttl(queue.key) > 0
         api.message_player.assert_called_once()
+        if mode == "new_generation":
+            assert real_redis.hget(queue.key, ident) == encoded
+            assert real_redis.ttl(queue.key) > 0
+        elif mode == "clear":
+            assert not real_redis.exists(queue.key)
+        else:
+            assert real_redis.hget(queue.key, "other") == b"unrelated"
+            assert real_redis.ttl(queue.key) > 0
+            actual = real_redis.hget(queue.key, ident)
+            if accepted:
+                assert actual is None
+            else:
+                queued = json.loads(actual)
+                assert queued["state"] == "queued"
+                assert "claim_token" not in queued
     finally:
         queue.clear()
+
+@pytest.mark.parametrize("execute_first", [False, True])
+@pytest.mark.parametrize("accepted", [False, True])
+def test_real_redis_completion_reply_loss_does_not_duplicate(real_redis, monkeypatch, execute_first, accepted):
+    monkeypatch.setattr(notifications.time, "sleep", lambda _: None)
+
+    class FailingRedis:
+        fail = True
+
+        def eval(self, *args):
+            if self.fail:
+                self.fail = False
+                if execute_first:
+                    real_redis.eval(*args)
+                raise redis_package.ConnectionError("synthetic lost response")
+            return real_redis.eval(*args)
+
+        def __getattr__(self, name):
+            return getattr(real_redis, name)
+
+    queue = notifications.NotificationOutbox(FailingRedis(), "isolated-" + uuid4().hex)
+    api = Mock()
+    api.without_retries.side_effect = nullcontext
+    api.message_player.return_value = accepted
+    try:
+        queue.enqueue({"synthetic-player": "notice"}, api)
+        queue.flush(api)
+        queue.flush(api)
+        api.message_player.assert_called_once()
+        values = list(real_redis.hgetall(queue.key).values())
+        if execute_first and accepted:
+            assert not values
+        else:
+            assert len(values) == 1
+            item = json.loads(values[0])
+            assert item['state'] == ('queued' if execute_first else 'sending')
+            assert real_redis.ttl(queue.key) > 0
+    finally:
+        queue.clear()
+
+
+def test_real_redis_simultaneous_completion_only_one_wins(real_redis):
+    key = "seed-test:" + uuid4().hex
+    try:
+        for _ in range(50):
+            original = json.dumps({"state": "sending", "claim_token": uuid4().hex})
+            real_redis.hset(key, "same", original)
+            real_redis.expire(key, 120)
+            barrier = threading.Barrier(3)
+            results = []
+
+            def complete(action):
+                barrier.wait()
+                results.append(real_redis.eval(notifications.COMPLETE_CLAIM, 1,
+                                               key, "same", original, action, '{"state":"queued"}'))
+
+            workers = [threading.Thread(target=complete, args=(action,)) for action in ("delete", "requeue")]
+            for worker in workers:
+                worker.start()
+            barrier.wait()
+            for worker in workers:
+                worker.join(timeout=5)
+                assert not worker.is_alive()
+            assert sorted(results) == [0, 1]
+            if real_redis.exists(key):
+                assert real_redis.ttl(key) > 0
+    finally:
+        real_redis.delete(key)
 
 
 def test_real_redis_new_generation_before_requeue_is_preserved(real_redis, monkeypatch):
