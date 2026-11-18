@@ -16,7 +16,7 @@ from api.management.commands import barricade_scan_integration as command
 def options(**overrides):
     return {'action': 'register', 'actor': 'operator', 'reason': 'synthetic setup',
             'credential_id': 4, 'integration_id': None, 'expected_credential_id': None,
-            'legacy_scanner_stopped': True, **overrides}
+            'legacy_scanner_stopped': True, 'dedicated_key_confirmed': True, **overrides}
 
 
 def test_registration_uses_verified_key_and_emits_only_public_identifier():

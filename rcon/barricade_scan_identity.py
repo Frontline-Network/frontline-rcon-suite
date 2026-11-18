@@ -42,13 +42,18 @@ def integration_namespace(query_string: bytes, *, server_number: int, credential
     from rcon import barricade_scan_journal as journal
 
     ident = parse_integration_id(query_string)
-    if ident is None or type(server_number) is not int or not 1 <= server_number <= 32:
+    # A supplied invalid query is never silently converted to key-only mode.
+    if query_string not in (b'', None) and ident is None:
+        return None
+    if type(server_number) is not int or not 1 <= server_number <= 32:
         return None
     if type(credential_id) is not int or credential_id <= 0:
         return None
     with journal.get_session_maker()() as session:
-        binding = session.scalar(select(journal.BarricadeScanIntegration).where(
+        stmt = select(journal.BarricadeScanIntegration).where(
             journal.BarricadeScanIntegration.server_number == server_number,
-            journal.BarricadeScanIntegration.integration_id == ident,
-            journal.BarricadeScanIntegration.credential_id == credential_id))
-        return f'integration:{ident}' if binding is not None else None
+            journal.BarricadeScanIntegration.credential_id == credential_id)
+        if ident is not None:
+            stmt = stmt.where(journal.BarricadeScanIntegration.integration_id == ident)
+        binding = session.scalar(stmt)
+        return f'integration:{binding.integration_id}' if binding is not None else None

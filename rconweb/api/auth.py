@@ -83,7 +83,7 @@ def get_barricade_api_key_id(raw_api_key: str, user_id: int) -> int | None:
 def get_barricade_scan_namespace(query_string: bytes, credential_id: int | None) -> str | None:
     from rcon.barricade_scan_identity import integration_namespace, parse_integration_id
     from rcon.utils import get_server_number
-    if credential_id is None or parse_integration_id(query_string) is None:
+    if credential_id is None:
         return None
     return integration_namespace(query_string, server_number=int(get_server_number()), credential_id=credential_id)
 
@@ -193,6 +193,8 @@ class APITokenAuthMiddleware:
                 scope['barricade_credential_id'] = await get_barricade_api_key_id(raw_api_key, user_id)
             scope['barricade_scan_namespace'] = await get_barricade_scan_namespace(
                 scope.get('query_string', b''), scope['barricade_credential_id'])
+            scope['barricade_registered_namespace'] = await get_barricade_scan_namespace(
+                b'', scope['barricade_credential_id'])
 
         return await self.app(scope, receive, send)
 

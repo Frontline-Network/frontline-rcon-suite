@@ -46,6 +46,7 @@ def upgrade():
         sa.Column('integration_id', sa.String(36), primary_key=True),
         sa.Column('credential_id', sa.Integer, nullable=False),
         sa.Column('registered_at_us', sa.BigInteger, nullable=False),
+        sa.UniqueConstraint('server_number', 'credential_id', name='uq_barricade_scan_server_credential'),
         sa.CheckConstraint('server_number BETWEEN 1 AND 32', name='ck_barricade_integration_server'),
         sa.CheckConstraint('credential_id > 0', name='ck_barricade_integration_credential'),
     )

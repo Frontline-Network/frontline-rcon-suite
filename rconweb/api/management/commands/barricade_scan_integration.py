@@ -26,6 +26,8 @@ class Command(BaseCommand):
         parser.add_argument('--expected-credential-id', type=int)
         parser.add_argument('--legacy-scanner-stopped', action='store_true',
                             help='Confirm every old scanner is stopped and cannot reconnect')
+        parser.add_argument('--dedicated-key-confirmed', action='store_true',
+                            help='Confirm the credential is used by exactly this Barricade integration')
 
     def handle(self, *args, **options):
         try:
@@ -36,6 +38,8 @@ class Command(BaseCommand):
             raise CommandError('Active superuser required')
         if not current_credential_is_authorized(options['credential_id']):
             raise CommandError('The new key is missing or lacks Barricade permissions')
+        if not options['dedicated_key_confirmed']:
+            raise CommandError('A dedicated Barricade key must be confirmed')
         if options['action'] == 'register':
             if not options['legacy_scanner_stopped']:
                 raise CommandError('Stop all legacy scanners before registering the cutover')

@@ -186,6 +186,8 @@ def test_key_rotation_preserves_registered_namespace_and_rejects_other_keys(data
     assert before_registration <= registered_at <= time.time_ns() // 1000
     namespace = integration_namespace(query, server_number=3, credential_id=1)
     assert namespace == f'integration:{peer}'
+    assert integration_namespace(b'', server_number=3, credential_id=1) == namespace
+    assert integration_namespace(b'frontline_integration=invalid', server_number=3, credential_id=1) is None
     assert integration_namespace(query, server_number=3, credential_id=2) is None
     assert integration_namespace(query, server_number=4, credential_id=1) is None
     for invalid in (None, 0, -1, True, '1'):

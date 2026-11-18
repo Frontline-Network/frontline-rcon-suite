@@ -66,7 +66,7 @@ async def scan_once(server_number, integration_id, game, sender, is_present, *, 
             if await asyncio.to_thread(journal.is_manually_reconstructed_session, server_number, session_id):
                 await record_review(session_id, player_id, 'reconstructed_session')
                 continue
-            if not await asyncio.to_thread(journal.live_connect_after_cutover,
+            if delivery_status != 'queued' and not await asyncio.to_thread(journal.live_connect_after_cutover,
                                            server_number, integration_id, session_id, player_id, boundary):
                 if is_observed is not None and await is_observed(session_id, player_id) is True:
                     await record_review(session_id, player_id, 'missing_live_connect')

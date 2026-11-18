@@ -157,6 +157,7 @@ class BarricadeScanIntegration(Base):
     # sessions were previously scanned or that game clocks are synchronized.
     registered_at_us: Mapped[int] = mapped_column(BigInteger, nullable=False)
     __table_args__ = (
+        UniqueConstraint('server_number', 'credential_id', name='uq_barricade_scan_server_credential'),
         CheckConstraint('server_number BETWEEN 1 AND 32', name='ck_barricade_integration_server'),
         CheckConstraint('credential_id > 0', name='ck_barricade_integration_credential'),
     )
