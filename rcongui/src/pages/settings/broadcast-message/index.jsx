@@ -703,6 +703,7 @@ const BroadcastCampaignPage = () => {
 
   const handleTest = async (campaign) => {
     if (campaign.delivery_mode === "player_message") {
+      setTestResult(null);
       setTestCampaign(campaign);
       setSelectedPlayerId("");
       setLoadingPlayers(true);
@@ -913,6 +914,9 @@ const BroadcastCampaignPage = () => {
       >
         <DialogTitle>{t("settings.campaigns.selectTestPlayer")}</DialogTitle>
         <DialogContent>
+          {testResult?.severity === "error" && (
+            <Alert severity="error" sx={{ mt: 1 }}>{testResult.text}</Alert>
+          )}
           <TextField
             select
             fullWidth
