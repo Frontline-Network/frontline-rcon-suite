@@ -77,11 +77,35 @@ class NotificationOutbox:
                 if pipe.hget(self.key, ident) != raw:
                     return False
                 item["state"] = "sending"
+                # Differentiate separate reservations even when their other
+                # payload fields and hash entry ID happen to be identical.
+                item["claim_token"] = uuid4().hex
                 pipe.multi()
                 pipe.hset(self.key, ident, json.dumps(item))
                 pipe.execute()
                 return True
         except WatchError:
+            return False
+
+    def _complete_claim(self, ident, original_raw, claimed, item, accepted):
+        """Change only the reservation that produced this server response."""
+        expected = claimed.encode() if isinstance(original_raw, bytes) else claimed
+        try:
+            with self.redis.pipeline(transaction=True) as pipe:
+                pipe.watch(self.key)
+                if pipe.hget(self.key, ident) != expected:
+                    return False
+                pipe.multi()
+                if accepted:
+                    pipe.hdel(self.key, ident)
+                else:
+                    queued = {**item, 'state': 'queued'}
+                    queued.pop('claim_token', None)
+                    pipe.hset(self.key, ident, json.dumps(queued))
+                pipe.execute()
+                return True
+        except WatchError:
+            # A change after reading can include a byte-identical replacement.
             return False
 
     def flush(self, rcon):
@@ -130,14 +154,14 @@ class NotificationOutbox:
                 item['due'] = now + RETRY_SECONDS
                 if not self._claim(ident, raw, item):
                     continue
+                claimed = json.dumps(item)
                 result = send_notice(rcon, item['player_id'], item['message'])
                 if result is True:
                     self.redis.hdel(self.key, ident)
                     delivered += 1
                 elif result is False:
                     # The server explicitly rejected this attempt: a retry is safe.
-                    item['state'] = 'queued'
-                    self.redis.hset(self.key, ident, json.dumps(item))
+                    self._complete_claim(ident, raw, claimed, item, accepted=False)
             pending = self.redis.hlen(self.key)
             if entries:
                 logger.info("Seed VIP notices: delivered=%s pending=%s expired=%s",
