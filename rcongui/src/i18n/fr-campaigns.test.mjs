@@ -19,7 +19,7 @@ test("French campaigns cover the English catalog and retain all template variabl
     }
   };
   compare(en.settings.campaigns, campaignsFr, "settings.campaigns");
-  assert.equal(count, 182);
+  assert.equal(count, 184);
   assert.match(campaignsFr.vipLifecycle.testModeHelp, /manuellement.*envoyé/);
   assert.match(campaignsFr.broadcastDisclaimer, /ne garantit pas/);
   assert.match(campaignsFr.testNow, /Envoyer/);
