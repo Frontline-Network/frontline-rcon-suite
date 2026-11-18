@@ -92,6 +92,15 @@ without proving the peer's complete state is unsafe: the peer deletes its
 own local reference when its remote ID is absent. The read-only comparison
 helper classifies overlaps and discrepancies, but does not establish record
 ownership or authorize changes.
+The pinned CRCON peer also reads Frontline records with offset pagination and
+`exclude_expired=1`. In an isolated contract test using its actual retrieval
+and synchronization methods, removing an unrelated earlier record between
+pages shifted an active record past the next offset. The peer then deleted its
+local reference to that still-present record. The unchanged-list control kept
+the reference. This does not establish what happened on the deployed service,
+but means even a correctly acquired peer-side snapshot is not sufficient while
+the peer's Frontline reads can race with list changes. A tie-breaker in sorting
+alone does not prevent this shift. No real bans or external requests were used.
 To repeat the optional offline contract test, obtain the four public files at
 that revision (`integrations/custom/websocket.py`, `integrations/custom/integration.py`,
 `integrations/crcon/integration.py`, and `integrations/websocket.py`). Set

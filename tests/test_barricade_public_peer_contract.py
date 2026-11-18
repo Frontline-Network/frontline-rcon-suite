@@ -264,6 +264,57 @@ def test_public_crcon_missing_remote_record_deletes_local_reference():
     peer.expire_ban.assert_not_awaited()
 
 
+@pytest.mark.parametrize('delete_between_pages', [False, True])
+def test_public_crcon_pagination_can_hide_existing_record_after_deletion(delete_between_pages):
+    directory = os.environ.get('BARRICADE_PEER_URL_SOURCES')
+    if not directory:
+        pytest.skip('requires pinned public Barricade URL sources')
+    crcon = Path(directory) / 'crcon.py'
+    blob = '783e5fe6d52071d68b652e39a1fd8c91990d4b22'
+    get_bans = public_method(crcon, blob, 'CRCONIntegration', 'get_blacklist_bans', {
+        'game_switch': lambda game, hll, hllv: hllv if game == Game.HLLV else hll,
+    })
+    records = [{'id': i, 'is_active': True} for i in range(101, 0, -1)]
+    async def request(method, endpoint, data):
+        assert method == 'GET' and endpoint == '/get_blacklist_records'
+        if data['page'] == 2 and delete_between_pages:
+            records.pop(0)  # unrelated earlier record removed between requests
+        size, page = data['page_size'], data['page']
+        return {'result': {'records': records[(page - 1) * size:page * size], 'total': len(records)}}
+    peer = SimpleNamespace(config=SimpleNamespace(hll_banlist_id='classic', hllv_banlist_id='vietnam'),
+                           _make_request=request)
+    observed = asyncio.run(get_bans(peer, Game.HLLV))
+    assert any(record['id'] == 1 for record in records)
+    assert ('1' not in observed) is delete_between_pages
+
+    @asynccontextmanager
+    async def fake_session():
+        yield db
+    db = SimpleNamespace(delete=AsyncMock())
+    reference = SimpleNamespace(remote_id='1')
+    observed_ids = tuple(observed)
+    async def local_bans(*_args, **_kwargs):
+        yield reference
+        for record_id in observed_ids:
+            if record_id != reference.remote_id:
+                yield SimpleNamespace(remote_id=record_id)
+    async def community(*_args, **_kwargs):
+        return SimpleNamespace()
+    sync_peer = SimpleNamespace(config=SimpleNamespace(id=1, community_id=2),
+        get_blacklist_bans=AsyncMock(return_value=observed),
+        expire_ban=AsyncMock(), logger=logging.getLogger('synthetic-crcon'))
+    synchronize = public_method(crcon, blob, 'CRCONIntegration', 'synchronize', {
+        'session_factory': SimpleNamespace(begin=fake_session), 'get_community_by_id': community,
+        'schemas': SimpleNamespace(CommunityRef=SimpleNamespace(model_validate=lambda value: value)),
+        'Game': (Game.HLLV,), 'get_bans_by_integration': local_bans,
+    })
+    asyncio.run(synchronize(sync_peer))
+    if delete_between_pages:
+        db.delete.assert_awaited_once_with(reference)
+    else:
+        db.delete.assert_not_awaited()
+
+
 def test_public_forwarding_uses_vietnam_game_id_as_eos():
     path = os.environ.get('BARRICADE_PEER_FORWARDING_SOURCE')
     if not path:
