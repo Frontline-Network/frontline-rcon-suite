@@ -53,6 +53,16 @@ class MemoryRedis:
     def delete(self, key):
         self.data.pop(key, None)
 
+    def eval(self, script, key_count, key, field, expected, action, queued):
+        assert script == notifications.COMPLETE_CLAIM and key_count == 1
+        if self.hget(key, field) != expected:
+            return 0
+        if action == 'delete':
+            self.hdel(key, field)
+        else:
+            self.hset(key, field, queued)
+        return 1
+
 
 class NoticeTests(unittest.TestCase):
     def setUp(self):
