@@ -95,10 +95,13 @@ ownership or authorize changes.
 In the pinned public Barricade bans router, the async community-scoped list
 handler returns the coroutine from `get_bans` without awaiting it. The optional
 offline router contract test verifies the pinned Git blob and reproduces that
-the handler returns a nested coroutine. This raises an additional compatibility
-concern for the response model; the actual externally operated deployment and
-its HTTP behavior have not been tested. Do not assume that possessing a token
-alone makes the community-scoped snapshot endpoint usable. The unrestricted
+the handler returns a nested coroutine. With FastAPI 0.136.3, Starlette 1.1.0
+and Pydantic 2.13.4 from the public lockfile, a synthetic ASGI route using that
+handler and a dictionary response model produces HTTP 500; a control that awaits
+the nested coroutine produces HTTP 200. Dependencies and data were synthetic;
+the actual Barricade response model and externally operated deployment were not
+exercised. Do not assume that possessing a token alone makes the community-scoped
+snapshot endpoint usable. The unrestricted
 `/bans` endpoint has a different permission scope and must not be assumed to
 be available to a community token.
 The pinned CRCON peer also reads Frontline records with offset pagination and
