@@ -9,6 +9,8 @@ for (const sample of [
   test(`requires a reason and warns before scan retry in ${sample.language}`, async ({ page }) => {
     const errors = collectRuntimeErrors(page);
     const main = await openDemoPage(page, "/records/blacklists/manage", { language: sample.language, query: { demo_barricade_review: 1, demo_barricade_cause: "activation_ambiguous" } });
+    await expect(main.getByTestId("barricade-scan-review")).toHaveCount(0);
+    await main.getByRole("button", { name: sample.title, exact: true }).click();
     const panel = main.getByTestId("barricade-scan-review");
     await expect(panel.getByText(sample.title)).toBeVisible();
     await expect(panel.getByText(sample.disabled)).toBeVisible();
@@ -28,11 +30,14 @@ for (const sample of [
   test(`explains previous-session review in ${sample.language}`, async ({ page }) => {
     const main = await openDemoPage(page, "/records/blacklists/manage", { language: sample.language,
       query: { demo_barricade_review: 1, demo_barricade_cause: "activation_before" } });
+    await main.getByRole("button", { name: sample.title, exact: true }).click();
     await expect(main.getByTestId("barricade-scan-review").getByText(sample.before, { exact: false })).toBeVisible();
   });
   test(`does not offer automatic retry for ended session in ${sample.language}`, async ({ page }) => {
     const main = await openDemoPage(page, "/records/blacklists/manage", { language: sample.language,
       query: { demo_barricade_review: 1, demo_barricade_cause: "session_ended_before_scan" } });
+    await expect(main.getByTestId("barricade-scan-review")).toHaveCount(0);
+    await main.getByRole("button", { name: sample.title, exact: true }).click();
     const panel = main.getByTestId("barricade-scan-review");
     await panel.getByRole("combobox", { name: sample.decision }).click();
     await expect(page.getByRole("option", { name: sample.retry })).toHaveCount(0);
@@ -41,6 +46,8 @@ for (const sample of [
     const recover = { de: "Versandzustand prüfen", en: "Check delivery state", fr: "Vérifier l’état de l’envoi" }[sample.language];
     const main = await openDemoPage(page, "/records/blacklists/manage", { language: sample.language,
       query: { demo_barricade_review: 1, demo_barricade_status: "sending" } });
+    await expect(main.getByTestId("barricade-scan-review")).toHaveCount(0);
+    await main.getByRole("button", { name: sample.title, exact: true }).click();
     const panel = main.getByTestId("barricade-scan-review");
     await panel.getByRole("combobox", { name: sample.decision }).click();
     await expect(page.getByRole("option", { name: sample.retry })).toHaveCount(0);

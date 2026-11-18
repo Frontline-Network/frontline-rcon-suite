@@ -35,6 +35,16 @@ export default function BarricadeScanReview() {
   const has = (key) => permissions?.is_superuser || permissions?.permissions?.some((entry) => entry.permission === key);
   const canInspect = !!has("can_view_blacklists");
   const canReview = !!has("can_change_blacklists");
+  const [open, setOpen] = useState(false);
+  if (!canInspect) return null;
+  return <Box>
+    <Button aria-expanded={open} onClick={() => setOpen(!open)}>{t("barricadeScanReview.title")}</Button>
+    {open && <ScanJournal canReview={canReview} />}
+  </Box>;
+}
+
+function ScanJournal({ canReview }) {
+  const { t } = useTranslation();
   const [journal, setJournal] = useState({ total: 0, results: [] });
   const [status, setStatus] = useState("checking");
   const [error, setError] = useState("");
@@ -58,7 +68,7 @@ export default function BarricadeScanReview() {
       setError("");
     } catch { setError(t("barricadeScanReview.loadError")); }
   }, [t, offset]);
-  useEffect(() => { if (canInspect) load(); }, [canInspect, load]);
+  useEffect(() => { load(); }, [load]);
   async function save(row, decision, reason) {
     setBusy(true);
     try {
@@ -70,7 +80,6 @@ export default function BarricadeScanReview() {
     } catch { setError(t("barricadeScanReview.saveError")); }
     finally { setBusy(false); }
   }
-  if (!canInspect) return null;
   return <Box component="section" data-testid="barricade-scan-review" sx={{ border: 1, borderColor: "divider", p: 2 }}>
     <Stack spacing={1.5}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>

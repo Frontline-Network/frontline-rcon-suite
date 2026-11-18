@@ -24,6 +24,7 @@ test("operator can inspect an interrupted send through the real API and PostgreS
     return route.continue();
   });
   const main = await openDemoPage(page, "/records/blacklists/manage", { language: "en" });
+  await main.getByRole("button", { name: "Review Barricade scans", exact: true }).click();
   const panel = main.getByTestId("barricade-scan-review");
   await expect(panel.getByText("The scan may still be sending.", { exact: false })).toBeVisible({ timeout: 30_000 });
   await panel.getByRole("combobox", { name: "Decision" }).click();
