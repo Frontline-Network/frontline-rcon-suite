@@ -10,12 +10,13 @@ from contextlib import contextmanager
 from functools import cmp_to_key
 
 from dateutil import parser
-from sqlalchemy import BigInteger, and_, case, cast, func, literal, or_, text
+from sqlalchemy import and_, case, func, literal, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, contains_eager, joinedload, selectinload
 from sqlalchemy.sql.functions import ReturnTypeFromArgs
 
 from rcon.commands import HLLCommandFailedError
+from rcon.active_session_selection import session_created_microseconds
 from rcon.models import (
     BlacklistRecord,
     LogLine,
@@ -316,10 +317,7 @@ def _current_session_summary(sess, player_database_ids, server_number):
     # otherwise make an older connection appear newer merely because its row
     # was inserted later. Legacy rows lack an absolute event time; retain their
     # previous UTC creation-time fallback without reinterpreting local starts.
-    if sess.get_bind().dialect.name == "sqlite":
-        created_us = cast(func.strftime("%s", PlayerSession.created), BigInteger) * 1_000_000
-    else:
-        created_us = cast(func.extract("epoch", PlayerSession.created) * 1_000_000, BigInteger)
+    created_us = session_created_microseconds(sess)
     session_order = func.coalesce(PlayerSession.start_event_us, created_us)
 
     ranked_sessions = (
