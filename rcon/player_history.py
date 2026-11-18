@@ -18,6 +18,7 @@ from rcon.commands import HLLCommandFailedError
 from rcon.active_session_selection import session_created_microseconds
 from rcon.models import (
     BlacklistRecord,
+    LogLine,
     PlayerAccount,
     PlayerActionState,
     PlayerComment,
@@ -1042,6 +1043,22 @@ def _legacy_session_could_overlap(sess: Session, player: PlayerID, server_number
     ).first() is not None
 
 
+def _legacy_connect_log_candidates(sess: Session, player_id: int, server_number: int, event_us: int):
+    """Find legacy rows with an explicit same-player, same-event log, without linking them."""
+    instant = datetime.datetime.fromtimestamp(event_us / 1_000_000, datetime.timezone.utc).replace(tzinfo=None)
+    margin = datetime.timedelta(days=1)
+    return sess.query(PlayerSession).join(LogLine, and_(
+        LogLine.player1_player_id == PlayerSession.player_id_id,
+        LogLine.server == str(server_number), LogLine.type == 'CONNECTED',
+        LogLine.event_time == PlayerSession.start,
+        LogLine.raw.like(f'%({event_us // 1_000_000})%'),
+    )).filter(PlayerSession.player_id_id == player_id,
+              PlayerSession.server_number == server_number,
+              PlayerSession.start_event_us.is_(None),
+              PlayerSession.start >= instant - margin,
+              PlayerSession.start <= instant + margin).all()
+
+
 def _reconcile_pending_disconnects(sess: Session, player: PlayerID, server_number: int):
     pending_events = (
         sess.query(PendingPlayerDisconnect)
@@ -1201,6 +1218,8 @@ def save_start_player_session(
                         PlayerSession.start == start_time)
                 .first()
             )
+            if legacy_match is None:
+                legacy_match = next(iter(_legacy_connect_log_candidates(sess, player.id, server_number, start_event_us)), None)
             if legacy_match is not None:
                 if sess.get(PendingPlayerConnect, pending_key) is None:
                     sess.add(PendingPlayerConnect(**pending_key, started_at=start_time))

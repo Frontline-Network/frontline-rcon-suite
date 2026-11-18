@@ -203,6 +203,28 @@ def test_postgres_concurrent_disconnects_do_not_guess_between_legacy_and_new(dat
         assert len(session.scalars(select(PendingPlayerDisconnect)).all()) == 1
 
 
+def test_postgres_offset_legacy_connect_can_be_reviewed(database, monkeypatch):
+    monkeypatch.delenv('HLL_SESSION_LEGACY_UTC', raising=False)
+    start = 1_700_000_000
+    wall = datetime.fromtimestamp(start + 3600, timezone.utc).replace(tzinfo=None)
+    with database.begin() as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == 'synthetic-id'))
+        old = PlayerSession(player=player, start=wall, server_number=3)
+        session.add(old)
+        session.flush()
+        old_id = old.id
+        session.add(LogLine(type='CONNECTED', server='3', player1_player_id=player.id,
+                            event_time=wall, raw=f'[0 ms ({start})] CONNECTED fake', weapon='', content=''))
+    run_parallel(lambda: player_history.save_start_player_session('synthetic-id', start, server_number=3))
+    review = session_event_review.list_pending(3)['results']
+    assert len(review) == 1 and [item['id'] for item in review[0]['legacy_candidates']] == [old_id]
+    assert session_event_review.resolve(3, 'synthetic-id', 'connect', start * 1_000_000,
+                                        'link', 'verified source log', 'operator', session_id=old_id)
+    with database() as session:
+        assert session.get(PlayerSession, old_id).start_event_us == start * 1_000_000
+        assert len(session.scalars(select(PlayerSession)).all()) == 1
+
+
 @pytest.mark.skipif(not hasattr(time, "tzset"), reason="process timezone control requires tzset")
 def test_postgres_fall_back_records_absolute_event_duration(database, monkeypatch):
     old_tz = os.environ.get("TZ")
