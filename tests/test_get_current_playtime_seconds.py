@@ -1,6 +1,17 @@
 from datetime import datetime, timedelta, timezone
 from rcon.models import PlayerID, PlayerSession
 
+
+def test_ambiguous_legacy_duration_does_not_reduce_verified_playtime(monkeypatch):
+    monkeypatch.setenv("SERVER_NUMBER", "3")
+    player = PlayerID()
+    player.sessions = [
+        PlayerSession(server_number=3, start_event_us=1_000_000, end_event_us=601_000_000),
+        PlayerSession(server_number=3, start=datetime(2024, 10, 27, 2, 50),
+                      end=datetime(2024, 10, 27, 2, 10)),
+    ]
+    assert player.get_total_playtime_seconds() == 600
+
 def test_get_current_playtime_seconds(monkeypatch):
     monkeypatch.setenv('SERVER_NUMBER', '1')
     now = datetime.now()

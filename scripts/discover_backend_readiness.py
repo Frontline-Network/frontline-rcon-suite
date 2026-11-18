@@ -19,6 +19,26 @@ def run(command: list[str]) -> str:
     return subprocess.run(command, check=True, text=True, stdout=subprocess.PIPE).stdout
 
 
+def verify_running_backends(base: list[str], names: list[str]) -> None:
+    """Probe current containers directly; configured or cached health is insufficient."""
+    for name in names:
+        ids = run(base + ["ps", "--all", "-q", name]).split()
+        if len(ids) != 1:
+            raise ValueError(f"Expected exactly one current container for {name}")
+        details = json.loads(run(["docker", "inspect", ids[0]]))[0]
+        if (not details["State"].get("Running")
+                or (details["Config"].get("Healthcheck") or {}).get("Test") != HEALTHCHECK["test"]):
+            raise ValueError(f"{name} is no longer running with the expected readiness probe")
+        try:
+            subprocess.run(["docker", "exec", ids[0], *HEALTHCHECK["test"][1:]],
+                           check=True, timeout=10)
+        except subprocess.TimeoutExpired as exc:
+            raise ValueError(f"{name} readiness probe timed out") from exc
+        except subprocess.CalledProcessError as exc:
+            raise ValueError(f"{name} readiness probe failed") from exc
+        print(f"{name}: HTTP and WebSocket listeners are ready")
+
+
 def main() -> int:
     root = Path.cwd().resolve(strict=True)
     base = ["docker", "compose", "-f", "compose.yaml"]
@@ -41,7 +61,8 @@ def main() -> int:
         if (details["Config"].get("Healthcheck") or {}).get("Test") != HEALTHCHECK["test"]:
             legacy.append((name, details["Config"].get("Labels") or {}))
     if not legacy:
-        print("All running backends already have the readiness probe; stopped backends were left unchanged.")
+        verify_running_backends(base, running)
+        print("All running backends passed readiness; stopped backends were left unchanged.")
         return 0
 
     configs = set()
@@ -69,6 +90,9 @@ def main() -> int:
     command.append("--apply")
     # The reconciler validates configuration hashes, images, readiness and rollback.
     subprocess.run(command, check=True)
+    # This also probes already-correct services, which the reconciler does
+    # not recreate, using fresh container IDs after any Compose recreation.
+    verify_running_backends(base, running)
     return 0
 
 

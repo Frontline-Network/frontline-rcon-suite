@@ -171,6 +171,14 @@ def test_unknown_second_row_does_not_hide_ambiguous_steam_identity():
         prepare_online_steam_identity(api, STEAM)
 
 
+def test_steam_and_console_rows_cannot_share_an_eos_id_with_different_casing():
+    api = api_with_players([row(), row(EOS.upper(), 'EPlatformFamily::PS5', None)])
+    with pytest.raises(ValueError, match='duplicate EOS'):
+        prepare_online_identity_snapshot(api)
+    with pytest.raises(ValueError, match='duplicate EOS'):
+        prepare_online_steam_identity(api, STEAM)
+
+
 def test_list_roster_preserves_steam_and_console_without_guessing():
     console = 'fedcba9876543210fedcba9876543210'
     api = api_with_players([row(), row(console, 'EPlatformFamily::PS5', None)])
@@ -253,6 +261,22 @@ def test_offline_unknown_eos_never_sends_steam_id_as_a_game_command(sync, raises
         else:
             handler.handle_create_record(payload, {'steam_id': STEAM, 'eos_id': None})
     apply.assert_not_called()
+
+
+def test_short_immediate_steam_restriction_waits_for_verified_eos_connection():
+    api = api_with_players([])
+    entry = record(BlacklistSyncMethod.BAN_IMMEDIATELY,
+                   expires=datetime.now(timezone.utc) + timedelta(minutes=30))
+    handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    handler.rcon = api
+    payload = blacklist.BlacklistCreateRecordCommand(player_id=STEAM, record_id=1)
+    with patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
+         patch.object(blacklist, 'is_player_blacklisted', return_value=entry), \
+         patch.object(blacklist, 'apply_blacklist_punishment') as apply:
+        handler.handle_create_record(payload, {'steam_id': STEAM, 'eos_id': None})
+    apply.assert_not_called()
+    api.kick.assert_not_called()
+    api.temp_ban.assert_not_called()
 
 
 def test_higher_priority_eos_restriction_is_not_overwritten():

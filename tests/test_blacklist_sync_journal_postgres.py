@@ -297,6 +297,7 @@ def test_review_list_is_server_scoped_and_decodes_event(database):
 @pytest.mark.parametrize('error,kind', [
     (blacklist.HLLVSteamBanOwnershipUnverified('synthetic'), 'hllv_ownership'),
     (blacklist.HLLVSteamIdentityUnverified('synthetic'), 'hllv_identity'),
+    (blacklist.BlacklistBanOwnershipUnverified('synthetic'), 'hllv_ownership'),
     (TimeoutError('synthetic'), None),
 ])
 def test_review_kind_distinguishes_no_action_from_uncertain_action(database, error, kind):

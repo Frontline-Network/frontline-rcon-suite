@@ -374,9 +374,11 @@ class PlayerID(Base):
             elif s.start_event_us is not None and s.end is None and s is latest:
                 total += max(0, datetime.now(timezone.utc).timestamp() - s.start_event_us / 1_000_000)
             elif not s.end and s.end_event_us is None and s.start and s is latest:
-                total += (datetime.now() - s.start).total_seconds()
+                total += max(0, (datetime.now() - s.start).total_seconds())
             elif s.end and s.start:
-                total += (s.end - s.start).total_seconds()
+                # A legacy wall time can run backwards at the autumn DST
+                # transition. It cannot subtract playtime from other sessions.
+                total += max(0, (s.end - s.start).total_seconds())
 
         return int(total)
 

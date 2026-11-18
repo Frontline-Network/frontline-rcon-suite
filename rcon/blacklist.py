@@ -67,6 +67,10 @@ class HLLVBanOwnershipUnverified(RuntimeError):
     """An existing HLLV game ban cannot safely be attributed to this list."""
 
 
+class BlacklistBanOwnershipUnverified(RuntimeError):
+    """An existing game ban cannot safely be attributed to this list."""
+
+
 class HLLVSteamIdentityUnverified(RuntimeError):
     """An action was not attempted because its Steam/EOS link is unverified."""
 
@@ -391,6 +395,8 @@ def _blacklist_record_has_expired(record: BlacklistRecord) -> bool:
 
 
 _BLACKLIST_ACTION_EXPIRED = object()
+_BLACKLIST_ACTION_DEFERRED = object()
+_BLACKLIST_ACTION_CHANGED = object()
 
 
 class BanState(IntEnum):
@@ -460,10 +466,37 @@ def _synchronize_ban(
     """
     logger.info("Synchronizing ban for player %s", player_id)
     new_state = get_ban_state_from_record(new_record)
+    if new_state == BanState.TEMP:
+        if _blacklist_record_has_expired(new_record):
+            return
+        # A previous list state does not establish ownership of a game ban.
+        # Read the server rather than the 60-second cached ban lists: only a
+        # fresh, well-formed absence permits a new temporary sanction.
+        for method in ('get_temp_bans', 'get_perma_bans'):
+            try:
+                reader = getattr(rcon, method)
+                if isinstance(rcon, Rcon):
+                    bans = getattr(Rcon, method).__wrapped__(rcon)
+                else:
+                    bans = reader()
+            except Exception as exc:
+                if _blacklist_record_has_expired(new_record):
+                    return
+                raise BlacklistBanOwnershipUnverified('Cannot read current game bans') from exc
+            if _blacklist_record_has_expired(new_record):
+                return
+            if not isinstance(bans, list) or any(
+                    not isinstance(ban, dict) or not isinstance(ban.get('player_id'), str)
+                    for ban in bans):
+                raise BlacklistBanOwnershipUnverified('Cannot verify existing game bans')
+            def identity(value):
+                return value.lower() if len(value) == 32 and all(c in '0123456789abcdefABCDEF' for c in value) else value
+            if any(identity(ban['player_id']) == identity(player_id) for ban in bans):
+                raise BlacklistBanOwnershipUnverified('Existing game ban ownership is unknown')
 
     # Remove the existing ban if it will not be overwritten later. Also remove if the
     # player is to be banned upon connecting, so that they can see the updated ban reason
-    if (
+    if new_state != BanState.TEMP and (
         new_state != old_state
         or (new_record is not None and new_record.blacklist.sync == BlacklistSyncMethod.BAN_ON_CONNECT)
     ):
@@ -500,9 +533,9 @@ def _synchronize_ban(
         return
 
     result = apply_blacklist_punishment(
-        rcon, new_record, player_id=player_id, player_name=player_name
+        rcon, new_record, player_id=player_id, player_name=player_name, is_online=is_online
     )
-    if result is not True and result is not _BLACKLIST_ACTION_EXPIRED:
+    if result is not True and result is not _BLACKLIST_ACTION_EXPIRED and result is not _BLACKLIST_ACTION_DEFERRED:
         raise RuntimeError("Could not confirm blacklist action")
 
 
@@ -511,6 +544,7 @@ def apply_blacklist_punishment(
     record: BlacklistRecord,
     player_id: str = None,
     player_name: str = None,
+    is_online: bool = True,
 ):
     if player_id is None:
         player_id = record.player.player_id
@@ -518,28 +552,49 @@ def apply_blacklist_punishment(
         if _blacklist_record_has_expired(record):
             logger.info("Skipping blacklist action: record has expired")
             return _BLACKLIST_ACTION_EXPIRED
-        try:
+        for _ in range(3):
+            if _blacklist_record_has_expired(record):
+                return _BLACKLIST_ACTION_EXPIRED
             state = get_ban_state_from_record(record)
             guard_action = "kick" if state == BanState.NONE else "ban"
-            token = action_guard.reserve(SERVER_NUMBER, player_id, [BLACKLIST_ACTION_GUARD_RULE], guard_action)
-        except Exception:
-            logger.exception("Blacklist action not sent: durable reservation unavailable")
-            return False
-        if token is None:
-            logger.warning("Blacklist action not sent: previous result awaits review")
-            return False
-        try:
-            result = _apply_blacklist_punishment(rcon, record, player_id=player_id, player_name=player_name)
-        except Exception:
-            logger.exception("Blacklist action result uncertain; reservation retained")
-            return False
-        if result is True or result is False or result is _BLACKLIST_ACTION_EXPIRED:
+            if state == BanState.TEMP:
+                hours = _blacklist_remaining_hours(record)
+                if hours < 0:
+                    return _BLACKLIST_ACTION_EXPIRED
+                if hours < 1:
+                    guard_action = "kick"
+            if guard_action == "kick" and not is_online:
+                return _BLACKLIST_ACTION_DEFERRED
             try:
-                action_guard.finish(SERVER_NUMBER, player_id, token,
-                                    "confirmed" if result is True else "rejected", expected=1)
+                token = action_guard.reserve(SERVER_NUMBER, player_id, [BLACKLIST_ACTION_GUARD_RULE], guard_action)
             except Exception:
-                logger.exception("Could not finalize blacklist action; reservation retained")
-        return result if result is _BLACKLIST_ACTION_EXPIRED else result is True
+                logger.exception("Blacklist action not sent: durable reservation unavailable")
+                return False
+            if token is None:
+                logger.warning("Blacklist action not sent: previous result awaits review")
+                return False
+            try:
+                result = _apply_blacklist_punishment(rcon, record, player_id=player_id, player_name=player_name,
+                                                    expected_action=guard_action)
+            except Exception:
+                logger.exception("Blacklist action result uncertain; reservation retained")
+                return False
+            if result is True or result is False or result is _BLACKLIST_ACTION_EXPIRED or result is _BLACKLIST_ACTION_CHANGED:
+                try:
+                    action_guard.finish(SERVER_NUMBER, player_id, token,
+                                        "confirmed" if result is True else "rejected", expected=1)
+                except Exception:
+                    logger.exception("Could not finalize blacklist action; reservation retained")
+                    return result is True
+            if result is _BLACKLIST_ACTION_CHANGED:
+                continue
+            return result if result is _BLACKLIST_ACTION_EXPIRED else result is True
+        return False
+
+
+def _blacklist_remaining_hours(record):
+    expiry = normalize_blacklist_expiry(record.expires_at)
+    return int((expiry - datetime.now(tz=timezone.utc)).total_seconds() // 3600)
 
 
 def _apply_blacklist_punishment(
@@ -547,6 +602,7 @@ def _apply_blacklist_punishment(
     record: BlacklistRecord,
     player_id: str = None,
     player_name: str = None,
+    expected_action: str = None,
 ):
     logger.info("Applying punishment to %s", player_id)
     try:
@@ -569,6 +625,14 @@ def _apply_blacklist_punishment(
             logger.info("Skipping blacklist action: record has expired")
             return _BLACKLIST_ACTION_EXPIRED
 
+        hours = _blacklist_remaining_hours(record) if state == BanState.TEMP else None
+        if hours is not None and hours < 0:
+            return _BLACKLIST_ACTION_EXPIRED
+        actual_action = "kick" if state == BanState.NONE or (state == BanState.TEMP and hours < 1) else "ban"
+        if expected_action is not None and actual_action != expected_action:
+            return _BLACKLIST_ACTION_CHANGED
+        if state == BanState.TEMP and hours < 1:
+            state = BanState.NONE
         # Apply any bans/kicks
         match state:
             case BanState.NONE:
@@ -585,7 +649,6 @@ def _apply_blacklist_punishment(
                 )
 
             case BanState.TEMP:
-                hours = round_timedelta_to_hours(record.expires_at)
                 logger.info(
                     "Attempting to ban player %s for %s hour(s) due to blacklist "
                     "(blacklist expires at %s), reason: %s",
@@ -1266,7 +1329,8 @@ class BlacklistCommandHandler:
         eos_id = prepared.get('eos_id')
         if eos_id is None:
             if top_record.blacklist.sync == BlacklistSyncMethod.BAN_IMMEDIATELY:
-                raise HLLVSteamIdentityUnverified('No verified online EOS identity for immediate ban')
+                if top_record.expires_at is None or _blacklist_remaining_hours(top_record) >= 1:
+                    raise HLLVSteamIdentityUnverified('No verified online EOS identity for immediate ban')
             logger.info('Steam restriction retained for the next verified HLLV connection')
             return
         eos_record = is_player_blacklisted(sess, player_id=eos_id)

@@ -47,6 +47,7 @@ def test_blacklist_reports_server_result(monkeypatch, state, method, accepted):
     audit = Mock()
     monkeypatch.setattr(blacklist, "get_ban_state_from_record", lambda _: state)
     monkeypatch.setattr(blacklist, "round_timedelta_to_hours", lambda _: 1)
+    monkeypatch.setattr(blacklist, "_blacklist_remaining_hours", lambda _: 1)
     monkeypatch.setattr(blacklist, "send_to_discord_audit", audit)
     result = blacklist.apply_blacklist_punishment(server, record, player_id="id", player_name="name")
     assert result is accepted
@@ -113,7 +114,146 @@ def test_live_temporary_blacklist_record_accepts_legacy_utc_expiry(monkeypatch, 
     monkeypatch.setattr(blacklist, "get_ban_state_from_record", lambda _: blacklist.BanState.TEMP)
     monkeypatch.setattr(blacklist, "send_to_discord_audit", Mock())
     assert blacklist.apply_blacklist_punishment(server, record, player_id="synthetic", player_name="test") is True
-    assert server.temp_ban.call_args.kwargs["duration_hours"] == 2
+    assert server.temp_ban.call_args.kwargs["duration_hours"] == 1
+
+
+@pytest.mark.parametrize('sync', list(BlacklistSyncMethod))
+def test_short_temporary_record_kicks_online_in_every_sync_mode(monkeypatch, sync):
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
+                             blacklist=Blacklist(name='test', sync=sync))
+    monkeypatch.setattr(record, 'get_formatted_reason', lambda: 'reason')
+    server = Mock()
+    server.kick.return_value = True
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', Mock())
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='id', player_name='name') is True
+    server.kick.assert_called_once()
+    server.temp_ban.assert_not_called()
+
+
+@pytest.mark.parametrize('sync', [BlacklistSyncMethod.BAN_IMMEDIATELY, BlacklistSyncMethod.BAN_ON_CONNECT])
+def test_short_ban_offline_is_deferred_and_never_removes_unrelated_ban(monkeypatch, sync):
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
+                             blacklist=Blacklist(name='test', sync=sync))
+    server = Mock()
+    server.get_temp_bans.return_value = []
+    server.get_perma_bans.return_value = []
+    server.get_detailed_player_info.side_effect = blacklist.HLLCommandFailedError('offline')
+    blacklist.synchronize_ban(server, 'id', record, blacklist.BanState.TEMP)
+    server.kick.assert_not_called()
+    server.temp_ban.assert_not_called()
+    server.remove_temp_ban.assert_not_called()
+
+
+@pytest.mark.parametrize('existing', ['temporary', 'permanent'])
+@pytest.mark.parametrize('minutes', [30, 90])
+def test_temporary_restriction_does_not_remove_or_overwrite_unattributed_ban(existing, minutes):
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(minutes=minutes),
+                             blacklist=Blacklist(name='test', sync=BlacklistSyncMethod.BAN_IMMEDIATELY))
+    server = Mock()
+    server.get_temp_bans.return_value = [{'player_id': 'id'}] if existing == 'temporary' else []
+    server.get_perma_bans.return_value = [{'player_id': 'id'}] if existing == 'permanent' else []
+    with pytest.raises(blacklist.BlacklistBanOwnershipUnverified):
+        blacklist.synchronize_ban(server, 'id', record, blacklist.BanState.PERMA)
+    server.remove_temp_ban.assert_not_called()
+    server.remove_perma_ban.assert_not_called()
+    server.temp_ban.assert_not_called()
+    server.kick.assert_not_called()
+
+
+def test_stale_previous_ban_status_does_not_prevent_new_temporary_sanction(monkeypatch):
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(minutes=90),
+                             blacklist=Blacklist(name='test', sync=BlacklistSyncMethod.BAN_IMMEDIATELY))
+    monkeypatch.setattr(record, 'get_formatted_reason', lambda: 'reason')
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', Mock())
+    server = Mock()
+    server.get_temp_bans.return_value = []
+    server.get_perma_bans.return_value = []
+    server.get_detailed_player_info.return_value = {'name': 'test'}
+    server.temp_ban.return_value = True
+    blacklist.synchronize_ban(server, 'id', record, blacklist.BanState.PERMA)
+    server.remove_perma_ban.assert_not_called()
+    server.temp_ban.assert_called_once()
+
+
+def test_expired_new_temporary_restriction_does_not_query_or_remove_bans():
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+                             blacklist=Blacklist(name='test', sync=BlacklistSyncMethod.BAN_ON_CONNECT))
+    server = Mock()
+    blacklist.synchronize_ban(server, 'id', record, blacklist.BanState.PERMA)
+    server.assert_not_called()
+    server.get_temp_bans.assert_not_called()
+    server.remove_perma_ban.assert_not_called()
+
+
+def test_expiry_during_fresh_ban_lookup_skips_review_and_all_actions():
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(minutes=20),
+                             blacklist=Blacklist(name='test', sync=BlacklistSyncMethod.BAN_IMMEDIATELY))
+    server = Mock()
+    def expires_while_reading():
+        record.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        return [{'player_id': 'id'}]
+    server.get_temp_bans.side_effect = expires_while_reading
+    blacklist.synchronize_ban(server, 'id', record, blacklist.BanState.PERMA)
+    server.get_perma_bans.assert_not_called()
+    server.remove_perma_ban.assert_not_called()
+    server.kick.assert_not_called()
+
+
+def test_existing_eos_ban_matches_case_insensitively():
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
+                             blacklist=Blacklist(name='test', sync=BlacklistSyncMethod.BAN_IMMEDIATELY))
+    server = Mock()
+    server.get_temp_bans.return_value = [{'player_id': 'a' * 32}]
+    with pytest.raises(blacklist.BlacklistBanOwnershipUnverified):
+        blacklist.synchronize_ban(server, 'A' * 32, record, blacklist.BanState.NONE)
+    server.kick.assert_not_called()
+
+
+@pytest.mark.parametrize('minutes, expected', [(61, 1), (119, 1), (121, 2), (179, 2)])
+def test_temporary_list_ban_rounds_down(monkeypatch, minutes, expected):
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(minutes=minutes),
+                             blacklist=Blacklist(name='test', sync=BlacklistSyncMethod.BAN_IMMEDIATELY))
+    monkeypatch.setattr(record, 'get_formatted_reason', lambda: 'reason')
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', Mock())
+    server = Mock()
+    server.temp_ban.return_value = True
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='id', player_name='name') is True
+    assert server.temp_ban.call_args.kwargs['duration_hours'] == expected
+    server.kick.assert_not_called()
+
+
+def test_crossing_hour_boundary_reserves_kick_instead_of_ban(monkeypatch):
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
+                             blacklist=Blacklist(name='test', sync=BlacklistSyncMethod.BAN_IMMEDIATELY))
+    monkeypatch.setattr(record, 'get_formatted_reason', lambda: 'reason')
+    server = Mock()
+    server.kick.return_value = True
+    actions = []
+    reserve = blacklist.action_guard.reserve
+    def crosses_boundary(*args):
+        actions.append(args[-1])
+        token = reserve(*args)
+        if args[-1] == 'ban':
+            record.expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+        return token
+    monkeypatch.setattr(blacklist.action_guard, 'reserve', crosses_boundary)
+    monkeypatch.setattr(blacklist, 'send_to_discord_audit', Mock())
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='id', player_name='name') is True
+    assert actions == ['ban', 'kick']
+    server.kick.assert_called_once()
+    server.temp_ban.assert_not_called()
+
+
+@pytest.mark.parametrize('remaining_hours', [[-1], [1, -1]])
+def test_negative_remaining_time_never_becomes_kick(monkeypatch, remaining_hours):
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
+                             blacklist=Blacklist(name='test', sync=BlacklistSyncMethod.BAN_IMMEDIATELY))
+    monkeypatch.setattr(record, 'get_formatted_reason', lambda: 'reason')
+    monkeypatch.setattr(blacklist, '_blacklist_remaining_hours', Mock(side_effect=remaining_hours))
+    server = Mock()
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='id', player_name='name') is blacklist._BLACKLIST_ACTION_EXPIRED
+    server.kick.assert_not_called()
+    server.temp_ban.assert_not_called()
 
 
 @pytest.mark.parametrize('result', [None, TimeoutError('synthetic lost response')])

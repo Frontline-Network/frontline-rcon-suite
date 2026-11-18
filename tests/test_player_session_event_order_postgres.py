@@ -150,6 +150,46 @@ def test_postgres_legacy_open_session_is_matched_only_with_absolute_log(database
         assert (saved.start_event_us, saved.end_event_us) == (start * 1_000_000, (start + 50) * 1_000_000)
 
 
+def test_postgres_multiple_possible_connects_stay_unresolved_under_concurrent_disconnects(database, monkeypatch):
+    monkeypatch.delenv("HLL_SESSION_LEGACY_UTC", raising=False)
+    start = 1_729_991_400
+    wall = datetime.fromtimestamp(start, timezone.utc).replace(tzinfo=None)
+    with database.begin() as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == "synthetic-id"))
+        session.add(PlayerSession(player=player, start=wall, server_number=3, server_name="legacy"))
+        for epoch in (start, start - 3600):
+            session.add(LogLine(type="CONNECTED", server="3", player1_player_id=player.id,
+                                event_time=wall, raw=f"[0 ms ({epoch})] CONNECTED fake", weapon="", content=""))
+    run_parallel(lambda: player_history.save_end_player_session("synthetic-id", start + 50))
+    with database() as session:
+        saved = session.scalar(select(PlayerSession))
+        assert saved.start_event_us is None and saved.end_event_us is None
+        assert len(session.scalars(select(PendingPlayerDisconnect)).all()) == 1
+
+
+def test_postgres_late_unique_log_allows_deferred_disconnect_to_resolve(database, monkeypatch):
+    monkeypatch.delenv("HLL_SESSION_LEGACY_UTC", raising=False)
+    start = 1_700_000_000
+    wall = datetime.fromtimestamp(start, timezone.utc).replace(tzinfo=None)
+    with database.begin() as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == "synthetic-id"))
+        session.add(PlayerSession(player=player, start=wall, server_number=3, server_name="legacy"))
+    player_history.save_end_player_session("synthetic-id", start + 50)
+    with database() as session:
+        saved = session.scalar(select(PlayerSession))
+        assert saved.start_event_us is None and saved.end_event_us is None
+        assert len(session.scalars(select(PendingPlayerDisconnect)).all()) == 1
+    with database.begin() as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == "synthetic-id"))
+        session.add(LogLine(type="CONNECTED", server="3", player1_player_id=player.id,
+                            event_time=wall, raw=f"[0 ms ({start})] CONNECTED fake", weapon="", content=""))
+    player_history.save_end_player_session("synthetic-id", start + 50)
+    with database() as session:
+        saved = session.scalar(select(PlayerSession))
+        assert (saved.start_event_us, saved.end_event_us) == (start * 1_000_000, (start + 50) * 1_000_000)
+        assert session.scalars(select(PendingPlayerDisconnect)).all() == []
+
+
 @pytest.mark.skipif(not hasattr(time, "tzset"), reason="process timezone control requires tzset")
 def test_postgres_fall_back_records_absolute_event_duration(database, monkeypatch):
     old_tz = os.environ.get("TZ")
