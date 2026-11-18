@@ -44,7 +44,7 @@ export default function AutomodActionReview() {
   return (
     <>
     <Box><Button size="small" onClick={() => setOpen(true)}>{t("automodActionReview.open")}</Button></Box>
-    <Dialog open={open} onClose={() => setOpen(false)} aria-label={t("automodActionReview.title")} fullWidth maxWidth="md" disablePortal>
+    <Dialog open={open} onClose={() => setOpen(false)} aria-label={t("automodActionReview.title")} fullWidth maxWidth="md">
     <DialogContent data-testid="automod-action-review">
       <Stack spacing={1.5}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
