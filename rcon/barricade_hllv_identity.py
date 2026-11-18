@@ -44,6 +44,7 @@ def prepare_online_identity_snapshot(rcon) -> dict:
     if not isinstance(rows, list):
         raise ValueError('Invalid player snapshot')
     players = {}
+    seen_eos = set()
     seen_steam = set()
     for row in rows:
         if not isinstance(row, dict):
@@ -51,8 +52,9 @@ def prepare_online_identity_snapshot(rcon) -> dict:
         eos = row.get('iD')
         if (not isinstance(eos, str) or len(eos) != 32
                 or not all(c in '0123456789abcdefABCDEF' for c in eos)
-                or row.get('eosId') != eos or eos in players):
+                or row.get('eosId') != eos or eos.lower() in seen_eos):
             raise ValueError('Invalid or duplicate EOS identity in player snapshot')
+        seen_eos.add(eos.lower())
         platform = str(row.get('platform') or '').strip().lower()
         steam = row.get('steamId')
         if platform == 'eplatformfamily::steam':
@@ -110,9 +112,9 @@ def prepare_online_steam_identity(rcon, steam_id: str) -> dict:
                     and is_steam_id_64(value) and value != steam_id):
                 raise ValueError('Inconsistent online Steam identity')
         if (len(eos) != 32 or not all(c in '0123456789abcdefABCDEF' for c in eos)
-                or row.get('eosId') != eos or eos in seen_eos):
+                or row.get('eosId') != eos or eos.lower() in seen_eos):
             raise ValueError('Invalid or duplicate EOS identity in player snapshot')
-        seen_eos.add(eos)
+        seen_eos.add(eos.lower())
         if platform == 'eplatformfamily::steam':
             if row['steamId'] in seen_steam:
                 raise ValueError('Multiple online EOS IDs for one Steam ID')

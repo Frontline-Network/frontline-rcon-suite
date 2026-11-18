@@ -171,6 +171,14 @@ def test_unknown_second_row_does_not_hide_ambiguous_steam_identity():
         prepare_online_steam_identity(api, STEAM)
 
 
+def test_steam_and_console_rows_cannot_share_an_eos_id_with_different_casing():
+    api = api_with_players([row(), row(EOS.upper(), 'EPlatformFamily::PS5', None)])
+    with pytest.raises(ValueError, match='duplicate EOS'):
+        prepare_online_identity_snapshot(api)
+    with pytest.raises(ValueError, match='duplicate EOS'):
+        prepare_online_steam_identity(api, STEAM)
+
+
 def test_list_roster_preserves_steam_and_console_without_guessing():
     console = 'fedcba9876543210fedcba9876543210'
     api = api_with_players([row(), row(console, 'EPlatformFamily::PS5', None)])
