@@ -18,7 +18,6 @@ from rcon.commands import HLLCommandFailedError
 from rcon.active_session_selection import session_created_microseconds
 from rcon.models import (
     BlacklistRecord,
-    LogLine,
     PlayerAccount,
     PlayerActionState,
     PlayerComment,
