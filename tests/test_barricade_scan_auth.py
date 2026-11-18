@@ -54,7 +54,8 @@ def test_key_id_lookup_is_scoped_to_authenticated_user():
 
 
 def test_missing_explicit_peer_or_key_never_gets_a_durable_namespace():
-    assert websocket_auth.get_barricade_scan_namespace.func(b'', 42) is None
+    with patch('rcon.barricade_scan_identity.integration_namespace', return_value=None):
+        assert websocket_auth.get_barricade_scan_namespace.func(b'', 42) is None
     assert websocket_auth.get_barricade_scan_namespace.func(
         b'frontline_integration=01234567-89ab-4def-8012-0123456789ab', None) is None
 
@@ -76,5 +77,7 @@ def test_websocket_only_exposes_key_id_for_authenticated_legacy_key(mobile, expe
         assert captured['barricade_credential_id'] == expected
         assert captured['barricade_scan_namespace'] == ('registered-peer' if not mobile else None)
         assert lookup.await_count == (0 if mobile else 1)
-        resolve.assert_awaited_once_with(b'synthetic=query', expected)
+        assert resolve.await_count == 2
+        assert resolve.await_args_list[0].args == (b'synthetic=query', expected)
+        assert resolve.await_args_list[1].args == (b'', expected)
     asyncio.run(run())

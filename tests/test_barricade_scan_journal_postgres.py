@@ -63,6 +63,16 @@ def prepare_adapter(database, monkeypatch):
         expected_credential_id=None, new_credential_id=1, actor='test', reason='register')
 
 
+def establish_synthetic_join_evidence(database, selected=None):
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    journal.record_roster_snapshot(3, namespace, frozenset())
+    with database() as session:
+        rows = session.execute(select(PlayerID.player_id, PlayerSession.start_event_us)
+                               .join(PlayerSession, PlayerSession.player_id_id == PlayerID.id)).all()
+    journal.record_collector_connects([(3, player_id, 'connect', event_us) for player_id, event_us in rows
+                                      if event_us is not None and (selected is None or player_id in selected)])
+
+
 def test_baseline_records_existing_sessions_without_claiming_success(database, monkeypatch):
     prepare(database, monkeypatch)
     peer = '01234567-89ab-4def-8012-0123456789ab'
@@ -171,6 +181,37 @@ def test_roster_transition_dispatches_vietnam_eos_once_and_persists_confirmation
         delivery = session.scalar(select(journal.BarricadeScanDelivery).where(
             journal.BarricadeScanDelivery.player_session_id == session_id))
         assert delivery is not None and delivery.status == 'done'
+
+
+def test_twenty_vietnam_joins_dispatch_once_with_individual_checks(database, monkeypatch):
+    prepare_adapter(database, monkeypatch)
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    ids = [f'{number:032x}' for number in range(20)]
+    event_us = 1_700_000_100_000_000
+    journal.record_roster_snapshot(3, namespace, frozenset())
+    journal.record_collector_connects([(3, player_id, 'connect', event_us) for player_id in ids])
+    with database.begin() as session:
+        for player_id in ids:
+            player = PlayerID(player_id=player_id)
+            session.add(player)
+            session.flush()
+            session.add(PlayerSession(player_id_id=player.id, server_number=3,
+                start=datetime(2023, 1, 1), start_event_us=event_us))
+    checked, sent = [], []
+    async def present(session_id, player_id):
+        checked.append((session_id, player_id))
+        return True
+    async def sender(player_id, game):
+        sent.append((player_id, game))
+    async def roster():
+        return frozenset(ids)
+    async def run():
+        for _ in range(2):
+            await adapter.scan_once(3, namespace, 'HLLV', sender, present,
+                                    credential_id=1, get_roster=roster, page_size=7)
+    asyncio.run(run())
+    assert len(checked) == 20 and {player for _, player in checked} == set(ids)
+    assert len(sent) == 20 and {player for player, game in sent if game == 'HLLV'} == set(ids)
 
 
 def test_key_rotation_preserves_registered_namespace_and_rejects_other_keys(database, monkeypatch):
@@ -626,6 +667,7 @@ def test_scan_traverses_past_unverified_sessions_without_sending_them(database, 
             session.flush()
             session.add(PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2026, 1, 1),
                                       start_event_us=(int(time.time()) + 2) * 1_000_000))
+    establish_synthetic_join_evidence(database)
     async def run():
         seen = []
         async def present(session_id, player_id):
@@ -676,6 +718,7 @@ def test_scan_does_not_confuse_old_and_current_session_of_same_player(database, 
         session.add_all([old, current])
         session.flush()
         current_id = current.id
+    establish_synthetic_join_evidence(database)
     async def run():
         seen = []
         async def present(session_id, player_id):
@@ -708,6 +751,7 @@ def test_scan_activation_never_automatically_resends_old_or_ambiguous_sessions(d
             session.flush()
             session.add(PlayerSession(player_id_id=player.id, server_number=3,
                                       start=datetime(2026, 1, 1), start_event_us=event_us))
+    establish_synthetic_join_evidence(database, {'new'})
     async def run():
         sent = []
         async def sender(player_id, game):
@@ -720,14 +764,14 @@ def test_scan_activation_never_automatically_resends_old_or_ambiguous_sessions(d
     with database() as session:
         rows = session.scalars(select(journal.BarricadeScanDelivery)).all()
         assert {row.player_id: (row.status, row.review_cause) for row in rows} == {
-            'legacy': ('review', 'activation_unknown'),
-            'old': ('review', 'activation_before'),
-            'ambiguous': ('review', 'activation_ambiguous'),
+            'legacy': ('review', 'missing_live_connect'),
+            'old': ('review', 'missing_live_connect'),
+            'ambiguous': ('review', 'missing_live_connect'),
             'new': ('done', None),
         }
         ambiguous_id = next(row.id for row in rows if row.player_id == 'ambiguous')
     visible = journal.list_reviews(3)
-    assert {row['review_cause'] for row in visible['results']} == {'activation_unknown', 'activation_before', 'activation_ambiguous'}
+    assert {row['review_cause'] for row in visible['results']} == {'missing_live_connect'}
     assert journal.list_reviews(4)['total'] == 0
     journal.resolve_review(3, namespace, ambiguous_id, decision='retry', actor='operator', reason='synthetic review')
     async def retry():
@@ -787,6 +831,7 @@ def test_roster_limits_open_scan_but_preserves_closed_session_review(database, m
                 start=datetime(2026, 1, 1), start_event_us=event,
                 end=datetime(2026, 1, 1) if pid == 'ended' else None,
                 end_event_us=event + 1_000_000 if pid == 'ended' else None))
+    establish_synthetic_join_evidence(database)
     async def run():
         sent = []
         async def sender(player_id, game):
@@ -820,6 +865,8 @@ def test_scan_revisits_delayed_lower_session_id_after_later_commit(database, mon
     async def scan():
         await adapter.scan_once(3, namespace, 'HLLV', sender, verified, credential_id=1, page_size=1)
     event_time = (int(time.time()) + 2) * 1_000_000
+    journal.record_roster_snapshot(3, namespace, frozenset())
+    journal.record_collector_connects([(3, player_id, 'connect', event_time) for player_id in ('late', 'early')])
     with database() as delayed, database() as fast:
         late_player = delayed.scalar(select(PlayerID.id).where(PlayerID.player_id == 'late'))
         early_player = fast.scalar(select(PlayerID.id).where(PlayerID.player_id == 'early'))
@@ -856,6 +903,7 @@ def test_parallel_scan_passes_share_one_inflight_delivery(database, monkeypatch,
         session.flush()
         session.add(PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2026, 1, 1),
                                   start_event_us=(int(time.time()) + 2) * 1_000_000))
+    establish_synthetic_join_evidence(database)
     async def run():
         entered = asyncio.Event()
         release = asyncio.Event()

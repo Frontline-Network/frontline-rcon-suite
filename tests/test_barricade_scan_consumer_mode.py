@@ -16,9 +16,9 @@ from api import auth
 
 
 @pytest.mark.parametrize(('flag', 'namespace', 'credential', 'expected'), [
-    ('0', 'integration:synthetic', 1, 'legacy'),
+    ('0', 'integration:synthetic', 1, 'reject'),
     ('1', None, 1, 'legacy'),
-    ('1', 'integration:synthetic', None, 'legacy'),
+    ('1', 'integration:synthetic', None, 'reject'),
     ('1', 'integration:synthetic', 1, 'durable'),
 ])
 def test_consumer_selects_mode_only_for_registered_opt_in(monkeypatch, flag, namespace, credential, expected):
@@ -27,10 +27,12 @@ def test_consumer_selects_mode_only_for_registered_opt_in(monkeypatch, flag, nam
         consumer = BarricadeConsumer()
         consumer.scope = {'barricade_scan_namespace': namespace, 'barricade_credential_id': credential}
         consumer.accept = AsyncMock()
+        consumer.close = AsyncMock()
         consumer._scan_players_loop = AsyncMock()
         consumer._durable_scan_loop = AsyncMock()
         await consumer.connect()
         await asyncio.sleep(0)
+        assert consumer.close.await_count == (expected == 'reject')
         assert consumer._scan_players_loop.await_count == (expected == 'legacy')
         assert consumer._durable_scan_loop.await_count == (expected == 'durable')
         await consumer.disconnect(1000)
@@ -90,6 +92,23 @@ def test_disabled_durable_namespace_does_not_fall_back_to_legacy(monkeypatch):
         await consumer.connect()
         consumer.close.assert_awaited_once_with(code=4403)
         consumer.accept.assert_not_awaited()
+        consumer._scan_players_loop.assert_not_called()
+    asyncio.run(run())
+
+
+def test_registered_key_with_malformed_query_never_falls_back_to_legacy(monkeypatch):
+    monkeypatch.setenv('HLL_BARRICADE_DURABLE_SCANS', '1')
+    async def run():
+        consumer = BarricadeConsumer()
+        consumer.scope = {'query_string': b'other=value', 'barricade_scan_namespace': None,
+                          'barricade_registered_namespace': 'integration:synthetic',
+                          'barricade_credential_id': 1}
+        consumer.accept = AsyncMock()
+        consumer.close = AsyncMock()
+        consumer._scan_players_loop = AsyncMock()
+        await consumer.connect()
+        consumer.close.assert_awaited_once_with(code=4403)
+        consumer.accept.assert_not_called()
         consumer._scan_players_loop.assert_not_called()
     asyncio.run(run())
 

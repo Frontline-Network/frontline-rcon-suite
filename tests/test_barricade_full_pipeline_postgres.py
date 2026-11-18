@@ -41,6 +41,9 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
         model.__table__.create(database.kw['bind'], checkfirst=True)
     monkeypatch.setattr(presence, 'get_session_maker', lambda: database)
     start = time.time() - 60
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    journal.record_roster_snapshot(3, namespace, frozenset())
+    journal.record_collector_connects([(3, 'synthetic-eos', 'connect', int(start) * 1_000_000)])
     with database.begin() as session:
         binding = session.get(journal.BarricadeScanIntegration,
                               (3, '01234567-89ab-4def-8012-0123456789ab'))
@@ -55,7 +58,6 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
         session_id = row.id
     red = redis.Redis.from_url(url, decode_responses=True)
     scope = uuid4().hex * 2
-    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
     monkeypatch.setenv('HLL_DB_URL', 'postgresql://synthetic@localhost/synthetic')
     monkeypatch.setattr('rcon.cache_utils.get_redis_client', lambda **_kwargs: red)
     monkeypatch.setattr(log_loop, 'get_redis_client', lambda **_kwargs: red)
@@ -99,8 +101,13 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
         async def run():
             results = asyncio.Queue()
             barrier_seen = Event()
+            roster_barrier_seen = Event()
             original_check = presence.session_has_bounded_evidence
             original_confirm = presence.confirm_with_fresh_poll
+            original_roster_check = presence.observed_players_after
+            def observe_roster(*args, **kwargs):
+                roster_barrier_seen.set()
+                return original_roster_check(*args, **kwargs)
             def observe_check(*args, **kwargs):
                 barrier_seen.set()
                 return original_check(*args, **kwargs)
@@ -108,6 +115,7 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
                 return await original_confirm(*args, timeout=1.5, **kwargs)
             monkeypatch.setattr(presence, 'session_has_bounded_evidence', observe_check)
             monkeypatch.setattr(presence, 'confirm_with_fresh_poll', short_confirm)
+            monkeypatch.setattr(presence, 'observed_players_after', observe_roster)
             class TestConsumer(barricade.BarricadeConsumer):
                 async def connect(self):
                     await self.accept()
@@ -129,6 +137,8 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
                 socket = ApplicationCommunicator(app, ws_scope)
                 await socket.send_input({'type': 'websocket.connect'})
                 assert (await socket.receive_output(timeout=5))['type'] == 'websocket.accept'
+                assert await asyncio.to_thread(roster_barrier_seen.wait, 3)
+                assert await asyncio.to_thread(capture_observation, red, api, scope=scope, server_number=3)
                 assert await asyncio.to_thread(barrier_seen.wait, 3)
                 if scenario in ('confirmed', 'lost_response', 'pending_event'):
                     # The scan's barrier already exists; simulate the next real
