@@ -101,6 +101,21 @@ def test_record_expiring_during_reservation_does_not_send(monkeypatch, fake_blac
     assert fake_blacklist_guard == {}
 
 
+@pytest.mark.parametrize("naive", [False, True])
+def test_live_temporary_blacklist_record_accepts_legacy_utc_expiry(monkeypatch, naive):
+    expires = datetime.now(timezone.utc) + timedelta(hours=2)
+    if naive:
+        expires = expires.replace(tzinfo=None)
+    record = SimpleNamespace(admin_name="tester", expires_at=expires,
+                             get_formatted_reason=lambda: "reason")
+    server = Mock()
+    server.temp_ban.return_value = True
+    monkeypatch.setattr(blacklist, "get_ban_state_from_record", lambda _: blacklist.BanState.TEMP)
+    monkeypatch.setattr(blacklist, "send_to_discord_audit", Mock())
+    assert blacklist.apply_blacklist_punishment(server, record, player_id="synthetic", player_name="test") is True
+    assert server.temp_ban.call_args.kwargs["duration_hours"] == 2
+
+
 @pytest.mark.parametrize('result', [None, TimeoutError('synthetic lost response')])
 def test_uncertain_blacklist_action_blocks_later_attempts(monkeypatch, fake_blacklist_guard, result):
     record = SimpleNamespace(admin_name='tester', expires_at=None, get_formatted_reason=lambda: 'reason')

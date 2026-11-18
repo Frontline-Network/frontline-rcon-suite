@@ -381,7 +381,7 @@ def get_highest_priority_record(records: Sequence[BlacklistRecord]):
 
 def round_timedelta_to_hours(td: timedelta | datetime):
     if isinstance(td, datetime):
-        td = td - datetime.now(tz=timezone.utc)
+        td = normalize_blacklist_expiry(td) - datetime.now(tz=timezone.utc)
     return max(round(td.total_seconds() / (60 * 60)), 1)
 
 
