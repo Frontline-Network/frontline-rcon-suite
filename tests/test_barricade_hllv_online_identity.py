@@ -103,7 +103,7 @@ def test_non_steam_platform_identifier_does_not_block_steam_reconciliation(platf
     api = api_with_players([row(other_eos, platform=platform, steam=platform_id), row()])
     assert prepare_online_steam_identity(api, STEAM) == {'steam_id': STEAM, 'eos_id': EOS}
     assert prepare_online_identity_snapshot(api)[other_eos] == {
-        'steam_id': None, 'platform': platform.lower()}
+        'steam_id': None, 'platform': platform.lower(), 'platform_id': platform_id}
 
 
 @pytest.mark.parametrize('platform_id', [STEAM, 76561198036685844, True, ['unexpected']])
