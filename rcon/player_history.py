@@ -3,7 +3,6 @@ import hashlib
 import logging
 import math
 import os
-import re
 import time
 import unicodedata
 from contextlib import contextmanager
@@ -1002,9 +1001,10 @@ def _utc_legacy_event_us(value: datetime.datetime) -> int:
 
 
 def _prepare_open_utc_legacy_sessions(sess: Session, player: PlayerID, server_number: int):
-    # Open sessions may have been created just before this version was
-    # installed. An exact, unique absolute connect log is evidence; without
-    # it only the explicit fixed-UTC history setting may interpret old values.
+    # A single visible log is not proof that another conflicting log cannot
+    # arrive later. Only an operator-verified UTC history permits conversion.
+    if not _fixed_utc_timezone():
+        return
     rows = sess.query(PlayerSession).filter(
         PlayerSession.player_id_id == player.id,
         PlayerSession.server_number == server_number,
@@ -1018,42 +1018,29 @@ def _prepare_open_utc_legacy_sessions(sess: Session, player: PlayerID, server_nu
         PlayerSession.start.in_({row.start for row in rows}),
     ).group_by(PlayerSession.start).all()) if rows else {}
     for row in rows:
-        if _fixed_utc_timezone():
-            if starts[row.start] == 1:
-                row.start_event_us = _utc_legacy_event_us(row.start)
-            continue
-        if starts[row.start] != 1:
-            continue
-        logs = sess.query(LogLine.raw).filter(
-            LogLine.server == str(server_number), LogLine.type == "CONNECTED",
-            LogLine.player1_player_id == player.id,
-            LogLine.event_time >= row.start - datetime.timedelta(seconds=1),
-            LogLine.event_time <= row.start + datetime.timedelta(seconds=1),
-        ).limit(3).all()
-        if len(logs) != 1:
-            # Another nearby same-player connect can have the same naive wall
-            # time but a different absolute instant (e.g. different historical
-            # timezone settings). Matching one epoch under a UTC assumption is
-            # not sufficient to determine which event created the legacy row.
-            # A three-row result may also have been truncated by the limit.
-            continue
-        matching = []
-        for (raw,) in logs:
-            found = re.search(r"\(([0-9]{10})\)", raw or "")
-            if found:
-                event_us = int(found.group(1)) * 1_000_000
-                if event_us == _utc_legacy_event_us(row.start):
-                    matching.append(event_us)
-        if len(matching) == 1:
-            # Do not merge two legacy rows onto the same connection.
-            duplicate = sess.query(PlayerSession.id).filter(
-                PlayerSession.player_id_id == player.id,
-                PlayerSession.server_number == server_number,
-                PlayerSession.start_event_us == matching[0],
-                PlayerSession.id != row.id,
-            ).first()
-            if duplicate is None:
-                row.start_event_us = matching[0]
+        if starts[row.start] == 1:
+            row.start_event_us = _utc_legacy_event_us(row.start)
+
+
+def _legacy_session_could_overlap(sess: Session, player: PlayerID, server_number: int,
+                                  target_start_us: int, disconnect_us: int) -> bool:
+    """Keep ambiguous legacy intervals from stealing an absolute disconnect.
+
+    A datetime UTC offset is strictly less than 24 hours. An absolute newer
+    connect supersedes any definitely earlier connect for the same player and
+    server, including an old row with no recorded end. The inclusive bound
+    assumes historical wall clocks were not wrong by a day.
+    """
+    target_start = datetime.datetime.fromtimestamp(target_start_us / 1_000_000, datetime.timezone.utc).replace(tzinfo=None)
+    disconnect = datetime.datetime.fromtimestamp(disconnect_us / 1_000_000, datetime.timezone.utc).replace(tzinfo=None)
+    offset = datetime.timedelta(days=1)
+    return sess.query(PlayerSession.id).filter(
+        PlayerSession.player_id_id == player.id,
+        PlayerSession.server_number == server_number,
+        PlayerSession.start_event_us.is_(None),
+        or_(PlayerSession.start.is_(None), PlayerSession.start <= disconnect + offset),
+        or_(PlayerSession.start.is_(None), PlayerSession.start >= target_start - offset),
+    ).first() is not None
 
 
 def _reconcile_pending_disconnects(sess: Session, player: PlayerID, server_number: int):
@@ -1084,6 +1071,9 @@ def _reconcile_pending_disconnects(sess: Session, player: PlayerID, server_numbe
         if ambiguous_connect is not None and (target is None or ambiguous_connect[0] >= target.start_event_us):
             # Until the connect is reviewed this disconnect could belong to
             # it, so attaching it to an older known session is unsafe.
+            continue
+        if target is not None and _legacy_session_could_overlap(
+                sess, player, server_number, target.start_event_us, pending.ended_event_us):
             continue
         if target is not None and (target.end_event_us is None or pending.ended_event_us < target.end_event_us):
             if target.end is not None and target.end_event_us is None:
@@ -1117,6 +1107,9 @@ def _reassign_overlapping_disconnects(sess: Session, player: PlayerID, new_sessi
             .first()
         )
         if latest is None or latest.id == old.id:
+            continue
+        if _legacy_session_could_overlap(sess, player, new_session.server_number,
+                                         latest.start_event_us, old.end_event_us):
             continue
         if latest.end is not None and latest.end_event_us is None:
             # An unverified legacy end cannot be ordered against an absolute
