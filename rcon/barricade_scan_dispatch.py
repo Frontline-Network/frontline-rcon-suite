@@ -64,6 +64,13 @@ async def scan_once(server_number, integration_id, game, sender, is_present, *, 
             if await asyncio.to_thread(journal.is_manually_reconstructed_session, server_number, session_id):
                 await record_review(session_id, player_id, 'reconstructed_session')
                 continue
+            classification = journal.classify_activation_start(boundary, start_event_us)
+            if delivery_status != 'queued' and classification in ('before', 'ambiguous', 'unknown'):
+                if is_observed is not None and await is_observed(session_id, player_id) is True:
+                    await record_review(session_id, player_id, 'activation_' + classification)
+                continue
+            if delivery_status != 'queued' and classification != 'after':
+                continue
             await dispatch(server_number, integration_id, session_id, player_id, game, sender,
                            credential_id=credential_id, verify_session=is_present)
         if len(rows) < page_size:

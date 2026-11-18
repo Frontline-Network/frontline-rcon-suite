@@ -99,3 +99,20 @@ def test_fresh_poll_barrier_defers_stale_observations_and_accepts_new_poll(monke
     assert asyncio.run(candidate.confirm_with_fresh_poll(object(), timeout=2, **kwargs)) is False
     monkeypatch.setattr(candidate, 'redis_time', Mock(side_effect=OSError('partition')))
     assert asyncio.run(candidate.confirm_with_fresh_poll(object(), timeout=0, **kwargs)) is None
+
+
+def test_shared_poll_barrier_rechecks_each_vietnam_eos_player(monkeypatch):
+    clock = Mock(side_effect=AssertionError('barrier must not be recreated per player'))
+    monkeypatch.setattr(candidate, 'redis_time', clock)
+    check = Mock(return_value=True)
+    monkeypatch.setattr(candidate, 'session_has_bounded_evidence', check)
+    async def burst():
+        for number in range(50):
+            eos = f'{number:032x}'
+            assert await candidate.confirm_with_fresh_poll(object(), scope='synthetic', server_number=3,
+                session_id=number + 1, player_id=eos, barrier=123.0, timeout=0) is True
+    asyncio.run(burst())
+    assert check.call_count == 50
+    assert all(call.kwargs['min_poll_started_at'] == 123.0 for call in check.call_args_list)
+    assert len({call.kwargs['player_id'] for call in check.call_args_list}) == 50
+    clock.assert_not_called()

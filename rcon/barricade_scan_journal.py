@@ -226,6 +226,7 @@ def set_integration_credential(server_number: int, integration_id: str, *, expec
         raise ValueError('Invalid Barricade integration change')
     with delivery_scope(server_number, f'integration:{integration_id}'):
         with get_session_maker()() as session, session.begin():
+            session.execute(text('SET TRANSACTION ISOLATION LEVEL READ COMMITTED'))
             row = session.get(BarricadeScanIntegration, (server_number, integration_id), with_for_update=True)
             old = row.credential_id if row is not None else None
             if old != expected_credential_id:

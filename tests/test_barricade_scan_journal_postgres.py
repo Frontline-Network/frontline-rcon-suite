@@ -19,7 +19,7 @@ from sqlalchemy import inspect, select, text
 from rcon import barricade_scan_journal as journal
 from rcon import barricade_scan_dispatch as adapter
 from rcon.barricade_scan_identity import integration_namespace
-from rcon.models import PlayerID, PlayerSession
+from rcon.models import PlayerID, PlayerSession, SessionEventResolution
 from tests.test_blacklist_sync_journal_postgres import database, queue
 from rcon.blacklist_sync_journal import BlacklistSyncDelivery
 
@@ -43,6 +43,9 @@ def test_activation_boundary_at_exact_second_does_not_assume_event_order():
 
 
 def prepare(database, monkeypatch):
+    PlayerID.__table__.create(database.kw['bind'], checkfirst=True)
+    PlayerSession.__table__.create(database.kw['bind'], checkfirst=True)
+    SessionEventResolution.__table__.create(database.kw['bind'], checkfirst=True)
     journal.BarricadeScanBaseline.__table__.create(database.kw['bind'])
     journal.BarricadeScanDelivery.__table__.create(database.kw['bind'])
     journal.BarricadeScanIntegration.__table__.create(database.kw['bind'])
@@ -56,6 +59,30 @@ def prepare_adapter(database, monkeypatch):
     monkeypatch.setattr(adapter, 'key_is_live', lambda _credential_id: True)
     assert journal.set_integration_credential(3, '01234567-89ab-4def-8012-0123456789ab',
         expected_credential_id=None, new_credential_id=1, actor='test', reason='register')
+
+
+def test_baseline_records_existing_sessions_without_claiming_success(database, monkeypatch):
+    prepare(database, monkeypatch)
+    peer = '01234567-89ab-4def-8012-0123456789ab'
+    with database.begin() as session:
+        player = PlayerID(player_id='00000000000000000000000000000001')
+        session.add(player)
+        session.flush()
+        old = PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2026, 1, 1))
+        session.add(old)
+        session.flush()
+        old_id = old.id
+    assert journal.set_integration_credential(3, peer, expected_credential_id=None,
+        new_credential_id=1, actor='test', reason='synthetic cutover')
+    with database.begin() as session:
+        assert session.get(journal.BarricadeScanBaseline, (3, peer, old_id)) is not None
+        assert session.scalar(select(journal.BarricadeScanDelivery.id)) is None
+        fresh = PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2026, 1, 2))
+        session.add(fresh)
+        session.flush()
+        fresh_id = fresh.id
+    rows = journal.find_unreserved_open_sessions(3, f'integration:{peer}')
+    assert [row[0] for row in rows] == [fresh_id]
 
 
 def test_key_rotation_preserves_registered_namespace_and_rejects_other_keys(database, monkeypatch):
@@ -124,6 +151,11 @@ def test_migration_roundtrip_and_protects_delivery_history(database, monkeypatch
     migration = module_from_spec(spec)
     spec.loader.exec_module(migration)
     engine = database.kw['bind']
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
+    with engine.begin() as connection:
+        connection.execute(text('DROP INDEX ix_player_sessions_server_id_scan'))
+        connection.execute(text('DROP INDEX ix_player_sessions_server_open_id_scan'))
     monkeypatch.setattr(journal, 'get_session_maker', lambda: database)
     for index in range(5):
         assert queue(database, f'synthetic-{index}'.encode(), 1 << 3) == 1
@@ -174,8 +206,8 @@ def test_concurrent_reservation_is_once_and_isolated_by_server_and_integration(d
 def test_discovery_catches_late_commits_and_preserves_integration_isolation(database, monkeypatch):
     prepare(database, monkeypatch)
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     with database.begin() as session:
         session.add_all([PlayerID(player_id='slow'), PlayerID(player_id='fast')])
     with database() as delayed, database() as fast:
@@ -203,8 +235,8 @@ def test_discovery_catches_late_commits_and_preserves_integration_isolation(data
 def test_discovery_rejects_session_with_absolute_disconnect_even_if_legacy_end_is_missing(database, monkeypatch):
     prepare(database, monkeypatch)
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     with database.begin() as session:
         player = PlayerID(player_id='synthetic')
         session.add(player)
@@ -217,8 +249,8 @@ def test_discovery_rejects_session_with_absolute_disconnect_even_if_legacy_end_i
 def test_explicit_boundary_excludes_legacy_and_pre_activation_sessions(database, monkeypatch):
     prepare(database, monkeypatch)
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     with database.begin() as session:
         for pid, event_us in [('legacy', None), ('old', 99), ('boundary', 100), ('new', 101)]:
             player = PlayerID(player_id=pid)
@@ -495,8 +527,8 @@ def test_revoked_key_does_not_create_or_send_a_delivery(database, monkeypatch):
 def test_scan_traverses_past_unverified_sessions_without_sending_them(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     with database.begin() as session:
         for player_id in ('stale', 'unknown', 'present'):
             player = PlayerID(player_id=player_id)
@@ -521,8 +553,8 @@ def test_scan_traverses_past_unverified_sessions_without_sending_them(database, 
 def test_scan_recovers_interrupted_send_even_without_roster(database, monkeypatch, roster):
     prepare_adapter(database, monkeypatch)
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
     with journal.delivery_scope(3, namespace):
         delivery_id = journal.reserve(3, namespace, 999, 'synthetic-eos', 'HLLV')
@@ -542,8 +574,8 @@ def test_scan_recovers_interrupted_send_even_without_roster(database, monkeypatc
 def test_scan_does_not_confuse_old_and_current_session_of_same_player(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     with database.begin() as session:
         player = PlayerID(player_id='synthetic-eos')
         session.add(player)
@@ -575,8 +607,8 @@ def test_scan_activation_never_automatically_resends_old_or_ambiguous_sessions(d
     with database() as session:
         boundary = session.get(journal.BarricadeScanIntegration, (3, peer)).registered_at_us
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     floor = (boundary // 1_000_000) * 1_000_000
     with database.begin() as session:
         for pid, event_us in [('legacy', None), ('old', floor - 1_000_000),
@@ -623,8 +655,8 @@ def test_scan_activation_never_automatically_resends_old_or_ambiguous_sessions(d
 def test_activation_reviews_defer_unobserved_and_unavailable_roster(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
     with database.begin() as session:
         for pid in ('offline-stale', 'later-observed'):
@@ -652,8 +684,8 @@ def test_activation_reviews_defer_unobserved_and_unavailable_roster(database, mo
 def test_roster_limits_open_scan_but_preserves_closed_session_review(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
     event = (int(time.time()) + 2) * 1_000_000
     with database.begin() as session:
@@ -687,8 +719,8 @@ def test_scan_revisits_delayed_lower_session_id_after_later_commit(database, mon
     """A per-pass page cursor must not become a permanent high-water mark."""
     prepare_adapter(database, monkeypatch)
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     with database.begin() as session:
         session.add_all([PlayerID(player_id='late'), PlayerID(player_id='early')])
     namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
@@ -725,8 +757,8 @@ def test_scan_revisits_delayed_lower_session_id_after_later_commit(database, mon
 def test_parallel_scan_passes_share_one_inflight_delivery(database, monkeypatch, acknowledged):
     prepare_adapter(database, monkeypatch)
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
     with database.begin() as session:
         player = PlayerID(player_id='synthetic-eos')
@@ -763,8 +795,8 @@ def test_parallel_scan_passes_share_one_inflight_delivery(database, monkeypatch,
 def test_disconnected_sessions_are_visible_without_replaying_ended_session(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
     event = (int(time.time()) + 2) * 1_000_000
     with database.begin() as session:
@@ -800,8 +832,8 @@ def test_disconnected_sessions_are_visible_without_replaying_ended_session(datab
 def test_closed_discovery_combines_recent_and_queued_without_duplicates(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     engine = database.kw['bind']
-    PlayerID.__table__.create(engine)
-    PlayerSession.__table__.create(engine)
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
     namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
     identifiers = {}
     with database.begin() as session:
@@ -822,7 +854,7 @@ def test_closed_discovery_combines_recent_and_queued_without_duplicates(database
         if name.startswith('queued'):
             journal.resolve_review(3, namespace, delivery, decision='retry', actor='test', reason='synthetic')
     rows = journal.find_unreserved_recent_closed_sessions(3, namespace, 2_000_100)
-    assert rows == [(identifiers[name], name) for name in ('queued-old', 'queued-recent', 'fresh-recent')]
+    assert rows == [(identifiers[name], name) for name in ('queued-old', 'queued-recent', 'fresh-recent', 'fresh-old')]
     first = journal.find_unreserved_recent_closed_sessions(3, namespace, 2_000_100, limit=1)
     rest = journal.find_unreserved_recent_closed_sessions(3, namespace, 2_000_100, after_id=first[0][0])
     assert first + rest == rows
