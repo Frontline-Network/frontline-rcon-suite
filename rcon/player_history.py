@@ -1032,7 +1032,7 @@ def _legacy_session_could_overlap(sess: Session, player: PlayerID, server_number
     """
     target_start = datetime.datetime.fromtimestamp(target_start_us / 1_000_000, datetime.timezone.utc).replace(tzinfo=None)
     disconnect = datetime.datetime.fromtimestamp(disconnect_us / 1_000_000, datetime.timezone.utc).replace(tzinfo=None)
-    offset = datetime.timedelta(days=1)
+    offset = datetime.timedelta(0) if _fixed_utc_timezone() else datetime.timedelta(days=1)
     return sess.query(PlayerSession.id).filter(
         PlayerSession.player_id_id == player.id,
         PlayerSession.server_number == server_number,

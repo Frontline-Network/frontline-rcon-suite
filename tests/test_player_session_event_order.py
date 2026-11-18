@@ -449,6 +449,23 @@ def test_open_provably_older_legacy_start_does_not_block_new_session(database, m
         assert session.scalar(select(PendingPlayerDisconnect)) is None
 
 
+def test_verified_utc_history_does_not_block_definitely_earlier_closed_session(database, monkeypatch):
+    monkeypatch.setattr(player_history, '_fixed_utc_timezone', lambda: True)
+    monkeypatch.setattr(player_history, 'get_server_number', lambda: '1')
+    start = 1_700_000_000
+    player_history.save_start_player_session('fake-console-id', start, server_number=1)
+    with Session(database) as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == 'fake-console-id'))
+        session.add(PlayerSession(player=player, start=datetime.fromtimestamp(start - 60, timezone.utc).replace(tzinfo=None),
+                                  end=datetime.fromtimestamp(start - 30, timezone.utc).replace(tzinfo=None), server_number=1))
+        session.commit()
+    player_history.save_end_player_session('fake-console-id', start + 20)
+    with Session(database) as session:
+        saved = session.scalar(select(PlayerSession).where(PlayerSession.start_event_us == start * 1_000_000))
+        assert saved.end_event_us == (start + 20) * 1_000_000
+        assert session.scalar(select(PendingPlayerDisconnect)) is None
+
+
 def test_ambiguous_legacy_connect_is_not_silently_duplicated(database, monkeypatch):
     monkeypatch.delenv("HLL_SESSION_LEGACY_UTC", raising=False)
     start = 1_700_000_000
