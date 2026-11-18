@@ -124,6 +124,8 @@ def test_only_running_backend_is_reconciled(deployment):
 def test_discovery_cli_probes_existing_backend_without_recreating(tmp_path, probe_ok):
     (tmp_path / 'compose.yaml').touch()
     fake = tmp_path / 'docker'
+    details = json.dumps([{'State': {'Running': True},
+                           'Config': {'Healthcheck': {'Test': HEALTHCHECK['test']}}}])
     fake.write_text(f'''#!{sys.executable}
 import json, os, sys
 args = sys.argv[1:]
@@ -132,7 +134,7 @@ if 'config' in args:
 elif 'ps' in args:
     print('synthetic-container')
 elif args[0] == 'inspect':
-    print(json.dumps([{{'State': {{'Running': True}}, 'Config': {{'Healthcheck': {{'Test': {HEALTHCHECK['test']!r}}}}}}]))
+    print({details!r})
 elif args[0] == 'exec':
     assert args[1:] == ['synthetic-container', 'python', '/code/scripts/backend_healthcheck.py']
     sys.exit(0 if os.environ['PROBE_OK'] == '1' else 1)
