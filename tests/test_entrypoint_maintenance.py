@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class MaintenanceEntrypointTests(unittest.TestCase):
-    def run_maintenance(self, *, failure="", stale_marker=False):
+    def run_maintenance(self, *, failure="", stale_marker=False, legacy_player_ids=""):
         bash = os.environ.get("BASH") or shutil.which("bash")
         if bash is None:
             self.skipTest("bash is required for entrypoint behavior tests")
@@ -58,6 +58,7 @@ if [[ "$1" == migrate && "$FAIL_STAGE" == migrate ]]; then exit 23; fi
                 env={
                     **os.environ,
                     "COMMAND_LOG": str(commands),
+                    "HLL_MAINTENANCE_LEGACY_PLAYER_IDS": legacy_player_ids,
                     "FAIL_STAGE": failure,
                     "SERVER_NUMBER": "4",
                     "PATH": f"{binary}{os.pathsep}{os.environ['PATH']}",
@@ -83,8 +84,25 @@ if [[ "$1" == migrate && "$FAIL_STAGE" == migrate ]]; then exit 23; fi
         self.assertEqual(result.returncode, 42, result.stderr)
         self.assertFalse(generated)
         self.assertTrue(ready)
+        self.assertIn("rcon.cli merge_duplicate_player_ids", commands)
+        self.assertIn("rcon.cli convert_win_player_ids", commands)
         self.assertLess(commands.index("makemigrations"), commands.index("manage.py migrate"))
         self.assertLess(commands.index("manage.py migrate"), commands.index("sleep infinity"))
+
+    def test_disabling_legacy_id_rewrites_only_skips_the_two_cleanup_commands(self):
+        result, commands, ready, _ = self.run_maintenance(legacy_player_ids="0")
+        self.assertEqual(result.returncode, 42, result.stderr)
+        self.assertTrue(ready)
+        self.assertNotIn("rcon.cli merge_duplicate_player_ids", commands)
+        self.assertNotIn("rcon.cli convert_win_player_ids", commands)
+        for required in ("alembic upgrade head", "rcon.cache_migrations", "manage.py migrate --noinput"):
+            self.assertIn(required, commands)
+
+    def test_invalid_legacy_id_option_stops_before_any_migration(self):
+        result, commands, ready, _ = self.run_maintenance(legacy_player_ids="invalid", stale_marker=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(commands, "")
+        self.assertFalse(ready)
 
     def test_model_drift_does_not_generate_files_apply_django_or_reuse_readiness(self):
         result, commands, ready, generated = self.run_maintenance(

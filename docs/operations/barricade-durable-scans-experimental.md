@@ -80,6 +80,12 @@ uncertain deliveries are reconciled. Older binaries do not know the binding.
 Keep shared maintenance on an image that recognizes the migrated Alembic
 revision, including after a host or Compose restart.
 
+If maintenance on this shared database must preserve historical player IDs,
+set `HLL_MAINTENANCE_LEGACY_PLAYER_IDS=0` in the host environment file and
+verify the effective value on the maintenance service for each startup path.
+This skips the two historical ID cleanup commands while continuing schema
+and Redis migrations. The default value of `1` retains the legacy cleanup.
+
 The migration refuses to drop its tables when integration or scan history
 exists. Rolling back application code does not require dropping those tables;
 preserve them and the backups. Never delete this history to force downgrade,

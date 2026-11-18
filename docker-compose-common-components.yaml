@@ -47,6 +47,7 @@ services:
     image: ${BACKEND_DOCKER_REPOSITORY}:${TAGGED_VERSION}
     environment:
       HLL_MAINTENANCE_CONTAINER: true
+      HLL_MAINTENANCE_LEGACY_PLAYER_IDS: ${HLL_MAINTENANCE_LEGACY_PLAYER_IDS:-1}
       # Django management commands run during maintenance and require the
       # same application secret as the web backends.
       RCONWEB_API_SECRET: ${RCONWEB_API_SECRET}

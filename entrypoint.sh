@@ -8,20 +8,22 @@ if [ "$1" == 'maintenance' ]
 then
   # A restarted maintenance container must not retain a previous success marker.
   rm -f rconweb/maintenance-container-healthy
+  legacy_player_ids=${HLL_MAINTENANCE_LEGACY_PLAYER_IDS:-1}
+  case "$legacy_player_ids" in
+    0|1) ;;
+    *) echo "HLL_MAINTENANCE_LEGACY_PLAYER_IDS must be 0 or 1" >&2; exit 2 ;;
+  esac
   alembic upgrade head
-  # Convert old stye player IDs to new style (md5 hash)
-  # TODO: we can eventually remove this in a few releases once old installs have updated their game servers and CRCON
-  # SERVER_NUMBER is mandatory and not otherwise set in the maintenance container; only want it to run once
-  # LOGGING_PATH and LOGGING_FILENAME need to be passed to get it to log to the directory that is bind mounted
-  # A historical player record can still be referenced by an account.  Do not
-  # block every subsequent deployment (including schema migrations) on that
-  # legacy cleanup; the command remains safe to retry after the reference has
-  # been resolved.
-  if ! SERVER_NUMBER=1 LOGGING_PATH=/logs/ LOGGING_FILENAME=startup.log python -m rcon.cli merge_duplicate_player_ids
-  then
-    echo "WARNING: legacy duplicate-player-id cleanup was deferred; see startup.log" >&2
+  if [[ "$legacy_player_ids" == 1 ]]; then
+    # Old installations can have a legacy ID and its MD5 equivalent. An
+    # account reference can defer their merge while schema upgrades continue.
+    if ! SERVER_NUMBER=1 LOGGING_PATH=/logs/ LOGGING_FILENAME=startup.log python -m rcon.cli merge_duplicate_player_ids; then
+      echo "WARNING: legacy duplicate-player-id cleanup was deferred; see startup.log" >&2
+    fi
+    SERVER_NUMBER=1 LOGGING_PATH=/logs/ LOGGING_FILENAME=startup.log python -m rcon.cli convert_win_player_ids
+  else
+    echo "Legacy player ID conversion and merging disabled for this installation."
   fi
-  SERVER_NUMBER=1 LOGGING_PATH=/logs/ LOGGING_FILENAME=startup.log python -m rcon.cli convert_win_player_ids
   # Upgrade durable Redis structures before any server-specific container starts.
   # The command discovers every populated logical Redis database so multi-server
   # installations are migrated in the same maintenance pass.

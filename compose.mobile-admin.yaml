@@ -128,7 +128,9 @@ services:
   maintenance:
     <<: *frontline-backend
     image: ${FRONTLINE_MAINTENANCE_IMAGE:-frontline/hll_rcon_tool:${CRCON_IMAGE_TAG:-mobile-admin-autobalancer-v11.11.1}}
-    environment: *mobile-environment
+    environment:
+      <<: *mobile-environment
+      HLL_MAINTENANCE_LEGACY_PLAYER_IDS: ${HLL_MAINTENANCE_LEGACY_PLAYER_IDS:-1}
 
   webhook_service:
     <<: *frontline-backend
