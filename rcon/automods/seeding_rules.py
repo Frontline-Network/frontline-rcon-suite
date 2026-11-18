@@ -740,6 +740,11 @@ class SeedingRulesAutomod(WarningConfirmationMixin):
                     )
 
                 if len(violations) == 0:
+                    # Unknown position is not proof that the cap rule ended.
+                    role_known = bool(normalize_role(aplayer.role)) or self._is_seeding_rule_disabled('disallowed_roles')
+                    if role_known and (not cap_rule_active or position_violation is False):
+                        from rcon.automods.automod import release_observed_periodic_warning
+                        release_observed_periodic_warning(self, aplayer.player_id, team, squad_name, game_state)
                     continue
 
                 violation_msg = ", ".join(violations)
