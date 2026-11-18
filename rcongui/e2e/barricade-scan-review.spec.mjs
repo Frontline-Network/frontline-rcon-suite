@@ -33,6 +33,20 @@ for (const sample of [
     await main.getByRole("button", { name: sample.title, exact: true }).click();
     await expect(main.getByTestId("barricade-scan-review").getByText(sample.before, { exact: false })).toBeVisible();
   });
+  for (const [cause, labels] of Object.entries({
+    reconstructed_session: { de: "Die Sitzung wurde nachträglich rekonstruiert.", en: "The session was reconstructed afterwards.", fr: "La session a été reconstituée après coup." },
+    missing_live_connect: { de: "Frontline konnte den Beitritt nach der Aktivierung nicht eindeutig belegen.", en: "Frontline could not verify that the player joined after activation.", fr: "Frontline n’a pas pu vérifier que le joueur avait rejoint le serveur après l’activation." },
+  })) {
+    test(`explains ${cause} and its retry option in ${sample.language}`, async ({ page }) => {
+      const main = await openDemoPage(page, "/records/blacklists/manage", { language: sample.language,
+        query: { demo_barricade_review: 1, demo_barricade_cause: cause } });
+      await main.getByRole("button", { name: sample.title, exact: true }).click();
+      const panel = main.getByTestId("barricade-scan-review");
+      await expect(panel.getByText(labels[sample.language], { exact: false })).toBeVisible();
+      await panel.getByRole("combobox", { name: sample.decision }).click();
+      await expect(page.getByRole("option", { name: sample.retry })).toHaveCount(cause === "reconstructed_session" ? 0 : 1);
+    });
+  }
   test(`does not offer automatic retry for ended session in ${sample.language}`, async ({ page }) => {
     const main = await openDemoPage(page, "/records/blacklists/manage", { language: sample.language,
       query: { demo_barricade_review: 1, demo_barricade_cause: "session_ended_before_scan" } });

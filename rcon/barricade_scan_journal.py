@@ -250,6 +250,8 @@ def resolve_review(server_number: int, integration_id: str, delivery_id: int, *,
                 raise ValueError('Barricade scan is not awaiting review')
             if row.review_cause == 'session_ended_before_scan' and decision == 'retry':
                 raise ValueError('The session ended; an automatic retry cannot verify this session')
+            if row.review_cause == 'reconstructed_session' and decision == 'retry':
+                raise ValueError('A reconstructed session cannot trigger an automatic scan')
             row.status = {'confirmed': 'done', 'dismissed': 'reviewed', 'retry': 'queued', 'recover': 'review'}[decision]
             if decision == 'recover':
                 row.review_cause = 'uncertain_delivery'
