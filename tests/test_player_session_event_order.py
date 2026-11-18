@@ -502,6 +502,46 @@ def test_ambiguous_legacy_connect_is_not_silently_duplicated(database, monkeypat
         assert len(session.scalars(select(PendingPlayerConnect)).all()) == 1
 
 
+def test_connect_matching_legacy_under_different_timezone_is_deferred(database, monkeypatch):
+    monkeypatch.delenv('HLL_SESSION_LEGACY_UTC', raising=False)
+    monkeypatch.setattr(player_history.RconServerSettingsUserConfig, 'load_from_db', lambda: SimpleNamespace(short_name='test'))
+    start = 1_700_000_000
+    # Historical writer used a different legal UTC offset from this writer.
+    old_wall = datetime.fromtimestamp(start + 3600, timezone.utc).replace(tzinfo=None)
+    with Session(database) as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == 'fake-console-id'))
+        session.add(PlayerSession(player=player, start=old_wall, server_number=1))
+        session.add(LogLine(type='CONNECTED', server='1', player1_player_id=player.id,
+                            event_time=old_wall, raw=f'[0 ms ({start})] CONNECTED fake', weapon='', content=''))
+        session.commit()
+    player_history.save_start_player_session('fake-console-id', start, server_number=1)
+    with Session(database) as session:
+        rows = session.scalars(select(PlayerSession)).all()
+        assert len(rows) == 1
+        legacy_id = rows[0].id
+        assert session.scalar(select(PendingPlayerConnect)) is not None
+    pending = session_event_review.list_pending(1)
+    assert [candidate['id'] for candidate in pending['results'][0]['legacy_candidates']] == [legacy_id]
+    assert session_event_review.resolve(1, 'fake-console-id', 'connect', start * 1_000_000,
+                                        'link', 'verified source log', 'operator', session_id=legacy_id)
+    with Session(database) as session:
+        assert session.get(PlayerSession, legacy_id).start_event_us == start * 1_000_000
+
+
+def test_unrelated_recent_legacy_start_does_not_block_new_connect(database, monkeypatch):
+    monkeypatch.delenv('HLL_SESSION_LEGACY_UTC', raising=False)
+    start = 1_700_000_000
+    with Session(database) as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == 'fake-console-id'))
+        session.add(PlayerSession(player=player, start=datetime.fromtimestamp(start + 3600, timezone.utc).replace(tzinfo=None),
+                                  server_number=1))
+        session.commit()
+    player_history.save_start_player_session('fake-console-id', start, server_number=1)
+    with Session(database) as session:
+        assert len(session.scalars(select(PlayerSession)).all()) == 2
+        assert session.scalar(select(PendingPlayerConnect)) is None
+
+
 def test_unreviewed_legacy_connect_prevents_closing_an_older_known_session(database, monkeypatch):
     monkeypatch.delenv("HLL_SESSION_LEGACY_UTC", raising=False)
     monkeypatch.setattr(player_history, "get_server_number", lambda: "1")

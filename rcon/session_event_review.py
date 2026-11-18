@@ -11,7 +11,7 @@ from rcon.models import (
 )
 from rcon.player_history import (
     _lock_player_session_events, _reassign_overlapping_disconnects,
-    _reconcile_pending_disconnects,
+    _reconcile_pending_disconnects, _legacy_connect_log_candidates,
 )
 
 
@@ -73,7 +73,8 @@ def list_pending(server_number: int, limit: int = 50) -> dict:
             .limit(limit + 1)).all()
         visible_connects = connects[:limit]
         player_ids = {row.player_id for row in visible_connects}
-        identities = set(session.scalars(select(PlayerID.player_id).where(PlayerID.player_id.in_(player_ids))).all()) if player_ids else set()
+        identity_ids = dict(session.execute(select(PlayerID.player_id, PlayerID.id).where(PlayerID.player_id.in_(player_ids))).all()) if player_ids else {}
+        identities = set(identity_ids)
         candidate_map = {}
         pairs = {(row.player_id, row.started_at) for row in visible_connects}
         if pairs:
@@ -87,7 +88,12 @@ def list_pending(server_number: int, limit: int = 50) -> dict:
                 candidate_map.setdefault((candidate.player_id, candidate.start), []).append(candidate)
         result = []
         for row in visible_connects:
-            candidates = candidate_map.get((row.player_id, row.started_at), [])
+            candidates = list(candidate_map.get((row.player_id, row.started_at), []))
+            if row.player_id in identity_ids:
+                ids = {candidate.id for candidate in candidates}
+                candidates.extend(candidate for candidate in _legacy_connect_log_candidates(
+                    session, identity_ids[row.player_id], server_number, row.started_event_us)
+                    if candidate.id not in ids)
             result.append({"kind": "connect", "player_id": row.player_id,
                 "event_us": str(row.started_event_us), "event_time": _event_time(row.started_event_us), "identity_exists": row.player_id in identities,
                 "legacy_candidates": [{"id": candidate.id, "start": candidate.start.isoformat(),
@@ -132,7 +138,10 @@ def resolve(server_number: int, player_id: str, event_kind: str, event_us: int,
                     raise ValueError("A legacy session must be selected")
                 target = session.get(PlayerSession, int(session_id), with_for_update=True)
                 if (target is None or target.player_id_id != player.id or target.server_number != server_number
-                        or target.start != pending.started_at or target.start_event_us is not None):
+                        or target.start_event_us is not None):
+                    raise ValueError("The selected legacy session does not match")
+                if (target.start != pending.started_at and target.id not in {
+                        candidate.id for candidate in _legacy_connect_log_candidates(session, player.id, server_number, event_us)}):
                     raise ValueError("The selected legacy session does not match")
                 target.start_event_us = event_us
             else:
