@@ -177,6 +177,18 @@ def test_crossing_hour_boundary_reserves_kick_instead_of_ban(monkeypatch):
     server.temp_ban.assert_not_called()
 
 
+@pytest.mark.parametrize('remaining_hours', [[-1], [1, -1]])
+def test_negative_remaining_time_never_becomes_kick(monkeypatch, remaining_hours):
+    record = BlacklistRecord(admin_name='test', expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
+                             blacklist=Blacklist(name='test', sync=BlacklistSyncMethod.BAN_IMMEDIATELY))
+    monkeypatch.setattr(record, 'get_formatted_reason', lambda: 'reason')
+    monkeypatch.setattr(blacklist, '_blacklist_remaining_hours', Mock(side_effect=remaining_hours))
+    server = Mock()
+    assert blacklist.apply_blacklist_punishment(server, record, player_id='id', player_name='name') is blacklist._BLACKLIST_ACTION_EXPIRED
+    server.kick.assert_not_called()
+    server.temp_ban.assert_not_called()
+
+
 @pytest.mark.parametrize('result', [None, TimeoutError('synthetic lost response')])
 def test_uncertain_blacklist_action_blocks_later_attempts(monkeypatch, fake_blacklist_guard, result):
     record = SimpleNamespace(admin_name='tester', expires_at=None, get_formatted_reason=lambda: 'reason')

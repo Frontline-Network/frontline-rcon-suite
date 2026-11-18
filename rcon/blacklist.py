@@ -527,8 +527,12 @@ def apply_blacklist_punishment(
                 return _BLACKLIST_ACTION_EXPIRED
             state = get_ban_state_from_record(record)
             guard_action = "kick" if state == BanState.NONE else "ban"
-            if state == BanState.TEMP and _blacklist_remaining_hours(record) < 1:
-                guard_action = "kick"
+            if state == BanState.TEMP:
+                hours = _blacklist_remaining_hours(record)
+                if hours < 0:
+                    return _BLACKLIST_ACTION_EXPIRED
+                if hours < 1:
+                    guard_action = "kick"
             if guard_action == "kick" and not is_online:
                 return _BLACKLIST_ACTION_DEFERRED
             try:
@@ -592,6 +596,8 @@ def _apply_blacklist_punishment(
             return _BLACKLIST_ACTION_EXPIRED
 
         hours = _blacklist_remaining_hours(record) if state == BanState.TEMP else None
+        if hours is not None and hours < 0:
+            return _BLACKLIST_ACTION_EXPIRED
         actual_action = "kick" if state == BanState.NONE or (state == BanState.TEMP and hours < 1) else "ban"
         if expected_action is not None and actual_action != expected_action:
             return _BLACKLIST_ACTION_CHANGED
