@@ -154,7 +154,7 @@ def test_roster_absence_must_precede_connect_and_new_rejoin_can_be_scanned(datab
 def test_roster_transition_dispatches_vietnam_eos_once_and_persists_confirmation(database, monkeypatch):
     prepare_adapter(database, monkeypatch)
     namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
-    eos = '00026a3466a244829409f77af0a752d9'
+    eos = '0000000000000000000000000000a123'
     journal.record_roster_snapshot(3, namespace, frozenset())
     journal.record_collector_connects([(3, eos, 'connect', 1_700_000_100_000_000)])
     with database.begin() as session:
@@ -181,6 +181,21 @@ def test_roster_transition_dispatches_vietnam_eos_once_and_persists_confirmation
         delivery = session.scalar(select(journal.BarricadeScanDelivery).where(
             journal.BarricadeScanDelivery.player_session_id == session_id))
         assert delivery is not None and delivery.status == 'done'
+
+
+def test_reconstructed_session_review_cannot_be_retried(database, monkeypatch):
+    prepare_adapter(database, monkeypatch)
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    with journal.delivery_scope(3, namespace):
+        journal.mark_activation_review(3, namespace, 123, 'synthetic-eos', 'HLLV', 'reconstructed_session')
+    with database() as session:
+        delivery_id = session.scalar(select(journal.BarricadeScanDelivery.id))
+    with pytest.raises(ValueError):
+        journal.resolve_review(3, namespace, delivery_id, decision='retry', actor='test', reason='synthetic')
+    with database() as session:
+        delivery = session.get(journal.BarricadeScanDelivery, delivery_id)
+        assert (delivery.status, delivery.review_cause) == ('review', 'reconstructed_session')
+        assert session.scalar(select(func.count()).select_from(journal.BarricadeScanReviewAudit)) == 0
 
 
 def test_twenty_vietnam_joins_dispatch_once_with_individual_checks(database, monkeypatch):
