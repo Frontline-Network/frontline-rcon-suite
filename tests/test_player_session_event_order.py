@@ -221,6 +221,29 @@ def test_three_sessions_converge_for_every_event_arrival_order(database, monkeyp
 
 
 @pytest.mark.skipif(not hasattr(time, "tzset"), reason="process timezone control requires tzset")
+@pytest.mark.parametrize('zone', ['UTC', 'Europe/Berlin', 'America/New_York', 'Pacific/Kiritimati'])
+def test_absolute_session_duration_is_independent_of_process_timezone(database, monkeypatch, zone):
+    original_tz = os.environ.get('TZ')
+    monkeypatch.setenv('TZ', zone)
+    time.tzset()
+    try:
+        monkeypatch.setattr(player_history, 'get_server_number', lambda: '1')
+        start, end = 1_729_990_200, 1_729_991_400
+        player_history.save_start_player_session('fake-console-id', start, server_number=1)
+        player_history.save_end_player_session('fake-console-id', end)
+        with Session(database) as session:
+            player = session.scalar(select(PlayerID).where(PlayerID.player_id == 'fake-console-id'))
+            assert player.get_total_playtime_seconds() == 1200
+            assert player.sessions[0].end_event_us - player.sessions[0].start_event_us == 1_200_000_000
+    finally:
+        if original_tz is None:
+            os.environ.pop('TZ', None)
+        else:
+            os.environ['TZ'] = original_tz
+        time.tzset()
+
+
+@pytest.mark.skipif(not hasattr(time, "tzset"), reason="process timezone control requires tzset")
 @pytest.mark.parametrize("start,end", [
     (1_729_990_200, 1_729_991_400),  # 2024-10-27 fall-back
     (1_711_846_200, 1_711_847_400),  # 2024-03-31 spring-forward
