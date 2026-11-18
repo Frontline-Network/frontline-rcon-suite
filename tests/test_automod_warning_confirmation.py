@@ -116,3 +116,27 @@ def test_duplicate_names_do_not_share_warnings_and_rename_keeps_identity(mod_typ
         first.name = "Renamed"
         assert mod.should_warn_player(state, "Able", first) == PunishStepState.GO_TO_NEXT_STEP
         assert state.warned[second.player_id] == [PENDING_WARNING]
+
+
+def test_failed_warning_does_not_stay_pending_after_player_leaves_squad():
+    redis = fakeredis.FakeStrictRedis()
+    mod = NoLeaderAutomod(AutoModNoLeaderUserConfig(number_of_warnings=1, warning_interval_seconds=0), redis)
+    player = PunishPlayer(player_id="fake-id", name="Player", squad="Able", team="allies", lvl=100,
+                          details=PunishDetails(author=mod.action_author, message="warning"))
+    with mod.watch_state("allies", "Able") as state:
+        assert mod.should_warn_player(state, "Able", player) == PunishStepState.APPLY
+        state.punished[player.player_id] = [PENDING_WARNING]
+    mod.punitions_to_apply({}, "Able", "allies", {"has_leader": False, "players": []}, {})
+    with mod.watch_state("allies", "Able") as state:
+        assert player.player_id not in state.punished
+        assert mod.should_warn_player(state, "Able", player) == PunishStepState.APPLY
+
+
+def test_incomplete_squad_snapshot_keeps_pending_watch():
+    redis = fakeredis.FakeStrictRedis()
+    mod = NoLeaderAutomod(AutoModNoLeaderUserConfig(number_of_warnings=1), redis)
+    with mod.watch_state("allies", "Able") as state:
+        state.warned["fake-id"] = [PENDING_WARNING]
+    mod.punitions_to_apply({}, "Able", "allies", {"has_leader": False, "players": [{"player_id": ""}]}, {})
+    with mod.watch_state("allies", "Able") as state:
+        assert state.warned["fake-id"] == [PENDING_WARNING]

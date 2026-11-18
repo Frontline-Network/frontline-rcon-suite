@@ -195,6 +195,19 @@ class NoLeaderAutomod(WarningConfirmationMixin):
 
             self.logger.debug("There is NO leader in squad - (%s) %s", team, squad_name)
 
+            # A failed attempt belongs to this player's current stay in this
+            # squad. Once a complete squad snapshot shows that they left, its
+            # pending watch marker must not suppress a later new stay.
+            players = squad["players"]
+            if all(isinstance(p.get("player_id"), str) and p["player_id"].strip() for p in players):
+                current_ids = {p["player_id"] for p in players}
+                for history in (watch_status.warned, watch_status.punished):
+                    for player_id in list(history):
+                        if player_id not in current_ids and history[player_id] and history[player_id][-1] == PENDING_WARNING:
+                            history[player_id].pop()
+                            if not history[player_id]:
+                                del history[player_id]
+
             author = AUTOMOD_USERNAME + ("-DryRun" if self.config.dry_run else "")
 
             for player in squad["players"]:
