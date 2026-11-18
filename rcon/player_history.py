@@ -1030,8 +1030,12 @@ def _prepare_open_utc_legacy_sessions(sess: Session, player: PlayerID, server_nu
             LogLine.event_time >= row.start - datetime.timedelta(seconds=1),
             LogLine.event_time <= row.start + datetime.timedelta(seconds=1),
         ).limit(3).all()
-        if len(logs) == 3:
-            # Do not infer uniqueness when the bounded read was truncated.
+        if len(logs) != 1:
+            # Another nearby same-player connect can have the same naive wall
+            # time but a different absolute instant (e.g. different historical
+            # timezone settings). Matching one epoch under a UTC assumption is
+            # not sufficient to determine which event created the legacy row.
+            # A three-row result may also have been truncated by the limit.
             continue
         matching = []
         for (raw,) in logs:
