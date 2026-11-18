@@ -1,5 +1,8 @@
 import json
+import os
+from pathlib import Path
 import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -114,3 +117,35 @@ def test_only_running_backend_is_reconciled(deployment):
     assert command[-3:] == ['--service', 'backend_1', '--apply']
     assert 'backend_2' not in command
     assert [call[2] for call in state['calls'][1:]] == ['backend_1']
+
+
+@pytest.mark.skipif(os.name != 'posix', reason='fake executable requires POSIX')
+@pytest.mark.parametrize('probe_ok', [True, False])
+def test_discovery_cli_probes_existing_backend_without_recreating(tmp_path, probe_ok):
+    (tmp_path / 'compose.yaml').touch()
+    fake = tmp_path / 'docker'
+    fake.write_text(f'''#!{sys.executable}
+import json, os, sys
+args = sys.argv[1:]
+if 'config' in args:
+    print('backend_1')
+elif 'ps' in args:
+    print('synthetic-container')
+elif args[0] == 'inspect':
+    print(json.dumps([{{'State': {{'Running': True}}, 'Config': {{'Healthcheck': {{'Test': {HEALTHCHECK['test']!r}}}}}}]))
+elif args[0] == 'exec':
+    assert args[1:] == ['synthetic-container', 'python', '/code/scripts/backend_healthcheck.py']
+    sys.exit(0 if os.environ['PROBE_OK'] == '1' else 1)
+else:
+    sys.exit(99)
+''', encoding='utf-8')
+    fake.chmod(0o755)
+    env = dict(os.environ, PATH=str(tmp_path) + os.pathsep + os.environ['PATH'],
+               PROBE_OK='1' if probe_ok else '0')
+    script = Path(discovery.__file__).resolve()
+    result = subprocess.run([sys.executable, str(script)], cwd=tmp_path, env=env,
+                            text=True, capture_output=True, timeout=15)
+    assert result.returncode == (0 if probe_ok else 1)
+    assert ('listeners are ready' in result.stdout) == probe_ok
+    if not probe_ok:
+        assert 'backend_1 readiness probe failed' in result.stderr
