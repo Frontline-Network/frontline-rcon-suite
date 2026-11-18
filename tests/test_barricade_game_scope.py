@@ -35,8 +35,11 @@ def test_new_session_scan_includes_configured_game(monkeypatch, configured, expe
         consumer = barricade.BarricadeConsumer()
         now = datetime(2026, 1, 1, 12)
         consumer.send_request = AsyncMock(return_value={})
+        async def dispatch(_server, _namespace, rows, game, sender):
+            return await sender([row[0] for row in rows], game)
         with patch.object(barricade, 'get_most_recent_session_date', AsyncMock(return_value=now)), \
-             patch.object(barricade, 'get_joined_players_since', AsyncMock(return_value=[(player_id, now + timedelta(seconds=1))])), \
+             patch.object(barricade, 'get_joined_players_since', AsyncMock(return_value=[(player_id, now + timedelta(seconds=1), 1)])), \
+             patch('rcon.barricade_legacy_dispatch.dispatch', dispatch), \
              patch.object(barricade.asyncio, 'sleep', AsyncMock(side_effect=[None, asyncio.CancelledError])):
             with pytest.raises(asyncio.CancelledError):
                 await consumer._scan_players_loop()

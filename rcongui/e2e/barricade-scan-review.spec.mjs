@@ -56,6 +56,30 @@ for (const sample of [
     await panel.getByRole("combobox", { name: sample.decision }).click();
     await expect(page.getByRole("option", { name: sample.retry })).toHaveCount(0);
   });
+  test(`labels unbound connection and never offers retry in ${sample.language}`, async ({ page }) => {
+    const label = { de: "Nicht zugeordneter Verbindungsversuch", en: "Unattributed connection attempt", fr: "Tentative de connexion non attribuée" }[sample.language];
+    const cause = { de: "Dieser Scan wurde nicht gesendet", en: "This scan was not sent", fr: "Cette analyse n’a pas été envoyée" }[sample.language];
+    const main = await openDemoPage(page, "/records/blacklists/manage", { language: sample.language,
+      query: { demo_barricade_review: 1, demo_barricade_unbound: 1, demo_barricade_cause: "prior_unbound_uncertain" } });
+    await main.getByRole("button", { name: sample.title, exact: true }).click();
+    const panel = main.getByTestId("barricade-scan-review");
+    await expect(panel.getByText(label, { exact: false })).toBeVisible();
+    await expect(panel.getByText(cause, { exact: false })).toBeVisible();
+    await panel.getByRole("combobox", { name: sample.decision }).click();
+    await expect(page.getByRole("option", { name: sample.retry })).toHaveCount(0);
+    const confirmed = { de: "Als zugestellt bestätigen", en: "Confirm as delivered", fr: "Confirmer la transmission" }[sample.language];
+    await expect(page.getByRole("option", { name: confirmed })).toHaveCount(0);
+  });
+  test(`does not retry a registered scan after an unattributed attempt in ${sample.language}`, async ({ page }) => {
+    const main = await openDemoPage(page, "/records/blacklists/manage", { language: sample.language,
+      query: { demo_barricade_review: 1, demo_barricade_cause: "prior_unbound_uncertain" } });
+    await main.getByRole("button", { name: sample.title, exact: true }).click();
+    const panel = main.getByTestId("barricade-scan-review");
+    await panel.getByRole("combobox", { name: sample.decision }).click();
+    await expect(page.getByRole("option", { name: sample.retry })).toHaveCount(0);
+    const confirmed = { de: "Als zugestellt bestätigen", en: "Confirm as delivered", fr: "Confirmer la transmission" }[sample.language];
+    await expect(page.getByRole("option", { name: confirmed })).toHaveCount(0);
+  });
   test(`shows interrupted sends without offering immediate retry in ${sample.language}`, async ({ page }) => {
     const recover = { de: "Versandzustand prüfen", en: "Check delivery state", fr: "Vérifier l’état de l’envoi" }[sample.language];
     const main = await openDemoPage(page, "/records/blacklists/manage", { language: sample.language,

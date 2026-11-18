@@ -144,20 +144,22 @@ def test_scan_recovers_from_initial_database_error():
     asyncio.run(run())
 
 
-@pytest.mark.xfail(strict=True, reason='Unconfirmed scan is lost; see issue #397')
-def test_scan_failure_does_not_advance_past_unconfirmed_players():
+def test_scan_does_not_replay_journaled_unconfirmed_players():
     async def run():
         consumer = BarricadeConsumer()
         initial = datetime(2026, 1, 1, 12)
         later = datetime(2026, 1, 1, 12, 1)
-        read = AsyncMock(side_effect=[[('synthetic-player', later)], []])
+        read = AsyncMock(side_effect=[[('synthetic-player', later, 1)], []])
         consumer.send_request = AsyncMock(side_effect=OSError('synthetic disconnect'))
+        dispatch = AsyncMock(return_value='review')
         with patch.object(barricade, 'get_most_recent_session_date', AsyncMock(return_value=initial)), \
              patch.object(barricade, 'get_joined_players_since', read), \
+             patch('rcon.barricade_legacy_dispatch.dispatch', dispatch), \
              patch.object(barricade.asyncio, 'sleep', AsyncMock(side_effect=[None, None, asyncio.CancelledError])):
             with pytest.raises(asyncio.CancelledError):
                 await consumer._scan_players_loop()
-        assert read.await_args_list[1].args[0] == initial
+        assert read.await_args_list[1].args[0] == later
+        dispatch.assert_awaited_once()
 
     asyncio.run(run())
 
@@ -185,7 +187,7 @@ def test_scan_cursor_can_distinguish_sessions_with_equal_start_time():
             result = barricade.get_joined_players_since.func(stamp)
         # The timestamp alone cannot distinguish the later row from one
         # already acknowledged; recovery must supply additional identity.
-        assert {player_id for player_id, _ in result} == {'later-commit'}
+        assert {row[0] for row in result} == {'later-commit'}
     finally:
         engine.dispose()
 

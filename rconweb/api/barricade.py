@@ -4,6 +4,7 @@ import os
 import time
 from datetime import datetime
 from logging import getLogger
+from uuid import uuid4
 from urllib.parse import parse_qsl
 
 import pydantic
@@ -96,7 +97,7 @@ def unban_player(record_id: int, blacklist_id: int):
 def get_joined_players_since(since: datetime):
     with models.enter_session() as sess:
         rows = (
-            sess.query(models.PlayerID.player_id, models.PlayerSession.start)
+            sess.query(models.PlayerID.player_id, models.PlayerSession.start, models.PlayerSession.id)
             .filter(models.PlayerSession.start > since)
             .filter(models.PlayerSession.server_number == int(get_server_number()))
             .filter(models.PlayerSession.end.is_(None))
@@ -126,6 +127,7 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         self._resp_cache = TTLCache(9999, ttl=60)
         self._last_seen_session = datetime.utcnow()
         self._scan_players_task = None
+        self._legacy_scan_namespace = f'unbound:{uuid4().hex}'
 
     async def connect(self):
         enabled = os.getenv('HLL_BARRICADE_DURABLE_SCANS') == '1'
@@ -228,13 +230,14 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
                 if not rows:
                     continue
 
+                from rcon.barricade_legacy_dispatch import dispatch
+                async def send_scan(player_ids, game):
+                    return await self.send_request(ServerRequestType.SCAN_PLAYERS,
+                        ScanPlayersRequestPayload(player_ids=player_ids, game=game).model_dump())
+                await dispatch(int(get_server_number()), self._legacy_scan_namespace,
+                               [(row[0], row[2]) for row in rows], barricade_game_for_server(), send_scan)
+                # The attempt is durably recorded even if its reply is lost.
                 self._last_seen_session = rows[-1][1]
-                await self.send_request(
-                    ServerRequestType.SCAN_PLAYERS,
-                    ScanPlayersRequestPayload(
-                        player_ids=[row[0] for row in rows], game=barricade_game_for_server()
-                    ).model_dump(),
-                )
             except Exception:
                 logger.exception("Failed to perform scan_players task")
 

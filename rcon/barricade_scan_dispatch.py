@@ -120,7 +120,8 @@ async def dispatch(server_number, integration_id, session_id, player_id, game, s
             if (not journal.credential_is_registered(server_number, integration_id, credential_id)
                     or key_is_live(credential_id) is not True):
                 return 'unauthorized'
-            delivery_id = journal.reserve(server_number, integration_id, session_id, player_id, game)
+            delivery_id = journal.reserve_registered_after_unbound_check(
+                server_number, integration_id, session_id, player_id, game)
             if delivery_id is None:
                 return 'already_recorded'
             if cancelled.is_set():

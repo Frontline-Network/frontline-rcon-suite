@@ -937,7 +937,8 @@ export function makeServer({ environment = "development" } = {}) {
           new URLSearchParams(window.location.search).get("demo_barricade_review") === "1" &&
           !barricadeScanReviewResolved;
         const results = show ? [{ id: 1, player_id: "synthetic-eos", player_session_id: 1,
-          integration_id: "integration:01234567-89ab-4def-8012-0123456789ab", game: "HLLV",
+          integration_id: new URLSearchParams(window.location.search).get("demo_barricade_unbound") === "1"
+            ? "unbound:0123456789abcdef0123456789abcdef" : "integration:01234567-89ab-4def-8012-0123456789ab", game: "HLLV",
           status: barricadeScanRecovered ? "review" : new URLSearchParams(window.location.search).get("demo_barricade_status") || "review",
           review_cause: new URLSearchParams(window.location.search).get("demo_barricade_cause") || "uncertain_delivery",
           updated_at: "2026-01-02T12:00:00Z" }] : [];

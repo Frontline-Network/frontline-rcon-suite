@@ -221,7 +221,9 @@ def list_reviews(server_number: int, offset: int = 0, limit: int = 50) -> dict:
         rows = session.scalars(select(BarricadeScanDelivery).where(*conditions)
                                .order_by(BarricadeScanDelivery.id).offset(offset).limit(limit)).all()
         return {'total': total, 'results': [
-            {'id': row.id, 'integration_id': row.integration_id, 'player_id': row.player_id,
+            {'id': row.id, 'integration_id': row.integration_id,
+             'identity_kind': 'unbound_connection' if row.integration_id.startswith('unbound:') else 'registered_integration',
+             'player_id': row.player_id,
              'player_session_id': row.player_session_id, 'game': row.game, 'review_cause': row.review_cause,
              'status': row.status,
              'updated_at': row.updated_at.isoformat()} for row in rows]}
@@ -239,6 +241,8 @@ def resolve_review(server_number: int, integration_id: str, delivery_id: int, *,
             not isinstance(actor, str) or not actor.strip() or len(actor) > 150 or
             not isinstance(reason, str) or not reason.strip() or len(reason) > 1000):
         raise ValueError('Invalid Barricade scan review')
+    if isinstance(integration_id, str) and integration_id.startswith('unbound:') and decision == 'retry':
+        raise ValueError('An unbound connection cannot safely retry a scan')
     with delivery_scope(server_number, integration_id):
         with get_session_maker()() as session, session.begin():
             row = session.scalar(select(BarricadeScanDelivery).where(
@@ -248,6 +252,10 @@ def resolve_review(server_number: int, integration_id: str, delivery_id: int, *,
             expected_status = 'sending' if decision == 'recover' else 'review'
             if row is None or row.status != expected_status:
                 raise ValueError('Barricade scan is not awaiting review')
+            if row.review_cause == 'prior_unbound_uncertain' and decision == 'confirmed':
+                raise ValueError('This unbound scan was not sent and cannot be confirmed')
+            if row.review_cause == 'prior_unbound_uncertain' and decision == 'retry':
+                raise ValueError('A prior unattributed attempt makes retry unsafe')
             if row.review_cause == 'session_ended_before_scan' and decision == 'retry':
                 raise ValueError('The session ended; an automatic retry cannot verify this session')
             if row.review_cause == 'reconstructed_session' and decision == 'retry':
@@ -438,8 +446,10 @@ def mark_activation_review(server_number: int, integration_id: str, session_id: 
                            player_id: str, game: str, cause: str) -> None:
     """Record an ambiguous pre-send candidate; no remote action has occurred."""
     _require_scope(server_number, integration_id)
-    if (cause not in ('activation_before', 'activation_ambiguous', 'activation_unknown', 'reconstructed_session', 'missing_live_connect',
-                      'session_ended_before_scan') or
+    if cause not in ('activation_before', 'activation_ambiguous', 'activation_unknown', 'reconstructed_session', 'missing_live_connect',
+                     'session_ended_before_scan', 'prior_unbound_uncertain'):
+        raise ValueError('Invalid activation review')
+    if (
             game not in ('HLL', 'HLLV') or type(session_id) is not int or session_id <= 0 or
             not isinstance(player_id, str) or not 0 < len(player_id) <= 100):
         raise ValueError('Invalid activation review')
@@ -449,7 +459,7 @@ def mark_activation_review(server_number: int, integration_id: str, session_id: 
             created_at=now, updated_at=now).on_conflict_do_nothing(constraint='uq_barricade_scan_session'))
     with get_session_maker()() as session, session.begin():
         session.execute(stmt)
-        if cause == 'session_ended_before_scan':
+        if cause in ('session_ended_before_scan', 'prior_unbound_uncertain'):
             session.execute(update(BarricadeScanDelivery).where(
                 BarricadeScanDelivery.server_number == server_number,
                 BarricadeScanDelivery.integration_id == integration_id,
@@ -493,6 +503,54 @@ def find_unreserved_recent_closed_sessions(server_number: int, integration_id: s
     stmt = select(candidates.c.session_id, candidates.c.player_id).order_by(candidates.c.session_id).limit(limit)
     with get_session_maker()() as session:
         return [(row.session_id, row.player_id) for row in session.execute(stmt)]
+
+
+def reserve_unbound(server_number: int, namespace: str, session_id: int, player_id: str, game: str) -> int | None:
+    """Avoid replaying a session after any uncertain unbound attempt.
+
+    This does not assert that two connections belong to the same peer. If
+    they are different, the later scan is recorded for review without send.
+    """
+    _require_scope(server_number, namespace)
+    if not namespace.startswith('unbound:'):
+        raise ValueError('Expected an unbound connection')
+    with lock(f'barricade-unbound-session:{server_number}:{session_id}'):
+        with get_session_maker()() as session:
+            prior = session.scalars(select(BarricadeScanDelivery).where(
+                BarricadeScanDelivery.server_number == server_number,
+                BarricadeScanDelivery.player_session_id == session_id,
+                BarricadeScanDelivery.integration_id.like('unbound:%'),
+                or_(BarricadeScanDelivery.status == 'sending',
+                    BarricadeScanDelivery.review_cause == 'uncertain_delivery'),
+            )).all()
+            if any(row.player_id != player_id or row.game != game for row in prior):
+                raise ValueError('Conflicting unbound session identity')
+        if prior:
+            mark_activation_review(server_number, namespace, session_id, player_id, game, 'prior_unbound_uncertain')
+            return None
+        return reserve(server_number, namespace, session_id, player_id, game)
+
+
+def reserve_registered_after_unbound_check(server_number: int, namespace: str, session_id: int, player_id: str, game: str) -> int | None:
+    """Do not infer a new peer identity for a prior uncertain unbound send."""
+    _require_scope(server_number, namespace)
+    if not namespace.startswith('integration:'):
+        raise ValueError('Expected a registered integration')
+    with lock(f'barricade-unbound-session:{server_number}:{session_id}'):
+        with get_session_maker()() as session:
+            prior = session.scalars(select(BarricadeScanDelivery).where(
+                BarricadeScanDelivery.server_number == server_number,
+                BarricadeScanDelivery.player_session_id == session_id,
+                BarricadeScanDelivery.integration_id.like('unbound:%'),
+                or_(BarricadeScanDelivery.status == 'sending',
+                    BarricadeScanDelivery.review_cause == 'uncertain_delivery'),
+            )).all()
+            if any(row.player_id != player_id or row.game != game for row in prior):
+                raise ValueError('Conflicting unbound session identity')
+        if prior:
+            mark_activation_review(server_number, namespace, session_id, player_id, game, 'prior_unbound_uncertain')
+            return None
+        return reserve(server_number, namespace, session_id, player_id, game)
 
 
 def reserve(server_number: int, integration_id: str, session_id: int, player_id: str, game: str) -> int | None:

@@ -10,18 +10,19 @@ function ReviewRow({ row, canReview, busy, onSave }) {
   const [decision, setDecision] = useState("");
   const [reason, setReason] = useState("");
   const inFlight = row.status === "sending";
+  const unbound = row.identity_kind === "unbound_connection" || row.integration_id?.startsWith("unbound:");
   const causeKey = `barricadeScanReview.cause.${row.review_cause}`;
-  const retryAvailable = !["reconstructed_session", "session_ended_before_scan"].includes(row.review_cause);
+  const retryAvailable = !unbound && !["reconstructed_session", "session_ended_before_scan", "prior_unbound_uncertain"].includes(row.review_cause);
   return <Box>
     <Divider sx={{ mb: 1 }} />
     <Stack spacing={1}>
       <Typography variant="body2">{t("barricadeScanReview.player")}: {row.player_id} · {row.game} · {new Date(row.updated_at).toLocaleString(i18n.resolvedLanguage)}</Typography>
-      <Typography variant="body2">{t("barricadeScanReview.integration")}: {row.integration_id}</Typography>
-      <Alert severity="info">{inFlight ? t("barricadeScanReview.sendingCause") : t([causeKey, "barricadeScanReview.cause.uncertain_delivery"])}</Alert>
+      <Typography variant="body2">{t(unbound ? "barricadeScanReview.unboundConnection" : "barricadeScanReview.integration")}: {row.integration_id}</Typography>
+      <Alert severity="info">{inFlight ? t("barricadeScanReview.sendingCause") : row.review_cause === "prior_unbound_uncertain" ? t("barricadeScanReview.priorUnbound") : t([causeKey, "barricadeScanReview.cause.uncertain_delivery"])}</Alert>
       {canReview && <>
         <TextField select size="small" label={t("barricadeScanReview.decision")} value={decision} onChange={(event) => setDecision(event.target.value)}>
           <MenuItem value="" disabled>{t("barricadeScanReview.choose")}</MenuItem>
-          {(inFlight ? ["recover"] : retryAvailable ? ["confirmed", "dismissed", "retry"] : ["confirmed", "dismissed"]).map((value) => <MenuItem key={value} value={value}>{t(`barricadeScanReview.${value}`)}</MenuItem>)}
+          {(inFlight ? ["recover"] : row.review_cause === "prior_unbound_uncertain" ? ["dismissed"] : retryAvailable ? ["confirmed", "dismissed", "retry"] : ["confirmed", "dismissed"]).map((value) => <MenuItem key={value} value={value}>{t(`barricadeScanReview.${value}`)}</MenuItem>)}
         </TextField>
         {decision === "retry" && <Alert severity="warning">{t("barricadeScanReview.retryWarning")}</Alert>}
         <TextField size="small" label={t("barricadeScanReview.reason")} value={reason} onChange={(event) => setReason(event.target.value)} inputProps={{ maxLength: 1000 }} />
