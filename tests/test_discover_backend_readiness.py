@@ -1,4 +1,5 @@
 import json
+import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -15,7 +16,7 @@ def deployment(tmp_path, monkeypatch):
     first.touch()
     second.touch()
     state = {'legacy': {'backend_1'}, 'running': True, 'stopped': set(), 'missing': False,
-             'different': False, 'calls': []}
+             'different': False, 'calls': [], 'failed': set(), 'timed_out': set()}
 
     def run(command):
         if 'config' in command:
@@ -36,8 +37,19 @@ def deployment(tmp_path, monkeypatch):
                                 ['CMD', 'old'] if name in state['legacy'] else HEALTHCHECK['test']}}}])
 
     monkeypatch.setattr(discovery, 'run', run)
-    monkeypatch.setattr(discovery.subprocess, 'run',
-                        lambda command, check: state['calls'].append(command) or SimpleNamespace())
+    def subprocess_run(command, check, **kwargs):
+        state['calls'].append(command)
+        if command[:2] == ['docker', 'exec']:
+            assert kwargs['timeout'] == 10
+            name = command[2]
+            if name in state['failed']:
+                raise subprocess.CalledProcessError(1, command)
+            if name in state['timed_out']:
+                raise subprocess.TimeoutExpired(command, 10)
+        else:
+            state['legacy'].clear()
+        return SimpleNamespace()
+    monkeypatch.setattr(discovery.subprocess, 'run', subprocess_run)
     return tmp_path, state
 
 
@@ -54,7 +66,27 @@ def test_no_recreation_when_probes_already_match(deployment):
     _, state = deployment
     state['legacy'].clear()
     assert discovery.main() == 0
-    assert not state['calls']
+    assert [call[2] for call in state['calls']] == ['backend_1', 'backend_2']
+    assert all(call[:2] == ['docker', 'exec'] for call in state['calls'])
+
+
+@pytest.mark.parametrize('field, message', [('failed', 'failed'), ('timed_out', 'timed out')])
+def test_matching_probe_must_also_succeed_now(deployment, field, message):
+    _, state = deployment
+    state['legacy'].clear()
+    state[field].add('backend_2')
+    with pytest.raises(ValueError, match=f'backend_2 readiness probe {message}'):
+        discovery.main()
+    assert all(call[:2] == ['docker', 'exec'] for call in state['calls'])
+
+
+def test_mixed_configuration_checks_already_correct_backend_after_reconciliation(deployment):
+    _, state = deployment
+    state['failed'].add('backend_2')
+    with pytest.raises(ValueError, match='backend_2 readiness probe failed'):
+        discovery.main()
+    assert state['calls'][0][-1] == '--apply'
+    assert [call[2] for call in state['calls'][1:]] == ['backend_1', 'backend_2']
 
 
 @pytest.mark.parametrize('field', ['missing', 'different'])
@@ -81,3 +113,4 @@ def test_only_running_backend_is_reconciled(deployment):
     command = state['calls'][0]
     assert command[-3:] == ['--service', 'backend_1', '--apply']
     assert 'backend_2' not in command
+    assert [call[2] for call in state['calls'][1:]] == ['backend_1']

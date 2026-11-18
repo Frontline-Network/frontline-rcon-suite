@@ -68,6 +68,10 @@ helper, or the reconciliation procedure below. On the same revision, `--deploy`
 checks existing backends and reconciles legacy probes using their recorded Compose
 files. It stops for manual review if the files are missing, the backends disagree
 on the configuration, or the reconciler cannot verify the running configuration.
+After reconciliation, or when probes already match, it runs the HTTP and
+WebSocket listener probe inside every running backend with a 10-second timeout.
+It returns failure if any probe fails or times out; stopped backends remain stopped.
+This is a point-in-time listener check, not a game-server connection test.
 Use the bootstrap procedure above before the first update to avoid this gap.
 
 If an older helper has already updated an installation, reconcile its running
