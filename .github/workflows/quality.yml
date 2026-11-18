@@ -93,6 +93,7 @@ jobs:
       - run: npm ci
       - run: npm run check:operator-copy
       - run: npm run check:i18n
+      - run: node --test src/pages/settings/broadcast-message/player-test-feedback.test.mjs
       - run: npm run check:admin-actions
       - run: npm run check:permissions
       - run: node --test ../rconweb/static/api/js/formset_handlers.test.cjs

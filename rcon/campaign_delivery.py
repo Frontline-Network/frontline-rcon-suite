@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import and_, func, or_, text
 
 from rcon.broadcast import campaign_is_eligible, format_message
+from rcon.commands import HLLCommandFailedError
 from rcon.models import (
     CampaignDelivery,
     PlayerID,
@@ -522,9 +523,18 @@ def send_test_message(ctl, campaign: AutoBroadcastMessage, player_id: str) -> st
         player_id=player_id,
         context={"player_id": player_id, "player_name": player_name},
     )
-    ctl.message_player(
-        player_id, formatted, save_message=False, player_name=player_name
-    )
+    try:
+        accepted = ctl.message_player(
+            player_id, formatted, save_message=False, player_name=player_name
+        )
+    except Exception as exc:
+        raise HLLCommandFailedError(
+            "Message delivery could not be confirmed; it may have been delivered"
+        ) from exc
+    if accepted is False:
+        raise HLLCommandFailedError("RCON rejected the player message")
+    if accepted is not True:
+        raise HLLCommandFailedError("Message delivery could not be confirmed; it may have been delivered")
     return formatted
 
 

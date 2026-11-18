@@ -2220,6 +2220,8 @@ const de = {
       testing: "Wird gesendet …",
       testSent: "Die Kampagne wurde testweise als Servernachricht gesendet.",
       playerTestSent: "Die Direktkampagne wurde an den ausgewählten Spieler gesendet.",
+      playerTestRejected: "Der Spielserver hat die Testnachricht abgelehnt.",
+      playerTestUnconfirmed: "Die Zustellung konnte nicht bestätigt werden. Der Spieler hat die Nachricht möglicherweise erhalten.",
       testFailed: "Der Testversand ist fehlgeschlagen: {{message}}",
       selectTestPlayer: "Testspieler auswählen",
       onlinePlayer: "Online-Spieler",

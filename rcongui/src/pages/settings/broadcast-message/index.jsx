@@ -39,6 +39,7 @@ import isEqual from "lodash/isEqual";
 
 import { AsyncClientError } from "@/components/shared/AsyncClientError";
 import { isFakeMode } from "@/mirage/demo-data";
+import { playerTestErrorKey } from "./player-test-feedback.mjs";
 import { TEMPLATE_CATEGORY, unpackBroadcastMessage } from "@/utils/lib";
 import { cmd } from "@/utils/fetchUtils";
 import BroadcastCampaignWorkbench from "./BroadcastCampaignWorkbench";
@@ -759,6 +760,7 @@ const BroadcastCampaignPage = () => {
       if (!isFakeMode()) {
         await cmd.TEST_PLAYER_CAMPAIGN({
           payload: { campaign: testCampaign, player_id: selectedPlayerId },
+          throwRouteError: false,
         });
       }
       setTestResult({
@@ -769,9 +771,9 @@ const BroadcastCampaignPage = () => {
     } catch (error) {
       setTestResult({
         severity: "error",
-        text: t("settings.campaigns.testFailed", {
-          message: error?.message || t("errors.unknown"),
-        }),
+        text: playerTestErrorKey(error?.message)
+          ? t(playerTestErrorKey(error.message))
+          : t("settings.campaigns.testFailed", { message: error?.message || t("errors.unknown") }),
       });
     } finally {
       setTestingId(null);

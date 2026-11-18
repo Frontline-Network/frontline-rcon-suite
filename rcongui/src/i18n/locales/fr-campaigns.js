@@ -43,6 +43,7 @@ export const campaignsFr = {
   playerRangeError: "Le nombre de joueurs doit être compris entre 0 et 100 ; le minimum ne peut pas dépasser le maximum.",
   pauseDuringSeeding: "Suspendre pendant le remplissage du serveur", testNow: "Envoyer un test maintenant", testing: "Envoi en cours…",
   testSent: "La campagne a été envoyée sous forme de diffusion de test du serveur.", playerTestSent: "La campagne directe a été envoyée au joueur sélectionné.",
+  playerTestRejected: "Le serveur de jeu a refusé le message de test.", playerTestUnconfirmed: "La réception n'a pas pu être confirmée. Le joueur a peut-être reçu le message.",
   testFailed: "Échec de la diffusion de test : {{message}}", selectTestPlayer: "Choisir le joueur de test", onlinePlayer: "Joueur connecté",
   noOnlinePlayers: "Aucun joueur n'est actuellement connecté.", testDoesNotCount: "Ce test ne modifie pas l'état des envois normaux.",
   globalSendInterval: "Intervalle global d'envoi", playerGap: "Délai minimal par joueur", deliverySettingsTitle: "Contrôle global des envois",

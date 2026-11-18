@@ -2202,6 +2202,8 @@ const en = {
       testing: "Sending …",
       testSent: "The campaign was sent as a test server broadcast.",
       playerTestSent: "The direct campaign was sent to the selected player.",
+      playerTestRejected: "The game server rejected the test message.",
+      playerTestUnconfirmed: "Delivery could not be confirmed. The player may have received the message.",
       testFailed: "The test broadcast failed: {{message}}",
       selectTestPlayer: "Select test player",
       onlinePlayer: "Online player",

@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
+import pytest
 
 os.environ.setdefault("SERVER_NUMBER", "1")
 os.environ.setdefault("DEBUG", "1")
@@ -20,6 +21,7 @@ from rcon.campaign_delivery import (
     session_is_eligible,
 )
 from rcon.user_config.auto_broadcast import AutoBroadcastMessage
+from rcon.commands import HLLCommandFailedError
 
 
 def campaign(**overrides):
@@ -177,3 +179,17 @@ def test_direct_test_formats_player_context_without_consuming_delivery():
         save_message=False,
         player_name="Alice",
     )
+
+
+@pytest.mark.parametrize("reply,expected", [(False, "rejected"), (None, "may have been delivered"),
+                                             (TimeoutError("lost response"), "may have been delivered")])
+def test_direct_test_does_not_report_unconfirmed_delivery_as_success(reply, expected):
+    ctl = Mock()
+    ctl.get_player_ids.return_value = [("Alice", "player-1")]
+    if isinstance(reply, Exception):
+        ctl.message_player.side_effect = reply
+    else:
+        ctl.message_player.return_value = reply
+    with pytest.raises(HLLCommandFailedError, match=expected):
+        send_test_message(ctl, campaign(), "player-1")
+    ctl.message_player.assert_called_once()
