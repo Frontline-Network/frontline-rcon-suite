@@ -14,6 +14,10 @@ depends_on = None
 
 
 def upgrade():
+    # Keep transactional DDL: a timeout rolls back both indexes and tables.
+    # Deployment must stop/retry if either index cannot be built promptly.
+    op.execute("SET LOCAL lock_timeout = '2s'")
+    op.execute("SET LOCAL statement_timeout = '30s'")
     op.create_index('ix_player_sessions_server_id_scan', 'player_sessions', ['server_number', 'id'])
     op.create_index('ix_player_sessions_server_open_id_scan', 'player_sessions', ['server_number', 'id'],
                     postgresql_where=sa.text('"end" IS NULL AND end_event_us IS NULL'))

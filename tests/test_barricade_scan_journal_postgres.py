@@ -313,6 +313,43 @@ def test_migration_roundtrip_and_protects_delivery_history(database, monkeypatch
     assert existing_queue() == before
 
 
+def test_migration_index_lock_timeout_rolls_back_and_allows_retry(database):
+    """A busy legacy writer cannot leave a half-installed scan migration."""
+    path = Path(__file__).resolve().parents[1] / 'alembic/versions/f3970a1b2c3d_barricade_scan_journal.py'
+    spec = spec_from_file_location('barricade_scan_retry_migration', path)
+    migration = module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    engine = database.kw['bind']
+    PlayerID.__table__.create(engine, checkfirst=True)
+    PlayerSession.__table__.create(engine, checkfirst=True)
+    with engine.begin() as conn:
+        conn.execute(text('DROP INDEX ix_player_sessions_server_id_scan'))
+        conn.execute(text('DROP INDEX ix_player_sessions_server_open_id_scan'))
+    blocker = engine.connect()
+    transaction = blocker.begin()
+    blocker.execute(text('LOCK TABLE player_sessions IN ROW EXCLUSIVE MODE'))
+    def upgrade():
+        with engine.begin() as connection:
+            with Operations.context(MigrationContext.configure(connection)):
+                migration.upgrade()
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            result = pool.submit(upgrade)
+            with pytest.raises(Exception, match='lock timeout'):
+                result.result(timeout=5)
+        with engine.connect() as conn:
+            assert not inspect(conn).has_table('barricade_scan_delivery')
+            assert 'ix_player_sessions_server_id_scan' not in {item['name'] for item in inspect(conn).get_indexes('player_sessions')}
+        transaction.commit()
+        upgrade()
+        with engine.connect() as conn:
+            assert inspect(conn).has_table('barricade_scan_delivery')
+    finally:
+        if transaction.is_active:
+            transaction.rollback()
+        blocker.close()
+
+
 def test_concurrent_reservation_is_once_and_isolated_by_server_and_integration(database, monkeypatch):
     prepare(database, monkeypatch)
     barrier = Barrier(2)
