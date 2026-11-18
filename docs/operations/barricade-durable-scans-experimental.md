@@ -1,17 +1,26 @@
-# Experimental Barricade scan recovery
+# Barricade scan recovery for a Custom integration
 
-This implementation is not yet approved for production activation. It requires
-an explicitly registered integration and API credential, the journal migration,
-a fresh shared player roster, and session-journal observations. Both
-`HLL_BARRICADE_DURABLE_SCANS` and `HLL_BARRICADE_JOURNAL_OBSERVATIONS` default
-to off. This document describes safety constraints, not an activation recipe.
+The durable scanner is opt-in for each server and integration. It needs the
+journal migration, an authenticated API key, a fresh shared roster and
+session-journal observations. Set `HLL_BARRICADE_DURABLE_SCANS` on the backend
+and `HLL_BARRICADE_JOURNAL_OBSERVATIONS` on its log collector. Both default to off.
 
-The game log's event times have second precision. The registration boundary
-uses the application host's clock, and a successful log poll does not prove
-that the game server has exposed all prior events. Clock skew, late events,
-identity uncertainty and transitions from an older scanner must be resolved
-before enabling automatic scans. Unconfirmed sends and ambiguous or recently
-ended sessions require operator review; a retry can create a duplicate alert.
+When switching from the legacy scanner, take and verify a paired backup and
+stop the old consumer before registering the integration. Register its
+dedicated key with the Django management command `barricade_scan_integration`.
+Registration snapshots existing session IDs under a database lock. PostgreSQL
+records the cutover time and the first observations of new connections.
+Start the new consumer with the binding and both services configured.
+Check for a fresh roster snapshot for the registered namespace. A WebSocket
+connection alone does not establish which scanner handled it.
+
+For automatic dispatch, Frontline checks that a roster taken after registration
+showed the player absent before the matching CONNECT was observed. It then
+checks current session and presence evidence. Existing sessions are excluded.
+Under blacklist management, open **Review Barricade scans** to inspect a
+missing connection observation, reconstructed session or missing response.
+Ended and reconstructed sessions have no retry option. An authorized operator
+can record a decision and reason for each entry.
 
 The review page's status distinguishes disabled, unregistered, unavailable,
 missing roster, missing log observation, pending events, and available evidence.
@@ -47,10 +56,12 @@ At the same public Barricade revision, Custom integrations use the configured
 WebSocket address directly and preserve its query string. Community RCON
 integrations instead append `/ws/barricade` to the configured base URL. Adding
 the integration query to that base URL therefore does not produce the intended
-WebSocket path and query. The current explicit-query binding must not be
-advertised as compatible with the Community RCON integration until an explicit,
-safe peer identity mechanism is designed and tested for it. Do not infer a
-unique peer from a potentially shared API key. The isolated contract test
+WebSocket path and query. For a **Custom** integration with an exclusive key,
+registering the authenticated key ID allows its existing query-free URL to
+remain in use. Keep the same integration UUID when rotating that key so its
+delivery history survives. A shared key alone cannot identify a peer.
+This binding does not establish ownership of pre-existing CRCON bans.
+The isolated contract test
 exercises both published URL adapters, not the version in actual use.
 To repeat the optional offline contract test, obtain the four public files at
 that revision (`integrations/custom/websocket.py`, `integrations/custom/integration.py`,
@@ -61,15 +72,17 @@ directory containing the latter three as `custom.py`, `crcon.py`, and
 isolated test environment. The test checks the pinned Git blob hashes and
 substitutes the alert callback; it does not contact Barricade or Discord.
 
-With the new consumer, an explicit `frontline_integration` connection is
-rejected if durable scanning is disabled or the binding is invalid. A peer
-without that parameter keeps the legacy path. **Older application versions do
-not enforce this restriction**: do not reconnect an opted-in peer to an older
-backend without first disabling the peer or blocking its credentials and
-reviewing its pending and uncertain deliveries. Merely switching the image or
-turning off the flag cannot guarantee that a previous scan was not processed.
+The new consumer rejects an explicitly requested or registered connection
+if durable scanning is disabled or its binding cannot be used. An unregistered
+peer without the parameter uses the legacy path. On rollback, keep the
+registered peer disconnected from any older backend until pending and
+uncertain deliveries are reconciled. Older binaries do not know the binding.
+Keep shared maintenance on an image that recognizes the migrated Alembic
+revision, including after a host or Compose restart.
 
 The migration refuses to drop its tables when integration or scan history
 exists. Rolling back application code does not require dropping those tables;
 preserve them and the backups. Never delete this history to force downgrade,
 because it is needed to distinguish confirmed, uncertain and reviewed work.
+After restoring a database backup, reconcile deliveries before reconnecting
+the scanner. Barricade may have processed a scan after the backup snapshot.
