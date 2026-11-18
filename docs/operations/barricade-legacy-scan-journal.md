@@ -37,3 +37,30 @@ may represent either a request in flight or a process interruption; the review
 operation takes the same namespace lock as the sender before deciding which.
 There is no claim of exactly-once delivery when the external peer can act
 before its response is received.
+
+## Why a connection snapshot is not yet an automatic cursor fix
+
+In disposable PostgreSQL tests, an insertion begun before a connection snapshot
+but committed afterwards was absent from the baseline and would be incorrectly
+classified as a new session by a simple set difference. A lexicographic
+`(start, id)` cursor likewise missed a lower-ID row committed after a
+higher-ID row at the same start time. These observations use synthetic rows and
+do not assert that either event occurred on a live server.
+
+A PostgreSQL `SHARE` lock before the baseline makes an already-inserting writer
+finish before the snapshot; the isolated control verifies that ordering. The
+same table-level lock also blocks a session insert for a different server; a
+separate isolated test observes its configured 300 ms lock timeout. This is
+not a benchmark or a measured production outage, but establishes that repeated
+connection-time baselines cannot be called nonblocking on a shared database.
+The lock duration of a real full-history baseline, memory/storage cost of a
+connection-specific set of all historical IDs, delayed log ingestion and
+inserts that have not yet reached the table also remain unmeasured.
+
+Without a stable identity for the remote peer, records absent from a baseline
+cannot be assumed never scanned by an earlier connection. Treating ambiguous
+candidates as review-only can avoid invented delivery claims, but does not by
+itself preserve automatic scanning or close the original issue. A safe complete
+design needs a measured activation boundary, scoped baseline and explicit
+handling of late observations and existing history; it must be tested under the
+actual shared-database workload before release. No cursor change is made here.
