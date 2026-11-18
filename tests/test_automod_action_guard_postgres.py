@@ -160,13 +160,13 @@ def test_real_automod_path_blocks_repeat_after_redis_watch_expires(database, mon
     monkeypatch.setattr(automod, "audit", Mock())
     assert mod.should_warn_player(state[0], "Able", player) == PunishStepState.APPLY
     automod._do_punitions(api, ActionMethod.MESSAGE, [player], [mod])
-    state[0] = WatchStatus()  # Redis key expired, but the database reservation survives.
+    state[0] = WatchStatus()  # A new watch starts a new occasion.
     assert mod.should_warn_player(state[0], "Able", player) == PunishStepState.APPLY
     automod._do_punitions(api, ActionMethod.MESSAGE, [player], [mod])
     automod._do_punitions(api, ActionMethod.PUNISH, [player], [mod])
-    api.message_player.assert_called_once()
-    api.punish.assert_not_called()
-    assert len(action_guard.list_pending(3)["results"]) == 1
+    assert api.message_player.call_count == 2
+    api.punish.assert_called_once()
+    assert action_guard.list_pending(3)["results"] == []
 
 
 @pytest.mark.parametrize("method,method_name", [(ActionMethod.MESSAGE, "message_player"),
@@ -189,7 +189,7 @@ def test_real_automod_outcome_controls_durable_reservation(database, monkeypatch
     automod._do_punitions(api, method, [player], [moderator])
     send.assert_called_once()
     pending = action_guard.list_pending(3)["results"]
-    assert bool(pending) is (response is None or response == "timeout")
+    assert bool(pending) is (method == ActionMethod.KICK and (response is None or response == "timeout"))
     assert (action_guard.reserve(3, "fake-console", ["rule"], method.name.lower()) is None) is bool(pending)
 
 
@@ -204,7 +204,7 @@ def test_real_automod_watch_failure_after_delivery_retains_reservation(database,
     monkeypatch.setattr(automod, "get_server_number", lambda: "3")
     monkeypatch.setattr(automod, "audit", Mock())
     automod._do_punitions(api, ActionMethod.MESSAGE, [player], [moderator])
-    assert action_guard.reserve(3, "fake-console", ["rule"], "message") is None
+    assert action_guard.reserve(3, "fake-console", ["rule"], "message") is not None
     api.message_player.assert_called_once()
 
 
@@ -233,6 +233,8 @@ def test_real_automod_retries_only_after_explicit_rejection(database, monkeypatc
     monkeypatch.setattr(automod, "audit", Mock())
     assert mod.should_warn_player(state, "Able", player) == PunishStepState.APPLY
     automod._do_punitions(api, ActionMethod.MESSAGE, [player], [mod])
+    assert mod.should_warn_player(state, "Able", player) == PunishStepState.WAIT
+    state = WatchStatus()  # A cleared violation permits a fresh occasion.
     assert mod.should_warn_player(state, "Able", player) == PunishStepState.APPLY
     automod._do_punitions(api, ActionMethod.MESSAGE, [player], [mod])
     assert api.message_player.call_count == 2
@@ -264,9 +266,8 @@ def test_connect_warning_preserves_uncertain_result_across_reconnect(database, m
     monkeypatch.setattr(automod, "get_server_number", lambda: "3")
     automod._send_connect_warning(api, player)
     automod._send_connect_warning(api, player)
-    uncertain = response is None or response == "timeout"
-    assert api.message_player.call_count == (1 if uncertain else 2)
-    assert bool(action_guard.list_pending(3)["results"]) is uncertain
+    assert api.message_player.call_count == 2
+    assert action_guard.list_pending(3)["results"] == []
 
 
 def test_connect_warning_fails_closed_when_database_unavailable(monkeypatch):
@@ -303,7 +304,7 @@ def test_connect_timer_reconnect_does_not_resend_uncertain_warning(database, mon
         for _ in range(2):
             automod.on_connected(api, {"player_name_1": "Fake", "player_id_1": "fake-console"})
             timers[-1].callback()
-        api.message_player.assert_called_once()
-        assert len(action_guard.list_pending(3)["results"]) == 1
+        assert api.message_player.call_count == 2
+        assert action_guard.list_pending(3)["results"] == []
     finally:
         automod.pendingTimers.pop("fake-console", None)

@@ -14,7 +14,7 @@ from rcon.automods.no_solotank import NoSoloTankAutomod
 from rcon.automods.seeding_rules import SeedingRulesAutomod
 from rcon.cache_utils import get_redis_client
 from rcon.commands import HLLCommandFailedError
-from rcon.connection import HLLServerError
+from rcon.connection import HLLCommandError, HLLServerError
 from rcon.discord import send_to_discord_audit
 from rcon.hooks import inject_player_ids
 from rcon.logs.loop import on_connected, on_kill
@@ -132,6 +132,18 @@ def _do_punitions(
                 logger.exception("Automod action outcome could not be saved; reservation retained")
                 return False
 
+        def close_unsuccessful_attempt(reason):
+            # Mark this particular event reviewed rather than rejected: rejected
+            # event reservations are eligible for replay of the same log line.
+            # The watch state stays pending until the current violation resets.
+            if guard_token is None:
+                return
+            try:
+                action_guard.review(guard_server, aplayer.player_id, guard_token,
+                                    'Automod', reason)
+            except Exception:
+                logger.exception('Could not record the unsuccessful automod attempt')
+
         try:
             if method == ActionMethod.MESSAGE:
                 if not aplayer.details.dry_run:
@@ -145,11 +157,11 @@ def _do_punitions(
                         raise WarningRejected("Game server rejected warning")
                     if accepted is not True:
                         raise HLLCommandFailedError("Game server did not confirm warning")
-                for moderator in _originating_moderators(mods, aplayer):
-                    moderator.player_warning_succeeded(aplayer)
                 action_confirmed = True
                 if not settle_guard("confirmed"):
                     continue
+                for moderator in _originating_moderators(mods, aplayer):
+                    moderator.player_warning_succeeded(aplayer)
                 audit(
                     discord_webhook_url=aplayer.details.discord_audit_url,
                     command_name="message_player",
@@ -171,11 +183,11 @@ def _do_punitions(
                         raise PunishmentRejected("Game server rejected punishment")
                     if accepted is not True:
                         raise HLLCommandFailedError("Game server did not confirm punishment")
-                for moderator in _originating_moderators(mods, aplayer):
-                    moderator.player_punish_succeeded(aplayer)
                 action_confirmed = True
                 if not settle_guard("confirmed"):
                     continue
+                for moderator in _originating_moderators(mods, aplayer):
+                    moderator.player_punish_succeeded(aplayer)
                 audit(
                     discord_webhook_url=aplayer.details.discord_audit_url,
                     command_name="punish",
@@ -207,21 +219,17 @@ def _do_punitions(
                     author=aplayer.details.author,
                 )
         except WarningRejected:
-            logger.warning("Game server rejected automod warning; it can be retried")
-            for moderator in _originating_moderators(mods, aplayer):
-                moderator.player_warning_failed(aplayer)
-            settle_guard("rejected")
+            logger.warning("Game server rejected automod warning")
+            close_unsuccessful_attempt('Game server rejected the warning')
         except PunishmentRejected:
-            logger.warning("Game server rejected automod punishment; it can be retried")
-            for moderator in _originating_moderators(mods, aplayer):
-                moderator.player_punish_failed(aplayer)
-            settle_guard("rejected")
+            logger.warning("Game server rejected automod punishment")
+            close_unsuccessful_attempt('Game server rejected the punishment')
         except KickRejected:
             logger.warning("Game server rejected automod kick; it can be retried")
             for moderator in _originating_moderators(mods, aplayer):
                 moderator.player_kick_rejected(aplayer)
             settle_guard("rejected")
-        except (HLLCommandFailedError, HLLServerError, OSError, UnicodeDecodeError):
+        except (HLLCommandFailedError, HLLServerError, OSError, UnicodeDecodeError) as exc:
             if action_confirmed:
                 logger.warning("Automod action confirmed but follow-up failed", exc_info=True)
                 continue
@@ -231,6 +239,11 @@ def _do_punitions(
                 repr(aplayer),
                 exc_info=True,
             )
+            if method in {ActionMethod.MESSAGE, ActionMethod.PUNISH}:
+                reason = (f'Game server returned status {exc.status_code}'
+                          if isinstance(exc, HLLCommandError)
+                          else 'Response not confirmed; do not replay this attempt')
+                close_unsuccessful_attempt(reason)
 
 
 def do_punitions(
@@ -370,13 +383,19 @@ def _send_connect_warning(rcon: Rcon, player: PunishPlayer) -> None:
             player_id=player.player_id, message=player.details.message,
             by=player.details.author, save_message=False,
         )
-        if accepted is not True and accepted is not False:
-            logger.warning("Connect warning outcome is uncertain; reservation retained")
-            return
-        action_guard.finish(server, player.player_id, token,
-                            "confirmed" if accepted else "rejected", expected=len(rules))
+        if accepted is True:
+            action_guard.finish(server, player.player_id, token, "confirmed", expected=len(rules))
+        else:
+            logger.warning("Connect warning failed or was not confirmed")
+            action_guard.review(server, player.player_id, token, 'Automod',
+                                'Warning failed or response was unconfirmed')
     except Exception:
-        logger.exception("Connect warning outcome is uncertain; reservation retained")
+        logger.exception("Connect warning failed or response was unconfirmed")
+        try:
+            action_guard.review(server, player.player_id, token, 'Automod',
+                                'Warning failed or response was unconfirmed')
+        except Exception:
+            logger.exception("Could not record the unsuccessful connect warning")
 
 
 @on_connected()

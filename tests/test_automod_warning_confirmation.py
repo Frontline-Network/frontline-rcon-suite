@@ -22,6 +22,7 @@ def isolate_watch_tests_from_durable_guard(monkeypatch):
     monkeypatch.setattr(automod, "get_server_number", lambda: "3")
     monkeypatch.setattr(automod.action_guard, "reserve", lambda *args: "synthetic-token")
     monkeypatch.setattr(automod.action_guard, "finish", lambda *args, **kwargs: kwargs["expected"])
+    monkeypatch.setattr(automod.action_guard, "review", lambda *args, **kwargs: 1)
 
 
 @pytest.mark.parametrize("mod_type,config_type", [
@@ -54,7 +55,7 @@ def test_warning_state_survives_worker_restart(monkeypatch, mod_type, config_typ
         if outcome == "confirmed":
             state.warned[mod.progress_key(player)][-1] -= timedelta(seconds=2)
         expected = {"confirmed": PunishStepState.GO_TO_NEXT_STEP,
-                    "rejected": PunishStepState.APPLY,
+                    "rejected": PunishStepState.WAIT,
                     "timeout": PunishStepState.WAIT,
                     "interrupted": PunishStepState.WAIT}[outcome]
         assert restarted.should_warn_player(state, player.squad, player) == expected

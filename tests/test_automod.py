@@ -20,6 +20,7 @@ def isolate_watch_tests_from_durable_guard(monkeypatch):
     monkeypatch.setattr(automod, "get_server_number", lambda: "3")
     monkeypatch.setattr(automod.action_guard, "reserve", lambda *args: "synthetic-token")
     monkeypatch.setattr(automod.action_guard, "finish", lambda *args, **kwargs: kwargs["expected"])
+    monkeypatch.setattr(automod.action_guard, "review", lambda *args, **kwargs: 1)
 
 
 def test_automod_uses_compact_live_roster_snapshot():
@@ -70,11 +71,7 @@ def test_failed_warning_rolls_back_only_originating_rule(result):
     else:
         server.message_player.return_value = result
     _do_punitions(server, ActionMethod.MESSAGE, [player], [origin, other])
-    if result is False:
-        saved = pickle.loads(red.setex.call_args.args[2])
-        assert saved.warned["id"] == []
-    else:
-        red.setex.assert_not_called()
+    red.setex.assert_not_called()
     other.player_warning_failed.assert_not_called()
 
 
@@ -87,7 +84,7 @@ def test_failed_punishment_does_not_reset_other_rule():
     server = Mock()
     server.punish.return_value = False
     _do_punitions(server, ActionMethod.PUNISH, [player], [origin, other])
-    origin.player_punish_failed.assert_called_once_with(player)
+    origin.player_punish_failed.assert_not_called()
     other.player_punish_failed.assert_not_called()
 
 
@@ -117,8 +114,6 @@ def test_warning_progress_requires_confirmation(monkeypatch, result):
     _do_punitions(server, ActionMethod.MESSAGE, [player], [mod])
     if result is True:
         assert mod.should_warn_player(state, "Able", player) == PunishStepState.GO_TO_NEXT_STEP
-    elif result is False:
-        assert mod.should_warn_player(state, "Able", player) == PunishStepState.APPLY
     else:
         assert state.warned[player.player_id] == [PENDING_WARNING]
         assert mod.should_warn_player(state, "Able", player) == PunishStepState.WAIT
@@ -150,8 +145,8 @@ def test_action_outcome_controls_repeat_and_escalation(monkeypatch, method, resu
         target.return_value = result
     monkeypatch.setattr(automod, "audit", Mock())
     _do_punitions(server, method, [player], [mod])
-    if result is False:
-        assert state.punished["fake-id"] == ([] if method == ActionMethod.PUNISH else [initial])
+    if result is False and method == ActionMethod.KICK:
+        assert state.punished["fake-id"] == [initial]
     elif result is True and method == ActionMethod.PUNISH:
         assert len(state.punished["fake-id"]) == 1
         assert state.punished["fake-id"][-1] != PENDING_WARNING
@@ -254,7 +249,7 @@ def test_merged_live_rules_receive_same_action_outcome(monkeypatch, method, resu
     for mod in mods:
         if method == ActionMethod.PUNISH:
             mod.player_punish_started.assert_called_once()
-            assert mod.player_punish_failed.call_count == (1 if result is False else 0)
+            mod.player_punish_failed.assert_not_called()
         else:
             mod.player_kick_attempted.assert_called_once()
             assert mod.player_kick_rejected.call_count == (1 if result is False else 0)

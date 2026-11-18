@@ -1,5 +1,6 @@
 export const automodActionReviewCopy = {
   de: {
+    open: "Automatische Aktionen verwalten", close: "Schließen",
     title: "Unbestätigte automatische Aktionen",
     help: "Das Ergebnis dieser Aktionen ist ungewiss. Weitere Aktionen derselben Regel für diesen Spieler bleiben gesperrt, bis ein Administrator sie prüft.",
     player: "Spieler-ID", allPlayers: "Alle Spieler dieser Regel", action: "Aktion", time: "Seit", refresh: "Aktualisieren", release: "Nach Prüfung freigeben",
@@ -11,6 +12,7 @@ export const automodActionReviewCopy = {
     loadError: "Unbestätigte automatische Aktionen konnten nicht geladen werden.", saveError: "Die Prüfung konnte nicht gespeichert werden.", more: "Weitere Vorgänge erscheinen nach der Bearbeitung.",
   },
   en: {
+    open: "Manage automatic actions", close: "Close",
     title: "Unconfirmed automatic actions",
     help: "The outcome of these actions is uncertain. Further actions by the same rule for this player stay blocked until an administrator reviews them.",
     player: "Player ID", allPlayers: "All players for this rule", action: "Action", time: "Since", refresh: "Refresh", release: "Release after review",
@@ -22,6 +24,7 @@ export const automodActionReviewCopy = {
     loadError: "Could not load unconfirmed automatic actions.", saveError: "Could not save the review.", more: "Further items will appear after these are handled.",
   },
   fr: {
+    open: "Gérer les actions automatiques", close: "Fermer",
     title: "Actions automatiques non confirmées",
     help: "Le résultat de ces actions est incertain. Les actions suivantes de la même règle pour ce joueur restent bloquées jusqu’à leur vérification par un administrateur.",
     player: "Identifiant du joueur", allPlayers: "Tous les joueurs concernés par cette règle", action: "Action", time: "Depuis", refresh: "Actualiser", release: "Débloquer après vérification",

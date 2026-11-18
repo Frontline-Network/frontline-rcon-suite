@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 from rcon.automods import action_guard, automod, event_guard
 from rcon.automods.models import ActionMethod, PunishDetails, PunishPlayer, PunitionsToApply
+from rcon.connection import HLLCommandError
 
 
 @pytest.fixture
@@ -91,6 +92,29 @@ def test_duplicate_no_squad_action_is_sent_only_once(database):
     automod._do_punitions(server, ActionMethod.PUNISH, [player], [], event=same_event)
     automod._do_punitions(server, ActionMethod.PUNISH, [player], [], event=same_event)
     server.punish.assert_called_once()
+
+
+@pytest.mark.parametrize('failure', [False, HLLCommandError(500, 'internal error'), TimeoutError('lost response')])
+@pytest.mark.parametrize('method', [ActionMethod.MESSAGE, ActionMethod.PUNISH])
+def test_failed_attempt_does_not_block_new_event_or_replay_old(database, method, failure):
+    open_cutover(database)
+    player = PunishPlayer(player_id='synthetic', name='synthetic', squad='', team='',
+                          details=PunishDetails(author='rule', message='test'))
+    server = Mock()
+    target = server.message_player if method == ActionMethod.MESSAGE else server.punish
+    if isinstance(failure, Exception):
+        target.side_effect = failure
+    else:
+        target.return_value = failure
+    first = event(now_ms(), 'first')
+    automod._do_punitions(server, method, [player], [], event=first)
+    automod._do_punitions(server, method, [player], [], event=first)
+    target.assert_called_once()
+    assert action_guard.list_pending(3)['results'] == []
+    target.side_effect = None
+    target.return_value = True
+    automod._do_punitions(server, method, [player], [], event=event(now_ms(), 'new'))
+    assert target.call_count == 2
 
 
 def test_on_kill_deduplicates_same_log_but_allows_a_new_event(database, monkeypatch):

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Box, Button, Divider, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, Divider, Stack, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { execute, get } from "@/utils/fetchUtils";
@@ -14,6 +14,7 @@ export default function AutomodActionReview() {
   const [journal, setJournal] = useState({ results: [] });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const load = useCallback(async () => {
     try {
       const response = await get("get_pending_automod_actions?limit=50");
@@ -41,7 +42,10 @@ export default function AutomodActionReview() {
 
   if (!canInspect || (!error && journal.results.length === 0)) return null;
   return (
-    <Box component="section" data-testid="automod-action-review" sx={{ border: 1, borderColor: "warning.main", p: 2 }}>
+    <>
+    <Box><Button size="small" onClick={() => setOpen(true)}>{t("automodActionReview.open")}</Button></Box>
+    <Dialog open={open} onClose={() => setOpen(false)} aria-label={t("automodActionReview.title")} fullWidth maxWidth="md" disablePortal>
+    <DialogContent data-testid="automod-action-review">
       <Stack spacing={1.5}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
           <Typography variant="subtitle1" fontWeight={700}>{t("automodActionReview.title")}</Typography>
@@ -61,6 +65,9 @@ export default function AutomodActionReview() {
         </Box>)}
         {journal.more && <Typography variant="body2">{t("automodActionReview.more")}</Typography>}
       </Stack>
-    </Box>
+    </DialogContent>
+    <DialogActions><Button onClick={() => setOpen(false)}>{t("automodActionReview.close")}</Button></DialogActions>
+    </Dialog>
+    </>
   );
 }
