@@ -403,6 +403,8 @@ class LevelThresholdsAutomod(WarningConfirmationMixin):
                         violations.append(message)
 
                 if len(violations) == 0:
+                    from rcon.automods.automod import release_observed_periodic_warning
+                    release_observed_periodic_warning(self, aplayer.player_id, team, squad_name, game_state)
                     continue
 
                 violation_msg = ", ".join(violations)
