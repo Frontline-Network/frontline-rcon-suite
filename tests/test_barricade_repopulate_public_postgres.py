@@ -19,6 +19,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, create_engine, exists, not_, select, text
 from sqlalchemy.orm import declarative_base, relationship, selectinload, sessionmaker
+from sqlalchemy.exc import IntegrityError
 
 
 @pytest.fixture
@@ -204,7 +205,7 @@ def test_public_sync_can_delete_reference_created_after_a_complete_snapshot():
     if not root:
         pytest.skip('requires pinned public Barricade integration sources')
     data = (Path(root) / 'crcon.py').read_bytes().replace(b'\r\n', b'\n')
-    expected = ('62db75a2d4f2bc517d0b75bbc1058c06f41aede7' if os.getenv('BARRICADE_EXPECT_FIXED')
+    expected = ('7bf8c578932c116b5fa06bd7d3c677ea4136551d' if os.getenv('BARRICADE_EXPECT_FIXED')
                 else '783e5fe6d52071d68b652e39a1fd8c91990d4b22')
     assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == expected
     tree = ast.parse(data.decode())
@@ -257,7 +258,7 @@ def test_sync_preserves_references_when_offset_pages_shift():
     if not root:
         pytest.skip('requires pinned public Barricade integration sources')
     data = (Path(root) / 'crcon.py').read_bytes().replace(b'\r\n', b'\n')
-    expected = ('62db75a2d4f2bc517d0b75bbc1058c06f41aede7' if os.getenv('BARRICADE_EXPECT_FIXED')
+    expected = ('7bf8c578932c116b5fa06bd7d3c677ea4136551d' if os.getenv('BARRICADE_EXPECT_FIXED')
                 else '783e5fe6d52071d68b652e39a1fd8c91990d4b22')
     assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == expected
     tree = ast.parse(data.decode())
@@ -313,7 +314,7 @@ def test_sync_does_not_expire_unrecognized_remote_ban():
     if not root:
         pytest.skip('requires pinned public Barricade integration sources')
     data = (Path(root) / 'crcon.py').read_bytes().replace(b'\r\n', b'\n')
-    expected = ('62db75a2d4f2bc517d0b75bbc1058c06f41aede7' if os.getenv('BARRICADE_EXPECT_FIXED')
+    expected = ('7bf8c578932c116b5fa06bd7d3c677ea4136551d' if os.getenv('BARRICADE_EXPECT_FIXED')
                 else '783e5fe6d52071d68b652e39a1fd8c91990d4b22')
     assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == expected
     tree = ast.parse(data.decode())
@@ -516,3 +517,80 @@ def test_patch_still_needs_durable_intent_for_lost_replies():
         with pytest.raises(ConnectionError):
             asyncio.run(ns['bulk_ban_players'](Peer(), [response]))
     assert len(attempts) == 2
+
+
+@pytest.mark.parametrize('status', [False, True, None, 'false'])
+def test_only_explicit_inactive_owned_record_expires_matching_game(status):
+    root = os.getenv('BARRICADE_PUBLIC_SOURCE_DIR')
+    if not root or not os.getenv('BARRICADE_EXPECT_FIXED'):
+        pytest.skip('requires patched peer sources')
+    tree = ast.parse((Path(root) / 'crcon.py').read_text())
+    klass = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CRCONIntegration')
+    method = next(n for n in klass.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'synchronize')
+    method.decorator_list = []
+    module = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), method], type_ignores=[])
+    ast.fix_missing_locations(module)
+    record = SimpleNamespace(remote_id='owned-id', player_id=5, integration=SimpleNamespace(community_id=10))
+    expired = AsyncMock()
+    class Factory:
+        def begin(self):
+            return self
+        async def __aenter__(self):
+            return object()
+        async def __aexit__(self, *args):
+            pass
+    async def local_bans(*args, **kwargs):
+        yield record
+    async def remote(game):
+        return {'owned-id': {'id': 'owned-id', 'is_active': status}}
+    ns = {'session_factory': Factory(), 'Game': ('HLLV',), 'get_bans_by_integration': local_bans,
+          'expire_bans_of_player': expired}
+    exec(compile(module, '<peer-explicit-unban>', 'exec'), ns)
+    peer = SimpleNamespace(config=SimpleNamespace(id=20), get_blacklist_bans=remote,
+                           logger=logging.getLogger('synthetic-barricade'))
+    asyncio.run(ns['synchronize'](peer))
+    if status is False:
+        assert expired.await_count == 1
+        assert expired.await_args.kwargs == {'game': 'HLLV'}
+        assert expired.await_args.args[1:] == (5, 10)
+    else:
+        expired.assert_not_awaited()
+
+
+def test_patched_peer_requests_inactive_records_for_unban_detection():
+    root = os.getenv('BARRICADE_PUBLIC_SOURCE_DIR')
+    if not root or not os.getenv('BARRICADE_EXPECT_FIXED'):
+        pytest.skip('requires patched peer sources')
+    tree = ast.parse((Path(root) / 'crcon.py').read_text())
+    klass = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CRCONIntegration')
+    method = next(n for n in klass.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'get_blacklist_bans')
+    method.decorator_list = []
+    module = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), method], type_ignores=[])
+    ast.fix_missing_locations(module)
+    ns = {'game_switch': lambda game, hll, hllv: hllv}
+    exec(compile(module, '<peer-list-inactive>', 'exec'), ns)
+    request = AsyncMock(return_value={'result': {'records': [{'id': 9, 'is_active': False}], 'total': 1}})
+    peer = SimpleNamespace(config=SimpleNamespace(hll_banlist_id='hll', hllv_banlist_id='hllv'), _make_request=request)
+    assert asyncio.run(ns['get_blacklist_bans'](peer, 'HLLV'))['9']['is_active'] is False
+    assert request.await_args.kwargs['data']['exclude_expired'] == 0
+
+
+def test_public_peer_unique_constraint_excludes_game(database):
+    root = os.getenv('BARRICADE_PUBLIC_SOURCE_DIR')
+    if not root:
+        pytest.skip('requires pinned public Barricade model source')
+    data = (Path(root) / 'player_ban.py').read_bytes().replace(b'\r\n', b'\n')
+    assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == '1e28ce40acf48433085e97de8da21484946050c2'
+    tree = ast.parse(data.decode())
+    cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'PlayerBan')
+    assignment = next(n for n in cls.body if isinstance(n, ast.Assign)
+                      and any(isinstance(t, ast.Name) and t.id == '__table_args__' for t in n.targets))
+    call = next(n for n in ast.walk(assignment) if isinstance(n, ast.Call)
+                and isinstance(n.func, ast.Name) and n.func.id == 'UniqueConstraint')
+    assert [arg.value for arg in call.args] == ['player_id', 'integration_id']
+    with database.begin() as conn:
+        conn.execute(text('CREATE TABLE synthetic_bans (player_id integer, integration_id integer, game text, UNIQUE(player_id,integration_id))'))
+        conn.execute(text("INSERT INTO synthetic_bans VALUES (5, 20, 'HLL')"))
+    with pytest.raises(IntegrityError):
+        with database.begin() as conn:
+            conn.execute(text("INSERT INTO synthetic_bans VALUES (5, 20, 'HLLV')"))

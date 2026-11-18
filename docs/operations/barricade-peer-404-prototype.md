@@ -15,12 +15,15 @@ and list creation across patched processes. Automatic replacement of an
 existing remote list is refused rather than silently deleting its references.
 Empty lists can still be created for a new integration.
 
-The proposed CRCON synchronization is non-destructive: missing or inactive
-remote records do not delete existing Barricade references or change report
-decisions, and unrecognized remote records are not expired. It logs aggregate
-discrepancy counts. This preserves records through shifted or incomplete pages
-but also means a genuine remote unban cannot be propagated automatically by
-this reconciliation path; it requires a separately verified resolution.
+The proposed CRCON synchronization keeps references missing from a scan and
+does not expire unrecognized remote records. It requests inactive records as
+well as active records. An explicitly inactive record with the exact existing
+peer reference updates the corresponding community decisions for that game;
+absence from a page is never treated as proof of an unban. It logs aggregate
+discrepancy counts. A deleted record still needs separately verified resolution:
+the peer cannot distinguish a real deletion from an incomplete scan. An
+inactive observation can race a later reactivation; the existing API provides
+no versioned, cross-service conditional update to make this atomic.
 
 Use separate integration IDs and dedicated new HLL and HLLV lists. Keep the
 historical Custom integration and its lists active during any proposed
@@ -51,3 +54,17 @@ committed atomically after a confirmed result; recovery of uncertain operations
 must not automatically submit a new ban. This needs a peer schema migration,
 recovery workflow, and tests for partial bulk replies, process death, network
 loss, concurrent retries and mixed games. No such journal is included here.
+
+An exclusive empty list created for a **new** integration avoids adopting an
+old manual record, but it is not proof that an existing integration's old
+references belong to a particular community or game. Reconciliation of those
+references requires a complete, authoritative peer-side mapping of
+integration, game, peer player and Frontline record ID, including deletions
+and changes during the snapshot, verified against the deployed service. That
+evidence is currently unavailable. The published peer also declares a unique
+constraint on `(player_id, integration_id)` and its bulk upsert uses the same
+key. Supporting both HLL and HLLV bans for one player in the same integration
+therefore additionally requires a reviewed peer schema migration and updates
+to unqualified lookups/unbans; changing only the repopulation query is not
+sufficient. Keep the historical Custom integration in place until those
+conditions and the lost-reply journal have been validated.
