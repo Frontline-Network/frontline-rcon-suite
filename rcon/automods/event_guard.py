@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, CheckConstraint, Column, DateTime, Integer, MetaData, String, Table, delete, select, update
+from sqlalchemy import BigInteger, CheckConstraint, Column, DateTime, Integer, MetaData, String, Table, delete, exists, select, update
 
 from rcon.models import get_session_maker
 
@@ -69,8 +69,15 @@ def allow_after_cutover(server_number: int, event_ms: int, lock) -> bool:
         else:
             boundary = row['boundary_ms']
             if now_ms - row['cleanup_ms'] >= 24 * 60 * 60 * 1000:
+                from rcon.automods.action_guard import action_guard_history
                 session.execute(delete(events).where(events.c.server_number == server_number,
                     events.c.event_ms < now_ms - 7 * 24 * 60 * 60 * 1000,
-                    events.c.state != 'pending'))
+                    events.c.state != 'pending',
+                    ~exists(select(action_guard_history.c.id).where(
+                        action_guard_history.c.server_number == events.c.server_number,
+                        action_guard_history.c.player_id == events.c.player_id,
+                        action_guard_history.c.token == events.c.token,
+                        action_guard_history.c.event == 'reserved',
+                        action_guard_history.c.reason.like('periodic:%')))))
                 session.execute(update(cutover).where(cutover.c.server_number == server_number).values(cleanup_ms=now_ms))
         return event_ms > boundary

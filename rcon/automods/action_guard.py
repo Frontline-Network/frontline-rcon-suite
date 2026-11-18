@@ -10,7 +10,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, Column, DateTime, Integer, MetaData, String, Table, Text, func, select, text, update
+from sqlalchemy import CheckConstraint, Column, DateTime, Integer, MetaData, String, Table, Text, delete, func, select, text, update
 
 from rcon.automods import event_guard
 from rcon.models import get_session_maker
@@ -62,7 +62,7 @@ def _expected_event_rules(session, server_number: int, player_id: str, token: st
         action_guard_history.c.token == token,
         action_guard_history.c.event == 'reserved',
     )).one_or_none()
-    if reserved is not None and reserved.reason and reserved.reason.startswith('event:'):
+    if reserved is not None and reserved.reason and reserved.reason.startswith(('event:', 'periodic:')):
         rules = json.loads(reserved.rules_json)
         if not isinstance(rules, list) or not rules:
             raise RuntimeError('Invalid event reservation history')
@@ -71,7 +71,8 @@ def _expected_event_rules(session, server_number: int, player_id: str, token: st
 
 
 def reserve(server_number: int, player_id: str, rules: list[str], action: str,
-            *, legacy_global: bool = False, event: tuple[int, str] | None = None) -> str | None:
+            *, legacy_global: bool = False, event: tuple[int, str] | None = None,
+            periodic_event: tuple | None = None, identity_unavailable: bool = False) -> str | None:
     """Reserve all originating rules, or reject the whole group if uncertain.
 
     Pending reservations deliberately survive reconnects and worker restarts.
@@ -85,13 +86,27 @@ def reserve(server_number: int, player_id: str, rules: list[str], action: str,
             or not rules or any(not rule or len(rule) > 150 for rule in rules)
             or action not in {"message", "punish", "kick", "switch", "ban", "vip"}):
         raise ValueError("Invalid automated action reservation")
+    if event is not None and periodic_event is not None:
+        raise ValueError('Event types cannot be combined')
+    if identity_unavailable and (event is not None or periodic_event is not None or action != 'message'):
+        raise ValueError('Invalid unverified warning reservation')
+    if periodic_event is not None:
+        if action != 'message':
+            raise ValueError('Periodic event is only supported for warnings')
+        if len(periodic_event) not in (2, 3):
+            raise ValueError('Invalid periodic warning identity')
+        if len(periodic_event) == 3 and (not isinstance(periodic_event[2], str)
+                or len(periodic_event[2]) != 64
+                or any(c not in '0123456789abcdef' for c in periodic_event[2])):
+            raise ValueError('Invalid periodic warning scope')
+        event = periodic_event[:2]
     if event is not None:
         event_ms, event_key = event
         if (legacy_global or not isinstance(event_ms, int) or isinstance(event_ms, bool)
                 or event_ms <= 0 or not isinstance(event_key, str) or len(event_key) != 64
                 or any(char not in '0123456789abcdef' for char in event_key)):
             raise ValueError("Invalid automated action event")
-        if not event_guard.allow_after_cutover(server_number, event_ms, _lock):
+        if periodic_event is None and not event_guard.allow_after_cutover(server_number, event_ms, _lock):
             return None
     token = uuid.uuid4().hex
     now = datetime.now(timezone.utc)
@@ -143,9 +158,68 @@ def reserve(server_number: int, player_id: str, rules: list[str], action: str,
         session.execute(action_guard_history.insert().values(
             id=uuid.uuid4().hex, server_number=server_number, player_id=player_id, token=token,
             event="reserved", rules_json=json.dumps(rules), action=action, created_at=now,
-            reason=(f"event:{event_key}" if event is not None else
+            reason=(f"periodic:{event_key}:{periodic_event[2]}" if periodic_event is not None and len(periodic_event) == 3 else
+                    f"periodic:{event_key}" if periodic_event is not None else
+                    f"event:{event_key}" if event is not None else
+                    'periodic-identity-unavailable' if identity_unavailable else
                     "Legacy actions may have unresolved outcomes" if legacy_global else None)))
     return token
+
+
+def release_periodic_scope(server_number: int, player_id: str, rule: str, scope: str) -> int:
+    """Release a warning only after a positive observation that its rule ended."""
+    if len(scope) != 64 or any(c not in '0123456789abcdef' for c in scope):
+        raise ValueError('Invalid warning scope')
+    with get_session_maker()() as session, session.begin():
+        _lock(session, server_number, player_id)
+        tokens = select(action_guard_history.c.token).where(
+            action_guard_history.c.server_number == server_number,
+            action_guard_history.c.player_id == player_id,
+            action_guard_history.c.event == 'reserved',
+            action_guard_history.c.reason.like(f'periodic:%:{scope}'))
+        in_flight = session.execute(select(event_guard.events.c.token).where(
+            event_guard.events.c.server_number == server_number,
+            event_guard.events.c.player_id == player_id,
+            event_guard.events.c.rule == rule,
+            event_guard.events.c.token.in_(tokens),
+            event_guard.events.c.state == 'pending',
+        )).scalars().all()
+        for token in in_flight:
+            already = session.execute(select(action_guard_history.c.id).where(
+                action_guard_history.c.server_number == server_number,
+                action_guard_history.c.player_id == player_id,
+                action_guard_history.c.token == token,
+                action_guard_history.c.event == 'reviewed',
+                action_guard_history.c.actor == 'scope-reset',
+                action_guard_history.c.reason == rule,
+            )).first()
+            if already is None:
+                session.execute(action_guard_history.insert().values(
+                    id=uuid.uuid4().hex, server_number=server_number, player_id=player_id,
+                    token=token, event='reviewed', actor='scope-reset', reason=rule,
+                    created_at=datetime.now(timezone.utc)))
+        result = session.execute(update(event_guard.events).where(
+            event_guard.events.c.server_number == server_number,
+            event_guard.events.c.player_id == player_id,
+            event_guard.events.c.rule == rule,
+            event_guard.events.c.token.in_(tokens),
+            event_guard.events.c.state == 'reviewed',
+        ).values(state='rejected', updated_at=datetime.now(timezone.utc)))
+        return result.rowcount
+
+
+def periodic_warning_players(server_number: int, rule: str) -> set[str]:
+    """Find players with scoped warnings needing possible positive reset."""
+    with get_session_maker()() as session:
+        return set(session.execute(select(event_guard.events.c.player_id).join(action_guard_history,
+            (action_guard_history.c.server_number == event_guard.events.c.server_number)
+            & (action_guard_history.c.player_id == event_guard.events.c.player_id)
+            & (action_guard_history.c.token == event_guard.events.c.token)
+        ).where(event_guard.events.c.server_number == server_number,
+                event_guard.events.c.rule == rule,
+                event_guard.events.c.state.in_(['pending', 'reviewed']),
+                action_guard_history.c.event == 'reserved',
+                action_guard_history.c.reason.like('periodic:%'))).scalars())
 
 
 def pending_players(server_number: int, rule: str) -> set[str]:
@@ -187,6 +261,18 @@ def finish(server_number: int, player_id: str, token: str, result: str, *, expec
             ).values(state=result, updated_at=datetime.now(timezone.utc)))
             if event_result.rowcount != event_expected:
                 raise RuntimeError("Could not finish all reserved event rules")
+            reason = session.execute(select(action_guard_history.c.reason).where(
+                action_guard_history.c.server_number == server_number,
+                action_guard_history.c.player_id == player_id,
+                action_guard_history.c.token == token,
+                action_guard_history.c.event == 'reserved',
+            )).scalar_one_or_none()
+            if reason and reason.startswith('periodic:'):
+                # Only uncertain outcomes require persistent deduplication.
+                session.execute(delete(event_guard.events).where(
+                    event_guard.events.c.server_number == server_number,
+                    event_guard.events.c.player_id == player_id,
+                    event_guard.events.c.token == token))
         if result_set.rowcount:
             session.execute(action_guard_history.insert().values(
                 id=uuid.uuid4().hex, server_number=server_number, player_id=player_id, token=token,
@@ -200,6 +286,13 @@ def review(server_number: int, player_id: str, token: str, actor: str, reason: s
     with get_session_maker()() as session, session.begin():
         _lock(session, server_number, player_id)
         expected_events = _expected_event_rules(session, server_number, player_id, token)
+        reserved_reason = session.execute(select(action_guard_history.c.reason).where(
+            action_guard_history.c.server_number == server_number,
+            action_guard_history.c.player_id == player_id,
+            action_guard_history.c.token == token,
+            action_guard_history.c.event == 'reserved',
+        )).scalar_one_or_none()
+        periodic = bool(reserved_reason and reserved_reason.startswith('periodic:'))
         result = session.execute(update(action_guard).where(
             action_guard.c.server_number == server_number, action_guard.c.player_id == player_id,
             action_guard.c.token == token, action_guard.c.state == "pending",
@@ -211,9 +304,47 @@ def review(server_number: int, player_id: str, token: str, actor: str, reason: s
                 event_guard.events.c.player_id == player_id,
                 event_guard.events.c.token == token,
                 event_guard.events.c.state == 'pending',
-            ).values(state='reviewed', updated_at=datetime.now(timezone.utc)))
+            ).values(state=('rejected' if periodic and actor != 'Automod' else 'reviewed'),
+                     updated_at=datetime.now(timezone.utc)))
             if event_result.rowcount != expected_events:
                 raise RuntimeError("Could not review all reserved event rules")
+            if periodic and actor == 'Automod':
+                reset_rules = session.execute(select(action_guard_history.c.reason).where(
+                    action_guard_history.c.server_number == server_number,
+                    action_guard_history.c.player_id == player_id,
+                    action_guard_history.c.token == token,
+                    action_guard_history.c.event == 'reviewed',
+                    action_guard_history.c.actor == 'scope-reset',
+                )).scalars().all()
+                if reset_rules:
+                    session.execute(update(event_guard.events).where(
+                        event_guard.events.c.server_number == server_number,
+                        event_guard.events.c.player_id == player_id,
+                        event_guard.events.c.token == token,
+                        event_guard.events.c.rule.in_(reset_rules),
+                        event_guard.events.c.state == 'reviewed',
+                    ).values(state='rejected', updated_at=datetime.now(timezone.utc)))
+        if not result.rowcount and periodic and actor != 'Automod':
+            # Automatic resolution leaves the scoped event for explicit review.
+            released = session.execute(update(event_guard.events).where(
+                event_guard.events.c.server_number == server_number,
+                event_guard.events.c.player_id == player_id,
+                event_guard.events.c.token == token,
+                event_guard.events.c.state == 'reviewed',
+            ).values(state='rejected', updated_at=datetime.now(timezone.utc)))
+            if released.rowcount:
+                total = session.execute(select(func.count()).select_from(event_guard.events).where(
+                    event_guard.events.c.server_number == server_number,
+                    event_guard.events.c.player_id == player_id,
+                    event_guard.events.c.token == token,
+                )).scalar_one()
+                if total != expected_events:
+                    raise RuntimeError('Periodic warning rule history is incomplete')
+                session.execute(action_guard_history.insert().values(
+                    id=uuid.uuid4().hex, server_number=server_number, player_id=player_id,
+                    token=token, event='reviewed', created_at=datetime.now(timezone.utc),
+                    actor=actor.strip(), reason=reason.strip()))
+                return released.rowcount
         if result.rowcount:
             session.execute(action_guard_history.insert().values(
                 id=uuid.uuid4().hex, server_number=server_number, player_id=player_id, token=token,
@@ -240,6 +371,36 @@ def list_pending(server_number: int, limit: int = 50) -> dict:
         details = {}
         for row in rows:
             details.setdefault(row["token"], []).append({"rule": row["rule"], "action": row["action"]})
-        return {"results": [{"token": row.token, "player_id": row.player_id,
-                             "updated_at": row.updated_at.isoformat(), "actions": details[row.token]}
-                            for row in visible], "more": len(groups) > limit}
+        results = [{"token": row.token, "player_id": row.player_id,
+                    "updated_at": row.updated_at.isoformat(), "actions": details[row.token]}
+                   for row in visible]
+        if tokens:
+            missing = set(session.execute(select(action_guard_history.c.token).where(
+                action_guard_history.c.server_number == server_number,
+                action_guard_history.c.token.in_(tokens),
+                action_guard_history.c.event == 'reserved',
+                action_guard_history.c.reason == 'periodic-identity-unavailable',
+            )).scalars())
+            for item in results:
+                if item['token'] in missing:
+                    item['identity_status'] = 'unavailable'
+        periodic = session.execute(select(event_guard.events).join(action_guard_history,
+            (action_guard_history.c.server_number == event_guard.events.c.server_number)
+            & (action_guard_history.c.player_id == event_guard.events.c.player_id)
+            & (action_guard_history.c.token == event_guard.events.c.token)
+        ).where(event_guard.events.c.server_number == server_number,
+                event_guard.events.c.state == 'reviewed',
+                action_guard_history.c.event == 'reserved',
+                action_guard_history.c.reason.like('periodic:%'))
+            .order_by(event_guard.events.c.updated_at, event_guard.events.c.token).limit((limit + 1) * 10)).mappings().all()
+        existing = {item['token']: item for item in results}
+        for row in periodic:
+            item = existing.get(row['token'])
+            if item is None:
+                item = {'token': row['token'], 'player_id': row['player_id'],
+                        'updated_at': row['updated_at'].isoformat(), 'actions': []}
+                existing[row['token']] = item
+                results.append(item)
+            item['actions'].append({'rule': row['rule'], 'action': row['action']})
+        results.sort(key=lambda item: (item['updated_at'], item['token']))
+        return {'results': results[:limit], 'more': len(groups) > limit or len(results) > limit}
