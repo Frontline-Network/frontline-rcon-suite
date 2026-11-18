@@ -92,6 +92,15 @@ without proving the peer's complete state is unsafe: the peer deletes its
 own local reference when its remote ID is absent. The read-only comparison
 helper classifies overlaps and discrepancies, but does not establish record
 ownership or authorize changes.
+In the pinned public Barricade bans router, the async community-scoped list
+handler returns the coroutine from `get_bans` without awaiting it. The optional
+offline router contract test verifies the pinned Git blob and reproduces that
+the handler returns a nested coroutine. This raises an additional compatibility
+concern for the response model; the actual externally operated deployment and
+its HTTP behavior have not been tested. Do not assume that possessing a token
+alone makes the community-scoped snapshot endpoint usable. The unrestricted
+`/bans` endpoint has a different permission scope and must not be assumed to
+be available to a community token.
 The pinned CRCON peer also reads Frontline records with offset pagination and
 `exclude_expired=1`. In an isolated contract test using its actual retrieval
 and synchronization methods, removing an unrelated earlier record between
@@ -111,6 +120,9 @@ directory containing the latter three as `custom.py`, `crcon.py`, and
 Run `pytest tests/test_barricade_public_peer_contract.py` in an
 isolated test environment. The test checks the pinned Git blob hashes and
 substitutes the alert callback; it does not contact Barricade or Discord.
+For the separate community API probe, set `BARRICADE_PEER_BANS_SOURCE` to the
+pinned `barricade/web/routers/bans.py` and run
+`pytest tests/test_barricade_public_bans_router_contract.py`.
 
 With the new consumer, an explicit `frontline_integration` connection is
 rejected if durable scanning is disabled or the binding is invalid. A peer
