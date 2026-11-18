@@ -12,8 +12,9 @@ from threading import get_ident
 import asyncio
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, String, TIMESTAMP, UniqueConstraint, and_, func, or_, select, union_all, update, text
+from sqlalchemy import BigInteger, CheckConstraint, Index, String, TIMESTAMP, UniqueConstraint, and_, func, or_, select, union_all, update, text
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from rcon.models import Base, PlayerID, PlayerSession, SessionEventResolution, get_session_maker
@@ -93,6 +94,57 @@ class BarricadeScanBaseline(Base):
     server_number: Mapped[int] = mapped_column(primary_key=True)
     integration_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     player_session_id: Mapped[int] = mapped_column(primary_key=True)
+
+
+class BarricadeConnectObservation(Base):
+    """First live-collector observation, keyed by the actual CONNECT event."""
+    __tablename__ = 'barricade_scan_connect_observation'
+    server_number: Mapped[int] = mapped_column(primary_key=True)
+    player_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    event_us: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    observed_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+
+
+class BarricadeRosterSnapshot(Base):
+    __tablename__ = 'barricade_scan_roster_snapshot'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    server_number: Mapped[int] = mapped_column(nullable=False)
+    integration_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    player_ids: Mapped[list] = mapped_column(JSONB, nullable=False)
+    __table_args__ = (Index('ix_barricade_roster_lookup', 'server_number', 'integration_id', 'captured_at'),)
+
+
+def record_roster_snapshot(server_number: int, integration_id: str, player_ids):
+    if (type(server_number) is not int or not 1 <= server_number <= 32 or
+            not isinstance(integration_id, str) or not integration_id or len(integration_id) > 128 or
+            not isinstance(player_ids, (set, frozenset)) or len(player_ids) > 250 or
+            any(not isinstance(value, str) or not value or len(value) > 100 for value in player_ids)):
+        raise ValueError('Invalid Barricade roster snapshot')
+    with get_session_maker()() as session, session.begin():
+        session.add(BarricadeRosterSnapshot(server_number=server_number, integration_id=integration_id,
+            captured_at=func.clock_timestamp(), player_ids=sorted(player_ids)))
+        # Old observations are not needed for a present transition. If they
+        # are needed after a prolonged outage, absence becomes unconfirmed and
+        # that historical case goes to review rather than being inferred.
+        session.execute(text("""DELETE FROM barricade_scan_roster_snapshot
+            WHERE server_number=:server AND integration_id=:integration
+            AND captured_at < clock_timestamp() - interval '7 days'"""),
+            {'server': server_number, 'integration': integration_id})
+
+
+def record_collector_connects(events):
+    """Persist first sightings; never update the first observation on replay."""
+    rows = [{'server_number': server, 'player_id': player, 'event_us': event_us,
+             'observed_at': func.clock_timestamp()}
+            for server, player, kind, event_us in events
+            if kind == 'connect' and 1 <= server <= 32 and 0 < len(player) <= 100 and event_us >= 0]
+    if not rows:
+        return
+    with get_session_maker()() as session, session.begin():
+        # Distinct input is necessary for a single ON CONFLICT statement.
+        unique = {(row['server_number'], row['player_id'], row['event_us']): row for row in rows}
+        session.execute(insert(BarricadeConnectObservation).values(list(unique.values())).on_conflict_do_nothing())
 
 
 class BarricadeScanIntegration(Base):
@@ -239,14 +291,16 @@ def set_integration_credential(server_number: int, integration_id: str, *, expec
                 # snapshot after waiting on the table lock.
                 session.execute(text("SET LOCAL lock_timeout = '5s'"))
                 session.execute(text('LOCK TABLE player_sessions IN SHARE MODE'))
+                session.execute(text('LOCK TABLE barricade_scan_connect_observation IN SHARE MODE'))
                 session.execute(text('''INSERT INTO barricade_scan_baseline
                     (server_number, integration_id, player_session_id)
                     SELECT :server, :integration, id FROM player_sessions
                     WHERE server_number = :server'''),
                     {'server': server_number, 'integration': integration_id})
+                boundary_us = session.scalar(text('SELECT floor(extract(epoch from clock_timestamp()) * 1000000)::bigint'))
                 session.add(BarricadeScanIntegration(server_number=server_number, integration_id=integration_id,
                     credential_id=new_credential_id,
-                    registered_at_us=int(datetime.now(timezone.utc).timestamp() * 1_000_000)))
+                    registered_at_us=boundary_us))
             else:
                 row.credential_id = new_credential_id
             session.add(BarricadeScanIntegrationAudit(server_number=server_number, integration_id=integration_id,
@@ -298,6 +352,42 @@ def is_manually_reconstructed_session(server_number: int, session_id: int) -> bo
             SessionEventResolution.decision == 'create').limit(1)))
 
 
+def live_connect_after_cutover(server_number: int, integration_id: str, session_id: int,
+                               player_id: str, boundary_us: int) -> bool:
+    """A durable first observation after the same-database cutover is required."""
+    with get_session_maker()() as session:
+        row = session.execute(select(PlayerSession.start_event_us, PlayerSession.player_id_id,
+                                     PlayerSession.start, BarricadeConnectObservation.observed_at)
+            .join(PlayerID, PlayerID.id == PlayerSession.player_id_id)
+            .join(BarricadeConnectObservation, and_(
+                BarricadeConnectObservation.server_number == PlayerSession.server_number,
+                BarricadeConnectObservation.player_id == player_id,
+                BarricadeConnectObservation.event_us == PlayerSession.start_event_us))
+            .where(PlayerSession.server_number == server_number, PlayerSession.id == session_id,
+                   PlayerID.player_id == player_id)).first()
+        if not row or int(row.observed_at.timestamp() * 1_000_000) <= boundary_us:
+            return False
+        absent = session.scalar(select(BarricadeRosterSnapshot.id).where(
+            BarricadeRosterSnapshot.server_number == server_number,
+            BarricadeRosterSnapshot.integration_id == integration_id,
+            BarricadeRosterSnapshot.captured_at > datetime.fromtimestamp(boundary_us / 1_000_000, timezone.utc),
+            BarricadeRosterSnapshot.captured_at < row.observed_at,
+            ~BarricadeRosterSnapshot.player_ids.contains([player_id])).limit(1))
+        if absent is None:
+            return False
+        earlier_match = session.scalar(select(PlayerSession.id)
+            .join(BarricadeScanBaseline, and_(
+                BarricadeScanBaseline.player_session_id == PlayerSession.id,
+                BarricadeScanBaseline.server_number == server_number,
+                BarricadeScanBaseline.integration_id == integration_id.removeprefix('integration:')))
+            .where(PlayerSession.server_number == server_number,
+                   PlayerSession.player_id_id == row.player_id_id,
+                   or_(PlayerSession.start_event_us == row.start_event_us,
+                       and_(PlayerSession.start_event_us.is_(None), PlayerSession.start == row.start)))
+            .limit(1))
+        return earlier_match is None
+
+
 def find_unreserved_open_sessions(server_number: int, integration_id: str, *, after_id: int = 0,
                                   limit: int = 100, after_event_us: int | None = None,
                                   include_start: bool = False, player_ids=None):
@@ -345,7 +435,7 @@ def mark_activation_review(server_number: int, integration_id: str, session_id: 
                            player_id: str, game: str, cause: str) -> None:
     """Record an ambiguous pre-send candidate; no remote action has occurred."""
     _require_scope(server_number, integration_id)
-    if (cause not in ('activation_before', 'activation_ambiguous', 'activation_unknown', 'reconstructed_session',
+    if (cause not in ('activation_before', 'activation_ambiguous', 'activation_unknown', 'reconstructed_session', 'missing_live_connect',
                       'session_ended_before_scan') or
             game not in ('HLL', 'HLLV') or type(session_id) is not int or session_id <= 0 or
             not isinstance(player_id, str) or not 0 < len(player_id) <= 100):

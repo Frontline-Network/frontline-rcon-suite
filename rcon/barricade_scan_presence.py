@@ -5,13 +5,14 @@ game server has already exposed every event; an unobserved reconnect remains
 possible.
 """
 import asyncio
+import json
 import math
 import time
 
 from sqlalchemy import select
 
 from rcon.models import PlayerSession, UnidentifiedSessionEvent, get_session_maker
-from rcon.player_presence import MAX_SNAPSHOT_AGE_SECONDS, read_observations, redis_time
+from rcon.player_presence import MAX_SNAPSHOT_AGE_SECONDS, read_observations, redis_time, snapshot_key, validated_observation
 from rcon.report_admin import session_token
 from rcon.session_journal_observation import read as read_journal_observation
 
@@ -27,6 +28,23 @@ def observed_players(red, *, scope: str, server_number: int):
         if server_number not in available:
             return None
         return frozenset(sightings)
+    except Exception:
+        return None
+
+
+def observed_players_after(red, *, scope: str, server_number: int, barrier: float):
+    """Use only a complete roster whose collection began after the barrier."""
+    try:
+        now = redis_time(red)
+        if abs(now - time.time()) > 2:
+            return None
+        raw = red.get(snapshot_key(scope, server_number))
+        payload = json.loads(raw) if raw is not None else None
+        valid = validated_observation(payload, server_number=server_number, now=now,
+                                      max_age=MAX_SNAPSHOT_AGE_SECONDS) if payload else None
+        if valid is None or payload['started_at'] <= barrier:
+            return None
+        return frozenset(payload['players'])
     except Exception:
         return None
 

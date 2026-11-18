@@ -116,3 +116,21 @@ def test_shared_poll_barrier_rechecks_each_vietnam_eos_player(monkeypatch):
     assert all(call.kwargs['min_poll_started_at'] == 123.0 for call in check.call_args_list)
     assert len({call.kwargs['player_id'] for call in check.call_args_list}) == 50
     clock.assert_not_called()
+
+
+def test_roster_absence_requires_a_fresh_complete_post_barrier_poll(monkeypatch):
+    import json
+    now = time.time()
+    monkeypatch.setattr(candidate, 'redis_time', lambda _red: now)
+    red = Mock()
+    payload = {'version': 1, 'server_number': 3, 'started_at': now - 3,
+               'finished_at': now - 2, 'players': []}
+    red.get.return_value = json.dumps(payload)
+    kwargs = dict(scope='a' * 64, server_number=3, barrier=now - 4)
+    assert candidate.observed_players_after(red, **kwargs) == frozenset()
+    kwargs['barrier'] = now - 3
+    assert candidate.observed_players_after(red, **kwargs) is None
+    payload['players'] = ['invalid', 'invalid']
+    red.get.return_value = json.dumps(payload)
+    kwargs['barrier'] = now - 4
+    assert candidate.observed_players_after(red, **kwargs) is None

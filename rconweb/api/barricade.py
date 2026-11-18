@@ -172,8 +172,13 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         async def get_roster():
             nonlocal roster, roster_checked
             if time.monotonic() - roster_checked >= 5:
-                roster = await asyncio.to_thread(barricade_scan_presence.observed_players,
-                    redis, scope=scope, server_number=server_number)
+                deadline = time.monotonic() + 20
+                while True:
+                    roster = await asyncio.to_thread(barricade_scan_presence.observed_players_after,
+                        redis, scope=scope, server_number=server_number, barrier=barrier)
+                    if roster is not None or time.monotonic() >= deadline:
+                        break
+                    await asyncio.sleep(.25)
                 roster_checked = time.monotonic()
             return roster
 

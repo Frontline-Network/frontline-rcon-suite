@@ -5,6 +5,7 @@ Revises: f7770a1b2c3d
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 
 revision = 'f3970a1b2c3d'
 down_revision = 'f7770a1b2c3d'
@@ -16,6 +17,23 @@ def upgrade():
     op.create_index('ix_player_sessions_server_id_scan', 'player_sessions', ['server_number', 'id'])
     op.create_index('ix_player_sessions_server_open_id_scan', 'player_sessions', ['server_number', 'id'],
                     postgresql_where=sa.text('"end" IS NULL AND end_event_us IS NULL'))
+    op.create_table(
+        'barricade_scan_roster_snapshot',
+        sa.Column('id', sa.Integer, primary_key=True),
+        sa.Column('server_number', sa.Integer, nullable=False),
+        sa.Column('integration_id', sa.String(128), nullable=False),
+        sa.Column('captured_at', sa.TIMESTAMP(timezone=True), nullable=False),
+        sa.Column('player_ids', JSONB, nullable=False),
+    )
+    op.create_index('ix_barricade_roster_lookup', 'barricade_scan_roster_snapshot',
+                    ['server_number', 'integration_id', 'captured_at'])
+    op.create_table(
+        'barricade_scan_connect_observation',
+        sa.Column('server_number', sa.Integer, primary_key=True),
+        sa.Column('player_id', sa.String(100), primary_key=True),
+        sa.Column('event_us', sa.BigInteger, primary_key=True),
+        sa.Column('observed_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    )
     op.create_table(
         'barricade_scan_baseline',
         sa.Column('server_number', sa.Integer, primary_key=True),
@@ -73,11 +91,13 @@ def upgrade():
 
 
 def downgrade():
-    if op.get_bind().execute(sa.text('SELECT EXISTS (SELECT 1 FROM barricade_scan_baseline) OR EXISTS (SELECT 1 FROM barricade_scan_delivery) OR EXISTS (SELECT 1 FROM barricade_scan_integration) OR EXISTS (SELECT 1 FROM barricade_scan_integration_audit) OR EXISTS (SELECT 1 FROM barricade_scan_review_audit)')).scalar():
+    if op.get_bind().execute(sa.text('SELECT EXISTS (SELECT 1 FROM barricade_scan_roster_snapshot) OR EXISTS (SELECT 1 FROM barricade_scan_connect_observation) OR EXISTS (SELECT 1 FROM barricade_scan_baseline) OR EXISTS (SELECT 1 FROM barricade_scan_delivery) OR EXISTS (SELECT 1 FROM barricade_scan_integration) OR EXISTS (SELECT 1 FROM barricade_scan_integration_audit) OR EXISTS (SELECT 1 FROM barricade_scan_review_audit)')).scalar():
         raise RuntimeError('Cannot remove Barricade scan delivery history; it prevents duplicate scans')
     op.drop_table('barricade_scan_delivery')
     op.drop_table('barricade_scan_integration')
     op.drop_table('barricade_scan_baseline')
+    op.drop_table('barricade_scan_connect_observation')
+    op.drop_table('barricade_scan_roster_snapshot')
     op.drop_index('ix_player_sessions_server_open_id_scan', table_name='player_sessions')
     op.drop_index('ix_player_sessions_server_id_scan', table_name='player_sessions')
     op.drop_table('barricade_scan_integration_audit')

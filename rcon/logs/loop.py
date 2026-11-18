@@ -429,6 +429,14 @@ class LogLoop:
                                                 log.get("player_name_1") or "",
                                                 log.get("raw") or log.get("line_without_time") or ""))
         added = self.session_journal.remember_batch(session_events, self.session_cutover_us, unidentified_events)
+        if os.getenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS') == '1':
+            try:
+                from rcon.barricade_scan_journal import record_collector_connects
+                record_collector_connects(session_events)
+            except Exception:
+                # Missing evidence must not stop the game log collector; scans
+                # lacking a persisted observation cannot be sent automatically.
+                logger.exception('Could not persist Barricade connect observations')
         if unidentified_events and added:
             logger.warning("Session log batch contains events without player IDs; retained for review")
         self.GET_LOGS_SINCE_MIN = 5

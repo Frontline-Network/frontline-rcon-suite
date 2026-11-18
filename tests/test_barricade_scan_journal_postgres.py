@@ -14,7 +14,7 @@ import sys
 import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy import inspect, select, text
+from sqlalchemy import func, inspect, select, text
 
 from rcon import barricade_scan_journal as journal
 from rcon import barricade_scan_dispatch as adapter
@@ -46,6 +46,8 @@ def prepare(database, monkeypatch):
     PlayerID.__table__.create(database.kw['bind'], checkfirst=True)
     PlayerSession.__table__.create(database.kw['bind'], checkfirst=True)
     SessionEventResolution.__table__.create(database.kw['bind'], checkfirst=True)
+    journal.BarricadeConnectObservation.__table__.create(database.kw['bind'])
+    journal.BarricadeRosterSnapshot.__table__.create(database.kw['bind'])
     journal.BarricadeScanBaseline.__table__.create(database.kw['bind'])
     journal.BarricadeScanDelivery.__table__.create(database.kw['bind'])
     journal.BarricadeScanIntegration.__table__.create(database.kw['bind'])
@@ -83,6 +85,92 @@ def test_baseline_records_existing_sessions_without_claiming_success(database, m
         fresh_id = fresh.id
     rows = journal.find_unreserved_open_sessions(3, f'integration:{peer}')
     assert [row[0] for row in rows] == [fresh_id]
+
+
+def test_collector_events_are_deduplicated_and_ordered_by_database_cutover(database, monkeypatch):
+    prepare(database, monkeypatch)
+    peer = '01234567-89ab-4def-8012-0123456789ab'
+    old_player, new_player = '00000000000000000000000000000001', '00000000000000000000000000000002'
+    event_us = 1_700_000_000_000_000
+    journal.record_collector_connects([(3, old_player, 'connect', event_us)])
+    journal.set_integration_credential(3, peer, expected_credential_id=None, new_credential_id=1,
+                                       actor='test', reason='cutover')
+    journal.record_roster_snapshot(3, f'integration:{peer}', frozenset())
+    journal.record_collector_connects([(3, old_player, 'connect', event_us),
+                                       (3, new_player, 'connect', event_us),
+                                       (3, new_player, 'connect', event_us)])
+    with database.begin() as session:
+        boundary = session.get(journal.BarricadeScanIntegration, (3, peer)).registered_at_us
+        ids = []
+        for player_id in (old_player, new_player):
+            player = PlayerID(player_id=player_id)
+            session.add(player)
+            session.flush()
+            row = PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2023, 1, 1), start_event_us=event_us)
+            session.add(row)
+            session.flush()
+            ids.append(row.id)
+        assert session.scalar(select(func.count()).select_from(journal.BarricadeConnectObservation)) == 2
+    namespace = f'integration:{peer}'
+    assert not journal.live_connect_after_cutover(3, namespace, ids[0], old_player, boundary)
+    assert journal.live_connect_after_cutover(3, namespace, ids[1], new_player, boundary)
+
+
+def test_roster_absence_must_precede_connect_and_new_rejoin_can_be_scanned(database, monkeypatch):
+    prepare(database, monkeypatch)
+    peer = '01234567-89ab-4def-8012-0123456789ab'
+    namespace = f'integration:{peer}'
+    player_id = '00000000000000000000000000000001'
+    journal.set_integration_credential(3, peer, expected_credential_id=None, new_credential_id=1,
+                                       actor='test', reason='cutover')
+    journal.record_roster_snapshot(3, namespace, frozenset({player_id}))
+    journal.record_collector_connects([(3, player_id, 'connect', 1_700_000_000_000_000)])
+    journal.record_roster_snapshot(3, namespace, frozenset())
+    journal.record_collector_connects([(3, player_id, 'connect', 1_700_000_100_000_000)])
+    with database.begin() as session:
+        boundary = session.get(journal.BarricadeScanIntegration, (3, peer)).registered_at_us
+        player = PlayerID(player_id=player_id)
+        session.add(player)
+        session.flush()
+        rows = [PlayerSession(player_id_id=player.id, server_number=3, start=datetime(2023, 1, 1), start_event_us=event)
+                for event in (1_700_000_000_000_000, 1_700_000_100_000_000)]
+        session.add_all(rows)
+        session.flush()
+        first, second = (row.id for row in rows)
+    assert not journal.live_connect_after_cutover(3, namespace, first, player_id, boundary)
+    assert journal.live_connect_after_cutover(3, namespace, second, player_id, boundary)
+
+
+def test_roster_transition_dispatches_vietnam_eos_once_and_persists_confirmation(database, monkeypatch):
+    prepare_adapter(database, monkeypatch)
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    eos = '00026a3466a244829409f77af0a752d9'
+    journal.record_roster_snapshot(3, namespace, frozenset())
+    journal.record_collector_connects([(3, eos, 'connect', 1_700_000_100_000_000)])
+    with database.begin() as session:
+        player = PlayerID(player_id=eos)
+        session.add(player)
+        session.flush()
+        row = PlayerSession(player_id_id=player.id, server_number=3,
+                            start=datetime(2023, 1, 1), start_event_us=1_700_000_100_000_000)
+        session.add(row)
+        session.flush()
+        session_id = row.id
+    sent = []
+    async def sender(player_id, game):
+        sent.append((player_id, game))
+    async def roster():
+        return frozenset({eos})
+    async def run():
+        for _ in range(2):
+            await adapter.scan_once(3, namespace, 'HLLV', sender, verified,
+                                    credential_id=1, get_roster=roster)
+    asyncio.run(run())
+    assert sent == [(eos, 'HLLV')]
+    with database() as session:
+        delivery = session.scalar(select(journal.BarricadeScanDelivery).where(
+            journal.BarricadeScanDelivery.player_session_id == session_id))
+        assert delivery is not None and delivery.status == 'done'
 
 
 def test_key_rotation_preserves_registered_namespace_and_rejects_other_keys(database, monkeypatch):
