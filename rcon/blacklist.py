@@ -67,6 +67,10 @@ class HLLVBanOwnershipUnverified(RuntimeError):
     """An existing HLLV game ban cannot safely be attributed to this list."""
 
 
+class BlacklistBanOwnershipUnverified(RuntimeError):
+    """An existing game ban cannot safely be attributed to this list."""
+
+
 class HLLVSteamIdentityUnverified(RuntimeError):
     """An action was not attempted because its Steam/EOS link is unverified."""
 
@@ -462,11 +466,37 @@ def _synchronize_ban(
     """
     logger.info("Synchronizing ban for player %s", player_id)
     new_state = get_ban_state_from_record(new_record)
-    short_record = new_state == BanState.TEMP and _blacklist_remaining_hours(new_record) < 1
+    if new_state == BanState.TEMP:
+        if _blacklist_record_has_expired(new_record):
+            return
+        # A previous list state does not establish ownership of a game ban.
+        # Read the server rather than the 60-second cached ban lists: only a
+        # fresh, well-formed absence permits a new temporary sanction.
+        for method in ('get_temp_bans', 'get_perma_bans'):
+            try:
+                reader = getattr(rcon, method)
+                if isinstance(rcon, Rcon):
+                    bans = getattr(Rcon, method).__wrapped__(rcon)
+                else:
+                    bans = reader()
+            except Exception as exc:
+                if _blacklist_record_has_expired(new_record):
+                    return
+                raise BlacklistBanOwnershipUnverified('Cannot read current game bans') from exc
+            if _blacklist_record_has_expired(new_record):
+                return
+            if not isinstance(bans, list) or any(
+                    not isinstance(ban, dict) or not isinstance(ban.get('player_id'), str)
+                    for ban in bans):
+                raise BlacklistBanOwnershipUnverified('Cannot verify existing game bans')
+            def identity(value):
+                return value.lower() if len(value) == 32 and all(c in '0123456789abcdefABCDEF' for c in value) else value
+            if any(identity(ban['player_id']) == identity(player_id) for ban in bans):
+                raise BlacklistBanOwnershipUnverified('Existing game ban ownership is unknown')
 
     # Remove the existing ban if it will not be overwritten later. Also remove if the
     # player is to be banned upon connecting, so that they can see the updated ban reason
-    if not short_record and (
+    if new_state != BanState.TEMP and (
         new_state != old_state
         or (new_record is not None and new_record.blacklist.sync == BlacklistSyncMethod.BAN_ON_CONNECT)
     ):

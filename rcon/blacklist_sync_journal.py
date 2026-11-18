@@ -382,6 +382,7 @@ def list_reviews(server_number: int, offset: int = 0, limit: int = 50) -> dict:
             review_kind = {
                 "unconfirmed: HLLVSteamBanOwnershipUnverified": "hllv_ownership",
                 "unconfirmed: HLLVBanOwnershipUnverified": "hllv_ownership",
+                "unconfirmed: BlacklistBanOwnershipUnverified": "hllv_ownership",
                 "unconfirmed: HLLVSteamIdentityUnverified": "hllv_identity",
             }.get(row.reason)
             result.append({"id": row.id, "command": command_name, "payload": payload,
