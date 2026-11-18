@@ -821,13 +821,15 @@ def windows_store_player_check(rcon: Rcon, _, name: str, player_id: str):
         # The detailed-player helper is cached; a rapid reconnect on another
         # platform must not inherit a previous session's PC classification.
         details = rcon._get_adapted_player_info(player_id)
-        if (not isinstance(details, dict) or str(details.get("iD") or "") != str(player_id)
+        if (not isinstance(details, dict) or details.get("iD") != player_id
                 or not isinstance(details.get("platform"), str)):
             logger.warning("Skipping Windows Store rule: player platform is not confirmed as PC WinGDK")
             return
-        platform = details["platform"].strip().lower().rsplit("::", 1)[-1]
+        platform = details["platform"].strip().lower()
         game = getattr(getattr(rcon, "config", None), "game", None)
-        if platform != "pc_wingdk" and not (game == GameEnum.HLL_VIETNAM and platform == "wingdk"):
+        if platform not in {"pc_wingdk", "eplatform::pc_wingdk"} and not (
+            game == GameEnum.HLL_VIETNAM and platform in {"wingdk", "eplatformfamily::wingdk"}
+        ):
             logger.warning("Skipping Windows Store rule: player platform is not confirmed as PC WinGDK")
             return
     except Exception:
