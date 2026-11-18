@@ -291,8 +291,8 @@ def test_legacy_session_is_not_reinterpreted_without_explicit_utc_setting(databa
         assert len(session.scalars(select(PendingPlayerDisconnect)).all()) == 1
 
 
-@pytest.mark.parametrize("log_count,expected_linked", [(0, False), (1, True), (2, False)])
-def test_legacy_utc_is_inferred_only_from_unique_matching_absolute_log(database, monkeypatch, log_count, expected_linked):
+@pytest.mark.parametrize("log_count", [0, 1, 2])
+def test_unverified_legacy_start_is_not_inferred_from_logs(database, monkeypatch, log_count):
     monkeypatch.delenv("HLL_SESSION_LEGACY_UTC", raising=False)
     monkeypatch.setattr(player_history, "get_server_number", lambda: "1")
     start = 1_700_000_000
@@ -309,13 +309,8 @@ def test_legacy_utc_is_inferred_only_from_unique_matching_absolute_log(database,
     with Session(database) as session:
         saved = session.scalar(select(PlayerSession))
         pending = session.scalars(select(PendingPlayerDisconnect)).all()
-        if expected_linked:
-            assert saved.start_event_us == start * 1_000_000
-            assert saved.end_event_us == (start + 50) * 1_000_000
-            assert pending == []
-        else:
-            assert saved.start_event_us is None and saved.end is None
-            assert len(pending) == 1
+        assert saved.start_event_us is None and saved.end is None
+        assert len(pending) == 1
 
 
 def test_one_connect_log_does_not_choose_between_duplicate_legacy_rows(database, monkeypatch):
@@ -353,6 +348,105 @@ def test_two_connect_logs_with_same_wall_time_do_not_prove_legacy_start(database
         assert saved.start_event_us is None
         assert saved.end_event_us is None
         assert len(session.scalars(select(PendingPlayerDisconnect)).all()) == 1
+
+
+def test_late_conflicting_connect_does_not_infer_legacy_start(database, monkeypatch):
+    monkeypatch.delenv('HLL_SESSION_LEGACY_UTC', raising=False)
+    monkeypatch.setattr(player_history, 'get_server_number', lambda: '1')
+    start = 1_729_991_400
+    wall = datetime.fromtimestamp(start, timezone.utc).replace(tzinfo=None)
+    with Session(database) as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == 'fake-console-id'))
+        session.add(PlayerSession(player=player, start=wall, server_number=1, server_name='legacy'))
+        session.add(LogLine(type='CONNECTED', server='1', player1_player_id=player.id,
+                            event_time=wall, raw=f'[0 ms ({start})] CONNECTED fake', weapon='', content=''))
+        session.commit()
+    player_history.save_end_player_session('fake-console-id', start + 50)
+    with Session(database) as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == 'fake-console-id'))
+        session.add(LogLine(type='CONNECTED', server='1', player1_player_id=player.id,
+                            event_time=wall, raw=f'[0 ms ({start - 3600})] CONNECTED fake', weapon='', content=''))
+        session.commit()
+    player_history.save_end_player_session('fake-console-id', start + 50)
+    with Session(database) as session:
+        saved = session.scalar(select(PlayerSession))
+        assert saved.start_event_us is None
+        assert saved.end_event_us is None
+        assert session.scalar(select(PendingPlayerConnect)) is None
+        assert session.scalar(select(PendingPlayerDisconnect)) is not None
+
+
+def test_previously_assigned_start_is_not_rewritten_without_provenance(database, monkeypatch):
+    monkeypatch.delenv('HLL_SESSION_LEGACY_UTC', raising=False)
+    monkeypatch.setattr(player_history, 'get_server_number', lambda: '1')
+    start = 1_729_991_400
+    wall = datetime.fromtimestamp(start, timezone.utc).replace(tzinfo=None)
+    with Session(database) as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == 'fake-console-id'))
+        session.add(PlayerSession(player=player, start=wall, start_event_us=start * 1_000_000,
+                                  end_event_us=(start + 50) * 1_000_000,
+                                  end=datetime.fromtimestamp(start + 50), server_number=1))
+        session.add(LogLine(type='CONNECTED', server='1', player1_player_id=player.id,
+                            event_time=wall, raw=f'[0 ms ({start - 3600})] CONNECTED fake', weapon='', content=''))
+        session.commit()
+    player_history.save_end_player_session('fake-console-id', start + 50)
+    with Session(database) as session:
+        saved = session.scalar(select(PlayerSession))
+        assert saved.start_event_us == start * 1_000_000
+        assert saved.end_event_us == (start + 50) * 1_000_000
+
+
+def test_unknown_legacy_start_prevents_ambiguous_disconnect_from_closing_new_session(database, monkeypatch):
+    monkeypatch.delenv('HLL_SESSION_LEGACY_UTC', raising=False)
+    monkeypatch.setattr(player_history, 'get_server_number', lambda: '1')
+    start = 1_700_000_000
+    player_history.save_start_player_session('fake-console-id', start, server_number=1)
+    with Session(database) as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == 'fake-console-id'))
+        session.add(PlayerSession(player=player, start=datetime.fromtimestamp(start + 10),
+                                  server_number=1, server_name='legacy'))
+        session.commit()
+    player_history.save_end_player_session('fake-console-id', start + 20)
+    with Session(database) as session:
+        rows = list(session.scalars(select(PlayerSession).order_by(PlayerSession.id)))
+        assert rows[0].end_event_us is None
+        assert rows[1].start_event_us is None and rows[1].end_event_us is None
+        assert session.scalar(select(PendingPlayerDisconnect)) is not None
+
+
+def test_closed_provably_older_legacy_session_does_not_block_new_session(database, monkeypatch):
+    monkeypatch.delenv('HLL_SESSION_LEGACY_UTC', raising=False)
+    monkeypatch.setattr(player_history, 'get_server_number', lambda: '1')
+    start = 1_700_000_000
+    player_history.save_start_player_session('fake-console-id', start, server_number=1)
+    with Session(database) as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == 'fake-console-id'))
+        session.add(PlayerSession(player=player, start=datetime.fromtimestamp(start - 200_000),
+                                  end=datetime.fromtimestamp(start - 100_000), server_number=1))
+        session.commit()
+    player_history.save_end_player_session('fake-console-id', start + 20)
+    with Session(database) as session:
+        rows = list(session.scalars(select(PlayerSession).order_by(PlayerSession.id)))
+        assert rows[0].end_event_us == (start + 20) * 1_000_000
+        assert session.scalar(select(PendingPlayerDisconnect)) is None
+
+
+def test_open_provably_older_legacy_start_does_not_block_new_session(database, monkeypatch):
+    monkeypatch.delenv('HLL_SESSION_LEGACY_UTC', raising=False)
+    monkeypatch.setattr(player_history, 'get_server_number', lambda: '1')
+    start = 1_700_000_000
+    player_history.save_start_player_session('fake-console-id', start, server_number=1)
+    with Session(database) as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == 'fake-console-id'))
+        session.add(PlayerSession(player=player, start=datetime.fromtimestamp(start - 100_000),
+                                  end=None, server_number=1))
+        session.commit()
+    player_history.save_end_player_session('fake-console-id', start + 20)
+    with Session(database) as session:
+        rows = list(session.scalars(select(PlayerSession).order_by(PlayerSession.id)))
+        assert rows[0].end_event_us == (start + 20) * 1_000_000
+        assert rows[1].end_event_us is None
+        assert session.scalar(select(PendingPlayerDisconnect)) is None
 
 
 def test_ambiguous_legacy_connect_is_not_silently_duplicated(database, monkeypatch):

@@ -135,7 +135,7 @@ def test_concurrent_duplicate_disconnect_does_not_close_older_session(database):
         assert newer.end is not None
 
 
-def test_postgres_legacy_open_session_is_matched_only_with_absolute_log(database, monkeypatch):
+def test_postgres_legacy_open_session_is_not_inferred_from_single_log(database, monkeypatch):
     monkeypatch.delenv("HLL_SESSION_LEGACY_UTC", raising=False)
     start = 1_700_000_000
     with database.begin() as session:
@@ -147,7 +147,8 @@ def test_postgres_legacy_open_session_is_matched_only_with_absolute_log(database
     player_history.save_end_player_session("synthetic-id", start + 50)
     with database() as session:
         saved = session.scalar(select(PlayerSession))
-        assert (saved.start_event_us, saved.end_event_us) == (start * 1_000_000, (start + 50) * 1_000_000)
+        assert (saved.start_event_us, saved.end_event_us) == (None, None)
+        assert len(session.scalars(select(PendingPlayerDisconnect)).all()) == 1
 
 
 def test_postgres_multiple_possible_connects_stay_unresolved_under_concurrent_disconnects(database, monkeypatch):
@@ -165,9 +166,7 @@ def test_postgres_multiple_possible_connects_stay_unresolved_under_concurrent_di
         saved = session.scalar(select(PlayerSession))
         assert saved.start_event_us is None and saved.end_event_us is None
         assert len(session.scalars(select(PendingPlayerDisconnect)).all()) == 1
-
-
-def test_postgres_late_unique_log_allows_deferred_disconnect_to_resolve(database, monkeypatch):
+def test_postgres_late_unique_log_does_not_resolve_unknown_legacy_timezone(database, monkeypatch):
     monkeypatch.delenv("HLL_SESSION_LEGACY_UTC", raising=False)
     start = 1_700_000_000
     wall = datetime.fromtimestamp(start, timezone.utc).replace(tzinfo=None)
@@ -186,8 +185,22 @@ def test_postgres_late_unique_log_allows_deferred_disconnect_to_resolve(database
     player_history.save_end_player_session("synthetic-id", start + 50)
     with database() as session:
         saved = session.scalar(select(PlayerSession))
-        assert (saved.start_event_us, saved.end_event_us) == (start * 1_000_000, (start + 50) * 1_000_000)
-        assert session.scalars(select(PendingPlayerDisconnect)).all() == []
+        assert (saved.start_event_us, saved.end_event_us) == (None, None)
+        assert len(session.scalars(select(PendingPlayerDisconnect)).all()) == 1
+
+
+def test_postgres_concurrent_disconnects_do_not_guess_between_legacy_and_new(database, monkeypatch):
+    monkeypatch.delenv('HLL_SESSION_LEGACY_UTC', raising=False)
+    start = 1_700_000_000
+    player_history.save_start_player_session('synthetic-id', start, server_number=3)
+    with database.begin() as session:
+        player = session.scalar(select(PlayerID).where(PlayerID.player_id == 'synthetic-id'))
+        session.add(PlayerSession(player=player, start=datetime.fromtimestamp(start + 10), server_number=3))
+    run_parallel(lambda: player_history.save_end_player_session('synthetic-id', start + 20))
+    with database() as session:
+        rows = list(session.scalars(select(PlayerSession).order_by(PlayerSession.id)))
+        assert rows[0].end_event_us is None and rows[1].end_event_us is None
+        assert len(session.scalars(select(PendingPlayerDisconnect)).all()) == 1
 
 
 @pytest.mark.skipif(not hasattr(time, "tzset"), reason="process timezone control requires tzset")
