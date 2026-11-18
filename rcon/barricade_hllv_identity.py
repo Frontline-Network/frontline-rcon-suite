@@ -101,7 +101,14 @@ def prepare_online_steam_identity(rcon, steam_id: str) -> dict:
         elif platform not in NON_STEAM_FAMILIES:
             raise ValueError('Unknown online platform in identity snapshot')
         elif not _non_steam_platform_id_is_safe(row.get('steamId')):
-            raise ValueError('Inconsistent online Steam identity')
+            # A fresh RCON3 roster showed a PS5 platform value shaped like a
+            # Steam64 ID. It is not a Steam association. For this *targeted*
+            # lookup, an unrelated string cannot match the requested ID;
+            # retain the ambiguity if it matches or the type is malformed.
+            value = row.get('steamId')
+            if not (platform == 'eplatformfamily::ps5' and isinstance(value, str)
+                    and is_steam_id_64(value) and value != steam_id):
+                raise ValueError('Inconsistent online Steam identity')
         if (len(eos) != 32 or not all(c in '0123456789abcdefABCDEF' for c in eos)
                 or row.get('eosId') != eos or eos in seen_eos):
             raise ValueError('Invalid or duplicate EOS identity in player snapshot')

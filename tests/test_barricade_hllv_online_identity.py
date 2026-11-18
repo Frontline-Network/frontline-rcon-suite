@@ -106,13 +106,35 @@ def test_non_steam_platform_identifier_does_not_block_steam_reconciliation(platf
         'steam_id': None, 'platform': platform.lower()}
 
 
-@pytest.mark.parametrize('platform_id', ['76561198036685844', 76561198036685844, True, ['unexpected']])
+@pytest.mark.parametrize('platform_id', [STEAM, 76561198036685844, True, ['unexpected']])
 def test_ambiguous_non_steam_platform_identifier_remains_blocked(platform_id):
     api = api_with_players([row(platform='EPlatformFamily::PS5', steam=platform_id)])
     with pytest.raises(ValueError):
         prepare_online_steam_identity(api, STEAM)
     with pytest.raises(ValueError):
         prepare_online_identity_snapshot(api)
+
+
+def test_unrelated_console_steam_shaped_identifier_does_not_block_targeted_lookup():
+    console = 'fedcba9876543210fedcba9876543210'
+    api = api_with_players([row(console, platform='EPlatformFamily::PS5', steam='76561198036685844'), row()])
+    assert prepare_online_steam_identity(api, STEAM) == {'steam_id': STEAM, 'eos_id': EOS}
+    # A whole-roster snapshot has no single target and remains conservative.
+    with pytest.raises(ValueError):
+        prepare_online_identity_snapshot(api)
+
+
+def test_unrelated_console_identifier_never_becomes_a_steam_match():
+    console = 'fedcba9876543210fedcba9876543210'
+    api = api_with_players([row(console, platform='EPlatformFamily::PS5', steam='76561198036685844')])
+    assert prepare_online_steam_identity(api, STEAM) == {'steam_id': STEAM, 'eos_id': None}
+
+
+def test_matching_console_steam_shaped_identifier_never_proves_the_target():
+    console = 'fedcba9876543210fedcba9876543210'
+    api = api_with_players([row(console, platform='EPlatformFamily::PS5', steam=STEAM), row()])
+    with pytest.raises(ValueError):
+        prepare_online_steam_identity(api, STEAM)
 
 
 @pytest.mark.parametrize('invalid', [
