@@ -1,0 +1,238 @@
+diff --git a/barricade/crud/responses.py b/barricade/crud/responses.py
+index c0f2c32..efe7e60 100644
+--- a/barricade/crud/responses.py
++++ b/barricade/crud/responses.py
+@@ -395,17 +395,19 @@ async def get_successful_responses_without_bans(
+             models.PlayerReportResponse.banned.is_(True),
+         )
+         .join(models.PlayerReportResponse.player_report)
++        .join(models.PlayerReport.report)
+         .where(
+             not_(
+                 exists(
+                     select(models.PlayerBan).where(
+                         models.PlayerBan.integration_id == integration_id,
+                         models.PlayerBan.player_id == models.PlayerReport.player_id,
++                        models.PlayerBan.game == models.Report.game,
+                     )
+                 )
+             )
+         )
+-        .distinct(models.PlayerReport.player_id)
++        .distinct(models.PlayerReport.player_id, models.Report.game)
+         .options(
+             selectinload(models.PlayerReportResponse.player_report)
+             .selectinload(models.PlayerReport.report)
+@@ -414,7 +416,7 @@ async def get_successful_responses_without_bans(
+     )
+ 
+     if game is not None:
+-        stmt = stmt.join(models.PlayerReport.report).where(models.Report.game == game)
++        stmt = stmt.where(models.Report.game == game)
+ 
+     result = await db.scalars(stmt)
+     return result.all()
+diff --git a/barricade/integrations/crcon/integration.py b/barricade/integrations/crcon/integration.py
+index 783e5fe..231189f 100644
+--- a/barricade/integrations/crcon/integration.py
++++ b/barricade/integrations/crcon/integration.py
+@@ -24,6 +24,7 @@ from barricade.integrations.mixins import (
+     IntegrationScopedMixin,
+ )
+ from barricade.integrations.scope import Scope
++from barricade.integrations.serialization import serialized_integration
+ from barricade.utils import async_ttl_cache, game_switch
+ 
+ RE_VERSION = re.compile(r"v(?P<major>\d+).(?P<minor>\d+).(?P<patch>\d+)")
+@@ -127,6 +128,7 @@ class CRCONIntegration(
+ 
+     @is_enabled
+     @is_websocket_enabled
++    @serialized_integration
+     async def synchronize(self):
+         if not self.config.id:
+             raise RuntimeError("Integration has not yet been saved")
+diff --git a/barricade/integrations/custom/integration.py b/barricade/integrations/custom/integration.py
+index 20a04c9..ba6336d 100644
+--- a/barricade/integrations/custom/integration.py
++++ b/barricade/integrations/custom/integration.py
+@@ -11,6 +11,7 @@ from barricade.enums import Game, IntegrationType
+ from barricade.exceptions import (
+     AlreadyBannedError,
+     IntegrationBanError,
++    IntegrationBulkBanError,
+     IntegrationCommandError,
+     IntegrationDisabledError,
+     IntegrationFailureError,
+@@ -32,6 +33,7 @@ from barricade.integrations.integration import (
+     IntegrationMetaData,
+     is_enabled,
+ )
++from barricade.integrations.serialization import serialized_integration
+ from barricade.integrations.websocket import validate_ws_connection
+ from barricade.utils import batched, game_switch
+ 
+@@ -141,6 +143,7 @@ class CustomIntegration(Integration):
+         return set()
+ 
+     @is_enabled
++    @serialized_integration
+     async def ban_player(self, response: schemas.ResponseWithToken):
+         async with session_factory.begin() as db:
+             game = response.player_report.report.game
+@@ -172,6 +175,7 @@ class CustomIntegration(Integration):
+             await self.set_ban_id(db, player_id, remote_id, game)
+ 
+     @is_enabled
++    @serialized_integration
+     async def unban_player(self, player_id: int, game: Game | None = None):
+         self.logger.info("%r: Unbanning player %s", self, player_id)
+         async with session_factory.begin() as db:
+@@ -190,6 +194,7 @@ class CustomIntegration(Integration):
+                 raise IntegrationBanError(player_id, "Failed to unban player") from e
+ 
+     @is_enabled
++    @serialized_integration
+     async def bulk_ban_players(self, responses: Sequence[schemas.ResponseWithToken]):
+         self.logger.info(
+             "%r: Bulk banning players %s",
+@@ -201,6 +206,8 @@ class CustomIntegration(Integration):
+             return
+ 
+         playerids_banids_games: list[tuple[int, str, Game]] = []
++        missing_player_ids: list[int] = []
++        bulk_error: Exception | None = None
+ 
+         # Sort by game so that they can be grouped together later
+         responses = sorted(responses, key=lambda r: r.player_report.report.game)
+@@ -221,6 +228,7 @@ class CustomIntegration(Integration):
+ 
+                             # Skip if no player ID is available
+                             if player_game_id is None:
++                                missing_player_ids.append(player.id)
+                                 self.logger.warning(
+                                     "%r: Player ID for %s is unknown, skipping player %s",
+                                     self,
+@@ -247,11 +255,21 @@ class CustomIntegration(Integration):
+                             player_id = player_game_id_to_id_map[player_game_id]
+                             playerids_banids_games.append((player_id, ban_id, game))
+ 
++            except Exception as exc:
++                # Commit references for confirmed remote writes before
++                # reporting a later failure to the caller.
++                bulk_error = exc
+             finally:
+                 if playerids_banids_games:
+                     await self.set_multiple_ban_ids(db, *playerids_banids_games)
+ 
++        if bulk_error is not None:
++            raise bulk_error
++        if missing_player_ids:
++            raise IntegrationBulkBanError(missing_player_ids, "Player game ID is unknown")
++
+     @is_enabled
++    @serialized_integration
+     async def bulk_unban_players(
+         self, player_ids: Sequence[int], game: Game | None = None
+     ):
+diff --git a/barricade/integrations/mixins.py b/barricade/integrations/mixins.py
+index 809aeb1..971be2a 100644
+--- a/barricade/integrations/mixins.py
++++ b/barricade/integrations/mixins.py
+@@ -2,8 +2,7 @@ import itertools
+ from abc import ABC, abstractmethod
+ 
+ from barricade import schemas
+-from barricade.crud.bans import bulk_delete_bans
+-from barricade.db import models, session_factory
++from barricade.db import session_factory
+ from barricade.enums import Game
+ from barricade.exceptions import (
+     IntegrationMissingPermissionsError,
+@@ -11,6 +10,7 @@ from barricade.exceptions import (
+ )
+ from barricade.integrations.integration import Integration
+ from barricade.integrations.scope import Scope
++from barricade.integrations.serialization import serialized_integration
+ from barricade.utils import game_switch
+ 
+ 
+@@ -84,6 +84,7 @@ class IntegrationBanListMixin(Integration, ABC):
+         """
+         raise NotImplementedError
+ 
++    @serialized_integration
+     async def create_ban_list(self, community: schemas.Community, game: Game) -> str:
+         self.logger.info("%r: Creating new ban list for game %s", self, game)
+ 
+@@ -92,15 +93,9 @@ class IntegrationBanListMixin(Integration, ABC):
+         )
+ 
+         if banlist_id:
+-            self.logger.info(
+-                "%s: Clearing bans from previous ban list %s", self, banlist_id
++            raise IntegrationValidationError(
++                'Existing ban list cannot be replaced automatically; preserve its references and migrate explicitly'
+             )
+-            async with session_factory.begin() as db:
+-                await bulk_delete_bans(
+-                    db,
+-                    models.PlayerBan.integration_id == self.config.id,
+-                    models.PlayerBan.game == game,
+-                )
+ 
+         try:
+             new_banlist_id = await self.create_remote_ban_list(community, game)
+@@ -117,8 +112,15 @@ class IntegrationBanListMixin(Integration, ABC):
+         else:
+             raise ValueError(f"Unrecognized game: {game}")
+ 
+-        async with session_factory.begin() as db:
+-            await self.update(db)
++        try:
++            async with session_factory.begin() as db:
++                await self.update(db)
++        except BaseException:
++            if game == Game.HLL:
++                self.config.hll_banlist_id = banlist_id
++            else:
++                self.config.hllv_banlist_id = banlist_id
++            raise
+ 
+         return new_banlist_id
+ 
+diff --git a/barricade/integrations/serialization.py b/barricade/integrations/serialization.py
+new file mode 100644
+index 0000000..dae3114
+--- /dev/null
++++ b/barricade/integrations/serialization.py
+@@ -0,0 +1,29 @@
++"""Serialize a CRCON integration's remote and reference mutations.
++
++The dedicated unpooled connection prevents lock waiters from exhausting the
++application's regular database pool. All replicas must run this version.
++"""
++from functools import wraps
++
++from sqlalchemy import text
++from sqlalchemy.ext.asyncio import create_async_engine
++from sqlalchemy.pool import NullPool
++
++from barricade.constants import DB_URL
++
++lock_engine = create_async_engine(DB_URL, poolclass=NullPool)
++
++
++def serialized_integration(func):
++    @wraps(func)
++    async def wrapper(integration, *args, **kwargs):
++        if integration.config.id is None:
++            raise RuntimeError('Integration needs to be created first')
++        async with integration.lock:
++            async with lock_engine.begin() as connection:
++                await connection.execute(
++                    text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
++                    {'key': f'barricade-integration:{integration.config.id}'},
++                )
++                return await func(integration, *args, **kwargs)
++    return wrapper

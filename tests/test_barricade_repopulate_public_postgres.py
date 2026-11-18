@@ -6,10 +6,12 @@ Barricade credentials, production rows, game server or sanctions are involved.
 import ast
 import asyncio
 import hashlib
+import importlib.util
 import itertools
 import logging
 import os
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -25,7 +27,9 @@ def peer_query():
     if not path:
         pytest.skip('requires pinned public Barricade responses.py')
     data = Path(path).read_bytes().replace(b'\r\n', b'\n')
-    assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == 'c0f2c324fe9452a7d1c3120963b72d72cc9e95be'
+    expected = ('efe7e600f4ac16232cc35145d96d45b794cf7bdc' if os.getenv('BARRICADE_EXPECT_FIXED')
+                else 'c0f2c324fe9452a7d1c3120963b72d72cc9e95be')
+    assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == expected
     tree = ast.parse(data.decode())
     function = next(n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'get_successful_responses_without_bans')
     function.decorator_list = []
@@ -113,10 +117,14 @@ def test_repopulate_query_can_omit_vietnam_for_same_person(peer_query, database,
         results = asyncio.run(query(DB(), community_id=10, integration_id=20, game='HLLV' if existing_hll_ref else None))
         # The actual peer query loses one of two games, or excludes HLLV
         # altogether when the other game's integration reference exists.
-        assert len(results) == (0 if existing_hll_ref else 1)
+        if os.getenv('BARRICADE_EXPECT_FIXED'):
+            assert len(results) == (1 if existing_hll_ref else 2)
+        else:
+            assert len(results) == (0 if existing_hll_ref else 1)
 
 
-def test_public_repopulate_reports_success_when_missing_game_id_is_skipped():
+@pytest.mark.parametrize('mode', ['missing_id', 'later_failure'])
+def test_public_repopulate_reports_partial_failures_correctly(mode):
     root = os.getenv('BARRICADE_PUBLIC_SOURCE_DIR')
     if not root:
         pytest.skip('requires pinned public Barricade integration sources')
@@ -131,7 +139,7 @@ def test_public_repopulate_reports_success_when_missing_game_id_is_skipped():
         return function
 
     repopulate = method('integration.py', 'c4835fdf067ddaeedfa6994d3ec3de58bdda35f3', 'Integration', 'repopulate')
-    bulk = method('custom.py', '20a04c97250fa7fadaa17822e3b4e5768a1626ff', 'CustomIntegration', 'bulk_ban_players')
+    bulk = method('custom.py', 'ba6336d449f4b72f3459aff64d6a4b49207fd284' if os.getenv('BARRICADE_EXPECT_FIXED') else '20a04c97250fa7fadaa17822e3b4e5768a1626ff', 'CustomIntegration', 'bulk_ban_players')
     module = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0),
                               repopulate, bulk], type_ignores=[])
     ast.fix_missing_locations(module)
@@ -140,7 +148,8 @@ def test_public_repopulate_reports_success_when_missing_game_id_is_skipped():
         player = SimpleNamespace(id=pid, get_game_id=lambda game: game_id)
         return SimpleNamespace(player_report=SimpleNamespace(player_id=pid, player=player,
                                                             report=SimpleNamespace(game='HLLV')))
-    responses = [response(1, 'synthetic-eos'), response(2, None)]
+    responses = [response(1, 'synthetic-eos'), response(2, None if mode == 'missing_id' else 'other-eos')]
+    exits = []
 
     class Factory:
         def __call__(self):
@@ -150,15 +159,20 @@ def test_public_repopulate_reports_success_when_missing_game_id_is_skipped():
         async def __aenter__(self):
             return object()
         async def __aexit__(self, *args):
-            pass
+            exits.append(args[0])
 
     async def query(*args, **kwargs):
         return responses
 
+    class BulkError(Exception):
+        def __init__(self, player_ids, *args):
+            self.player_ids = player_ids
+            super().__init__(*args)
+
     namespace = {'session_factory': Factory(), 'get_successful_responses_without_bans': query,
                  'schemas': SimpleNamespace(ResponseWithToken=SimpleNamespace(model_validate=lambda x: x)),
                  'itertools': itertools, 'batched': itertools.batched,
-                 'IntegrationBulkBanError': type('IntegrationBulkBanError', (Exception,), {})}
+                 'IntegrationBulkBanError': BulkError}
     exec(compile(module, '<pinned-barricade-repopulate>', 'exec'), namespace)
     created = []
 
@@ -170,17 +184,24 @@ def test_public_repopulate_reports_success_when_missing_game_id_is_skipped():
         def get_ban_reason(self, response):
             return 'synthetic'
         async def add_multiple_bans(self, mapping, game):
-            for game_id in mapping:
+            for index, game_id in enumerate(mapping):
+                if mode == 'later_failure' and index == 1:
+                    raise BulkError([2], 'synthetic later failure')
                 yield game_id, 'synthetic-record'
         async def set_multiple_ban_ids(self, db, *items):
             created.extend(items)
         bulk_ban_players = namespace['bulk_ban_players']
 
-    assert asyncio.run(namespace['repopulate'](Peer())) == (2, 2)
+    expected = (1, 2) if os.getenv('BARRICADE_EXPECT_FIXED') or mode == 'later_failure' else (2, 2)
+    assert asyncio.run(namespace['repopulate'](Peer())) == expected
     assert created == [(1, 'synthetic-record', 'HLLV')]
+    if mode == 'later_failure':
+        assert (exits[-1] is None) == bool(os.getenv('BARRICADE_EXPECT_FIXED'))
 
 
 def test_public_sync_can_delete_reference_created_after_a_complete_snapshot():
+    if os.getenv('BARRICADE_EXPECT_FIXED'):
+        pytest.skip('negative control extracts the undecorated original peer method')
     root = os.getenv('BARRICADE_PUBLIC_SOURCE_DIR')
     if not root:
         pytest.skip('requires pinned public Barricade integration sources')
@@ -226,3 +247,128 @@ def test_public_sync_can_delete_reference_created_after_a_complete_snapshot():
                            get_blacklist_bans=snapshot, logger=logging.getLogger('synthetic-barricade'))
     asyncio.run(ns['synchronize'](peer))
     db.delete.assert_awaited_once_with(reference)
+
+
+def test_patch_serializes_cross_instance_peer_sync_and_ban(monkeypatch):
+    root, dsn = os.getenv('BARRICADE_PUBLIC_SOURCE_DIR'), os.getenv('TEST_POSTGRES_DSN')
+    if not root or not dsn or not os.getenv('BARRICADE_EXPECT_FIXED'):
+        pytest.skip('requires patched peer sources and isolated PostgreSQL')
+    # Load the actual patch with a synthetic configuration; PostgreSQL is real.
+    monkeypatch.setitem(sys.modules, 'barricade.constants', SimpleNamespace(
+        DB_URL=dsn.replace('postgresql://', 'postgresql+asyncpg://')))
+    spec = importlib.util.spec_from_file_location('peer_serialization_test', Path(root) / 'serialization.py')
+    serialization = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(serialization)
+
+    async def exercise():
+        snapshot_open, release_scan, writer_entered = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        config = SimpleNamespace(id=20, community_id=10)
+        # Separate instances deliberately defeat the process-local lock, so
+        # only the PostgreSQL advisory lock can serialize these operations.
+        scanner = SimpleNamespace(config=config, lock=asyncio.Lock())
+        writer = SimpleNamespace(config=config, lock=asyncio.Lock())
+        other = SimpleNamespace(config=SimpleNamespace(id=21), lock=asyncio.Lock())
+
+        peer_references = []
+        db = SimpleNamespace(delete=AsyncMock())
+
+        class Factory:
+            def begin(self):
+                return self
+            async def __aenter__(self):
+                return db
+            async def __aexit__(self, *args):
+                pass
+
+        async def snapshot(game):
+            snapshot_open.set()
+            await release_scan.wait()
+            assert not writer_entered.is_set()
+            return {}
+
+        async def local_bans(*args, **kwargs):
+            for item in peer_references:
+                yield item
+
+        async def community(*args):
+            return object()
+
+        source = (Path(root) / 'crcon.py').read_text()
+        tree = ast.parse(source)
+        klass = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CRCONIntegration')
+        method = next(n for n in klass.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'synchronize')
+        assert any(isinstance(d, ast.Name) and d.id == 'serialized_integration' for d in method.decorator_list)
+        method.decorator_list = []
+        extracted = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), method], type_ignores=[])
+        ast.fix_missing_locations(extracted)
+        ns = {'session_factory': Factory(), 'get_community_by_id': community,
+              'schemas': SimpleNamespace(CommunityRef=SimpleNamespace(model_validate=lambda x: x)),
+              'Game': ('HLLV',), 'get_bans_by_integration': local_bans}
+        exec(compile(extracted, '<patched-barricade-sync>', 'exec'), ns)
+        scan = serialization.serialized_integration(ns['synchronize'])
+        scanner.get_blacklist_bans = snapshot
+        scanner.logger = logging.getLogger('synthetic-barricade')
+
+        @serialization.serialized_integration
+        async def write(integration):
+            peer_references.append(SimpleNamespace(remote_id='new-ban'))
+            writer_entered.set()
+
+        @serialization.serialized_integration
+        async def independent(integration):
+            return True
+
+        first = asyncio.create_task(scan(scanner))
+        await asyncio.wait_for(snapshot_open.wait(), 3)
+        second = asyncio.create_task(write(writer))
+        try:
+            await asyncio.sleep(.2)
+            assert not writer_entered.is_set()
+            assert await asyncio.wait_for(independent(other), 3)
+        finally:
+            release_scan.set()
+        await asyncio.wait_for(asyncio.gather(first, second), 3)
+        assert writer_entered.is_set()
+        db.delete.assert_not_awaited()
+        await serialization.lock_engine.dispose()
+
+    asyncio.run(exercise())
+
+
+def test_patch_does_not_delete_references_when_existing_list_is_missing():
+    root = os.getenv('BARRICADE_PUBLIC_SOURCE_DIR')
+    if not root or not os.getenv('BARRICADE_EXPECT_FIXED'):
+        pytest.skip('requires patched peer sources')
+    tree = ast.parse((Path(root) / 'mixins.py').read_text())
+    klass = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'IntegrationBanListMixin')
+    method = next(n for n in klass.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'create_ban_list')
+    assert any(isinstance(d, ast.Name) and d.id == 'serialized_integration' for d in method.decorator_list)
+    method.decorator_list = []
+    extracted = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), method], type_ignores=[])
+    ast.fix_missing_locations(extracted)
+    class ValidationError(Exception):
+        pass
+    game = SimpleNamespace(HLL='HLL', HLLV='HLLV')
+    ns = {'IntegrationValidationError': ValidationError, 'game_switch': lambda g, h, v: h if g == 'HLL' else v, 'Game': game}
+    exec(compile(extracted, '<patched-create-ban-list>', 'exec'), ns)
+    peer = SimpleNamespace(config=SimpleNamespace(id=20, hll_banlist_id='old-list', hllv_banlist_id=None),
+                           logger=logging.getLogger('synthetic-barricade'), create_remote_ban_list=AsyncMock())
+    with pytest.raises(ValidationError):
+        asyncio.run(ns['create_ban_list'](peer, object(), 'HLL'))
+    peer.create_remote_ban_list.assert_not_awaited()
+    assert peer.config.hll_banlist_id == 'old-list'
+
+    class Factory:
+        def begin(self):
+            return self
+        async def __aenter__(self):
+            return object()
+        async def __aexit__(self, *args):
+            pass
+    ns['session_factory'] = Factory()
+    peer.config.hll_banlist_id = None
+    peer.create_remote_ban_list.return_value = 'new-list'
+    peer.update = AsyncMock()
+    assert asyncio.run(ns['create_ban_list'](peer, object(), 'HLL')) == 'new-list'
+    assert peer.config.hll_banlist_id == 'new-list'
+    peer.update.assert_awaited_once()
