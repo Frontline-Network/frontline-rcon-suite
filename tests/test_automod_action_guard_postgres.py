@@ -160,13 +160,16 @@ def test_real_automod_path_blocks_repeat_after_redis_watch_expires(database, mon
     monkeypatch.setattr(automod, "audit", Mock())
     assert mod.should_warn_player(state[0], "Able", player) == PunishStepState.APPLY
     automod._do_punitions(api, ActionMethod.MESSAGE, [player], [mod])
-    state[0] = WatchStatus()  # A new watch starts a new occasion.
+    state[0] = WatchStatus()  # Expiry alone does not establish a new occasion.
     assert mod.should_warn_player(state[0], "Able", player) == PunishStepState.APPLY
     automod._do_punitions(api, ActionMethod.MESSAGE, [player], [mod])
     automod._do_punitions(api, ActionMethod.PUNISH, [player], [mod])
-    assert api.message_player.call_count == 2
-    api.punish.assert_called_once()
-    assert action_guard.list_pending(3)["results"] == []
+    assert api.message_player.call_count == 1
+    api.punish.assert_not_called()
+    # The fixture has no verified session/round, so this one action needs review.
+    pending = action_guard.list_pending(3)["results"]
+    assert len(pending) == 1
+    assert pending[0]['identity_status'] == 'unavailable'
 
 
 @pytest.mark.parametrize("method,method_name", [(ActionMethod.MESSAGE, "message_player"),

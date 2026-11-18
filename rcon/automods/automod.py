@@ -1,4 +1,7 @@
 import logging
+import hashlib
+import json
+from datetime import datetime, timezone
 from threading import Timer
 from typing import List
 
@@ -57,11 +60,68 @@ def _originating_moderators(mods, aplayer):
     ]
 
 
+def _periodic_warning_scope(player_id, team, squad, game_state):
+    """Identify a verified player session, game round and squad."""
+    from rcon.active_session_selection import latest_open_sessions
+    from rcon.autobalancer.snapshot import _current_round, _map_name
+    from rcon.models import get_session_maker
+
+    try:
+        server = int(get_server_number())
+        with get_session_maker()() as session:
+            matches = latest_open_sessions(session, [player_id], server)
+            if len(matches) != 1:
+                return None
+            session_id = matches[0][1].id
+        current_map = _map_name(game_state)
+        round_id, _, stable = _current_round(current_map, datetime.now(timezone.utc))
+        if not stable:
+            return None
+        parts = ['periodic-warning-scope-v1', server, player_id, session_id,
+                 round_id, team, squad]
+        return hashlib.sha256(json.dumps(parts, separators=(',', ':')).encode()).hexdigest()
+    except Exception:
+        logger.exception('Unable to establish periodic warning scope')
+        return None
+
+
+def _periodic_warning_identity(rcon, aplayer, mods):
+    """Identify a planned warning within one verified session and round."""
+    try:
+        scope = _periodic_warning_scope(aplayer.player_id, aplayer.team, aplayer.squad, rcon.get_gamestate())
+        if scope is None:
+            return None
+        stages = []
+        for mod in _originating_moderators(mods, aplayer):
+            with mod.watch_state(aplayer.team, aplayer.squad) as watch:
+                warnings = watch.warned.get(mod.progress_key(aplayer), [])
+                if not warnings:
+                    return None
+                stages.append((mod.action_author, len(warnings)))
+        if not stages:
+            return None
+        parts = ['periodic-warning-v1', scope, sorted(stages)]
+        key = hashlib.sha256(json.dumps(parts, separators=(',', ':')).encode()).hexdigest()
+        return int(datetime.now(timezone.utc).timestamp() * 1000), key, scope
+    except Exception:
+        logger.exception('Unable to establish periodic warning identity')
+        return None
+
+
 def get_punitions_to_apply(rcon, moderators) -> PunitionsToApply:
     logger.debug("Getting team info")
     team_view = rcon.get_team_view(compact=True)
     gamestate = rcon.get_gamestate()
     punitions_to_apply = PunitionsToApply()
+    scoped_players = {}
+    for mod in moderators:
+        if isinstance(mod, NoLeaderAutomod):
+            try:
+                scoped_players[mod.action_author] = action_guard.periodic_warning_players(
+                    int(get_server_number()), mod.action_author)
+            except Exception:
+                logger.exception('Unable to load scoped periodic warnings for reset')
+                scoped_players[mod.action_author] = set()
 
     for team in ["allies", "axis"]:
         if not team_view.get(team):
@@ -83,6 +143,22 @@ def get_punitions_to_apply(rcon, moderators) -> PunitionsToApply:
 
         for squad_name, squad in team_view[team]["squads"].items():
             for mod in moderators:
+                if isinstance(mod, NoLeaderAutomod) and squad.get('has_leader') is True:
+                    # Only players positively observed in a squad with a leader
+                    # have ended this particular violation. Missing roster rows
+                    # are not interpreted as proof of departure.
+                    for player in squad.get('players', []):
+                        player_id = player.get('player_id')
+                        if (not isinstance(player_id, str) or not player_id.strip()
+                                or player_id not in scoped_players.get(mod.action_author, set())):
+                            continue
+                        scope = _periodic_warning_scope(player_id, team, squad_name, gamestate)
+                        if scope:
+                            try:
+                                action_guard.release_periodic_scope(int(get_server_number()), player_id,
+                                                                    mod.action_author, scope)
+                            except Exception:
+                                logger.exception('Unable to release resolved periodic warning')
                 punitions_to_apply.merge(
                     mod.punitions_to_apply(
                         team_view, squad_name, team, squad, gamestate
@@ -104,10 +180,24 @@ def _do_punitions(
         guard_token = None
         guard_server = None
         guard_rules = sorted({aplayer.details.author, *aplayer.related_authors})
+        periodic_event = None
+        origins = _originating_moderators(mods, aplayer)
+        scoped_warning = (event is None and method == ActionMethod.MESSAGE and not aplayer.details.dry_run
+                          and bool(origins) and all(isinstance(mod, NoLeaderAutomod) for mod in origins))
+        if scoped_warning:
+            periodic_event = _periodic_warning_identity(rcon, aplayer, mods)
+            if periodic_event is None:
+                logger.warning('Periodic warning session or round identity unavailable')
         if not aplayer.details.dry_run and method in {ActionMethod.MESSAGE, ActionMethod.PUNISH, ActionMethod.KICK}:
             try:
                 guard_server = int(get_server_number())
-                if event is None:
+                if periodic_event is not None:
+                    guard_token = action_guard.reserve(guard_server, aplayer.player_id, guard_rules,
+                                                       method.name.lower(), periodic_event=periodic_event)
+                elif scoped_warning:
+                    guard_token = action_guard.reserve(guard_server, aplayer.player_id, guard_rules,
+                                                       method.name.lower(), identity_unavailable=True)
+                elif event is None:
                     guard_token = action_guard.reserve(guard_server, aplayer.player_id, guard_rules, method.name.lower())
                 else:
                     guard_token = action_guard.reserve(guard_server, aplayer.player_id, guard_rules, method.name.lower(), event=event)
@@ -243,7 +333,12 @@ def _do_punitions(
                 reason = (f'Game server returned status {exc.status_code}'
                           if isinstance(exc, HLLCommandError)
                           else 'Response not confirmed; do not replay this attempt')
-                close_unsuccessful_attempt(reason)
+                if scoped_warning and periodic_event is None:
+                    # No verified session/round: retain this individual action
+                    # for review rather than guessing a reusable identity.
+                    logger.warning('Unconfirmed warning has no verified session/round; retaining action for review')
+                else:
+                    close_unsuccessful_attempt(reason)
 
 
 def do_punitions(

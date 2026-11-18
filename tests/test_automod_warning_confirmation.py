@@ -20,7 +20,7 @@ from rcon.user_config.auto_mod_solo_tank import AutoModNoSoloTankUserConfig
 @pytest.fixture(autouse=True)
 def isolate_watch_tests_from_durable_guard(monkeypatch):
     monkeypatch.setattr(automod, "get_server_number", lambda: "3")
-    monkeypatch.setattr(automod.action_guard, "reserve", lambda *args: "synthetic-token")
+    monkeypatch.setattr(automod.action_guard, "reserve", lambda *args, **kwargs: "synthetic-token")
     monkeypatch.setattr(automod.action_guard, "finish", lambda *args, **kwargs: kwargs["expected"])
     monkeypatch.setattr(automod.action_guard, "review", lambda *args, **kwargs: 1)
 
