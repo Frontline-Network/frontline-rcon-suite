@@ -127,6 +127,7 @@ x-background-worker-deploy: &background-worker-deploy
 services:
   maintenance:
     <<: *frontline-backend
+    image: ${FRONTLINE_MAINTENANCE_IMAGE:-frontline/hll_rcon_tool:${CRCON_IMAGE_TAG:-mobile-admin-autobalancer-v11.11.1}}
     environment: *mobile-environment
 
   webhook_service:
