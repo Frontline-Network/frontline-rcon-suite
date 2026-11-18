@@ -222,7 +222,7 @@ else
   target_profiles+=(--profile split-background-workers)
 fi
 
-HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
+FRONTLINE_MAINTENANCE_IMAGE= HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
   CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
   "${target_profiles[@]}" \
   -f compose.yaml \
@@ -298,7 +298,7 @@ for service in "${deployment_services[@]}"; do
 done
 if ((${#extra_backend_services[@]})); then
   extra_backend_images="$(
-    HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
+    FRONTLINE_MAINTENANCE_IMAGE= HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
       CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
       "${target_profiles[@]}" -f compose.yaml -f "$target_override" \
       -f "$target_worker_override" -f "$target_health_override" config --format json |
@@ -349,7 +349,7 @@ fi
 git merge --ff-only "$target_sha"
 
 compose_target() {
-  HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
+  FRONTLINE_MAINTENANCE_IMAGE= HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
     CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
     "${target_profiles[@]}" \
     -f compose.yaml \
@@ -361,7 +361,7 @@ compose_target() {
 
 compose_target config --quiet
 compose_all_worker_profiles() {
-  HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
+  FRONTLINE_MAINTENANCE_IMAGE= HLL_SUPERVISOR_CONFIG="$target_supervisor_config" \
     CRCON_IMAGE_TAG="$target_short" CRCON_VERSION="$target_version" docker compose \
     --profile mobile \
     --profile combined-workers \
@@ -524,6 +524,14 @@ docker exec "$maintenance_container" sh -lc 'cd /code && alembic current'
 docker exec "$maintenance_container" sh -lc \
   'cd /code && python rconweb/manage.py showmigrations api --plan | tail -n 12'
 compose_target ps
+
+# A host-only pilot pin is required for ordinary starts before this upgrade.
+# The complete target stack is now healthy; future starts must use the new
+# release image rather than retaining a maintenance image for an older schema.
+pin_env_tmp="$(mktemp "$repo_root/.env.XXXXXX")"
+awk '!/^FRONTLINE_MAINTENANCE_IMAGE=/' .env > "$pin_env_tmp"
+chmod --reference=.env "$pin_env_tmp"
+mv "$pin_env_tmp" .env
 
 echo "Deployment completed: $current_short -> $target_short"
 echo "Database backup: $backup_file"

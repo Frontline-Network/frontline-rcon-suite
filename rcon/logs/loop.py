@@ -402,9 +402,12 @@ class LogLoop:
         return curr_map_time_elapsed
 
     def process_logs(self):
+        self._invalidate_session_journal_observation()
         self._drain_session_events()
+        observation = self._start_session_journal_observation()
         started = time.perf_counter()
         logs = self.rcon.get_structured_logs(since_min_ago=self.GET_LOGS_SINCE_MIN)
+        observation = self._finish_session_log_poll(observation)
         logger.info(
             "RCON log fetch completed in %.3fs (%d logs)",
             time.perf_counter() - started,
@@ -426,6 +429,14 @@ class LogLoop:
                                                 log.get("player_name_1") or "",
                                                 log.get("raw") or log.get("line_without_time") or ""))
         added = self.session_journal.remember_batch(session_events, self.session_cutover_us, unidentified_events)
+        if os.getenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS') == '1':
+            try:
+                from rcon.barricade_scan_journal import record_collector_connects
+                record_collector_connects(session_events)
+            except Exception:
+                # Missing evidence must not stop the game log collector; scans
+                # lacking a persisted observation cannot be sent automatically.
+                logger.exception('Could not persist Barricade connect observations')
         if unidentified_events and added:
             logger.warning("Session log batch contains events without player IDs; retained for review")
         self.GET_LOGS_SINCE_MIN = 5
@@ -436,6 +447,20 @@ class LogLoop:
             if line:
                 self.process_hooks(line)
         self._drain_session_events()
+        self._publish_session_journal_observation(observation)
+
+    def _invalidate_session_journal_observation(self):
+        """A failed pass must not leave a previous success as fresh evidence."""
+        if os.getenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS') != '1':
+            return
+        try:
+            from rcon.player_presence import database_scope
+            from rcon.session_journal_observation import invalidate
+            red = get_redis_client(global_pool=True)
+            invalidate(red, scope=database_scope(os.environ['HLL_DB_URL']),
+                       server_number=self.session_server_number)
+        except Exception as exc:
+            self._log_journal_observation_error(exc)
 
     def _drain_session_events(self):
         # A retry must never rerun the general hooks, which can send messages
@@ -464,6 +489,48 @@ class LogLoop:
             # The local journal retains the entry until a later successful
             # attempt, including when PostgreSQL is temporarily unavailable.
             logger.exception("Unable to process queued session events; will retry")
+
+    def _start_session_journal_observation(self):
+        if os.getenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS') != '1':
+            return None
+        try:
+            from rcon.player_presence import database_scope, redis_time
+            red = get_redis_client(global_pool=True)
+            return (red, database_scope(os.environ['HLL_DB_URL']), redis_time(red))
+        except Exception as exc:
+            self._log_journal_observation_error(exc)
+            return None
+
+    def _finish_session_log_poll(self, observation):
+        if observation is None:
+            return None
+        try:
+            from rcon.player_presence import redis_time
+            red, scope, started = observation
+            return (red, scope, started, redis_time(red))
+        except Exception as exc:
+            self._log_journal_observation_error(exc)
+            return None
+
+    def _publish_session_journal_observation(self, observation):
+        """Best-effort local backlog observation, never a log watermark."""
+        if observation is None:
+            return
+        try:
+            from rcon.session_journal_observation import publish
+            red, scope, started, finished = observation
+            publish(red, self.session_journal, scope=scope, server_number=self.session_server_number,
+                    poll_started_at=started, poll_finished_at=finished)
+        except Exception as exc:
+            self._log_journal_observation_error(exc)
+
+    def _log_journal_observation_error(self, exc):
+        # Never expose Redis/database URLs or player IDs in this message.
+        now = time.monotonic()
+        last = getattr(self, '_journal_observation_error_at', None)
+        if last is None or now - last >= 300:
+            logger.warning('Session journal observation unavailable (%s)', type(exc).__name__)
+            self._journal_observation_error_at = now
 
     def get_detailed_players(self) -> GetDetailedPlayers:
         started = time.perf_counter()

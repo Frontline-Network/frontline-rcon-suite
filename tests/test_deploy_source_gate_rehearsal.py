@@ -47,7 +47,8 @@ if args[:1] == ['compose']:
         sys.exit(0)
     if 'up' in args:
         # All commands are fake: reaching this point proves the gate passed.
-        sys.exit(71)
+        pathlib.Path(os.environ['FAKE_UP_ENV']).write_text(os.environ.get('FRONTLINE_MAINTENANCE_IMAGE', 'MISSING'))
+        sys.exit(0 if os.environ.get('FAKE_UP_SUCCESS') == '1' else 71)
     sys.exit(0)
 if args[:2] == ['image', 'inspect']:
     sys.exit(0)
@@ -67,7 +68,7 @@ sys.exit(0)
 
 @unittest.skipUnless(os.name == 'posix' and shutil.which('bash') and shutil.which('git'), 'requires POSIX, bash and git')
 class DeploySourceGateRehearsal(unittest.TestCase):
-    def run_case(self, stale):
+    def run_case(self, stale, success=False):
         with tempfile.TemporaryDirectory(prefix='rcon-deploy-gate-') as directory:
             base = Path(directory)
             repo = base / 'repo'
@@ -107,7 +108,7 @@ class DeploySourceGateRehearsal(unittest.TestCase):
             git('commit', '-m', 'target')
             git('push', 'frontline', 'master')
             git('reset', '--hard', baseline)
-            (repo / '.env').write_text('FRONTLINE_BACKGROUND_WORKER_MODE=combined\n')
+            (repo / '.env').write_text('FRONTLINE_BACKGROUND_WORKER_MODE=combined\nFRONTLINE_MAINTENANCE_IMAGE=synthetic/pilot\n')
             fake_bin = base / 'bin'
             fake_bin.mkdir()
             docker = fake_bin / 'docker'
@@ -116,14 +117,17 @@ class DeploySourceGateRehearsal(unittest.TestCase):
             log = base / 'docker.log'
             env = dict(os.environ, PATH=str(fake_bin) + os.pathsep + os.environ['PATH'],
                        FAKE_DOCKER_LOG=str(log), FAKE_IMAGE_ROOT=str(base / 'image'),
-                       FAKE_IMAGE_STALE='1' if stale else '0')
+                       FAKE_IMAGE_STALE='1' if stale else '0', FAKE_UP_SUCCESS='1' if success else '0',
+                       FAKE_UP_ENV=str(base / 'up-env'))
             result = subprocess.run(['bash', 'scripts/deploy_frontline.sh', '--deploy'],
                                     cwd=repo, env=env, capture_output=True, text=True, timeout=45)
             calls = [json.loads(line) for line in log.read_text().splitlines()]
-            return result, calls, git('rev-parse', 'HEAD'), baseline
+            pin = (repo / '.env').read_text()
+            up_env = (base / 'up-env').read_text() if (base / 'up-env').exists() else None
+            return result, calls, git('rev-parse', 'HEAD'), baseline, pin, up_env
 
     def test_stale_image_aborts_before_service_changes_and_restores_checkout(self):
-        result, calls, current, baseline = self.run_case(stale=True)
+        result, calls, current, baseline, _, _ = self.run_case(stale=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Different file: rcon/models.py', result.stdout)
         self.assertIn('Deployment stopped before changing running services.', result.stderr)
@@ -131,13 +135,22 @@ class DeploySourceGateRehearsal(unittest.TestCase):
         self.assertEqual(current, baseline)
 
     def test_matching_image_reaches_service_start_with_only_running_servers(self):
-        result, calls, current, baseline = self.run_case(stale=False)
+        result, calls, current, baseline, pin, up_env = self.run_case(stale=False)
         self.assertIn('Backend image runtime source matches the target Git archive.', result.stdout)
         starts = [call for call in calls if call[:1] == ['compose'] and 'up' in call]
         self.assertEqual(len(starts), 1)
         self.assertIn('backend_3', starts[0])
         self.assertNotIn('backend_1', starts[0])
         self.assertNotEqual(current, baseline)
+        self.assertIn('FRONTLINE_MAINTENANCE_IMAGE=synthetic/pilot', pin)
+        self.assertEqual(up_env, '')
+
+    def test_successful_update_removes_only_pilot_pin(self):
+        result, _, _, _, pin, up_env = self.run_case(stale=False, success=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('FRONTLINE_MAINTENANCE_IMAGE=', pin)
+        self.assertIn('FRONTLINE_BACKGROUND_WORKER_MODE=combined', pin)
+        self.assertEqual(up_env, '')
 
 
 if __name__ == '__main__':

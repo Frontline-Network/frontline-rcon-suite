@@ -1,0 +1,93 @@
+"""Review endpoints are server-scoped and require explicit permissions."""
+import json
+from unittest import mock
+
+from sqlalchemy import select
+
+from rcon import barricade_scan_journal as journal
+from tests.test_barricade_scan_journal_postgres import database, prepare
+from tests.test_blacklist_sync_api_postgres import invoke
+
+
+def test_status_endpoint_requires_permission_and_reports_disabled(monkeypatch):
+    monkeypatch.setenv('HLL_BARRICADE_DURABLE_SCANS', '0')
+    monkeypatch.setattr('rcon.api_commands.get_server_number', lambda: '3')
+    assert invoke('get_barricade_scan_status', 'GET', set()).status_code == 403
+    response = invoke('get_barricade_scan_status', 'GET', {'api.can_view_blacklists'})
+    assert response.status_code == 200 and json.loads(response.content)['result'] == {'state': 'disabled'}
+
+
+def test_review_permissions_server_isolation_and_operator_audit(database, monkeypatch):
+    prepare(database, monkeypatch)
+    monkeypatch.setattr('rcon.api_commands.get_server_number', lambda: '3')
+    for server in (3, 4):
+        with journal.delivery_scope(server, 'integration-a'):
+            item = journal.reserve(server, 'integration-a', 77, 'synthetic-eos', 'HLLV')
+            assert journal.finish(item, server, 'integration-a', confirmed=False)
+            if server == 3:
+                local_id = item
+    assert invoke('get_barricade_scan_reviews', 'GET', set()).status_code == 403
+    response = invoke('get_barricade_scan_reviews', 'GET', {'api.can_view_blacklists'})
+    result = json.loads(response.content)['result']
+    assert result['total'] == 1 and result['results'][0]['id'] == local_id
+    body = {'delivery_id': local_id, 'integration_id': 'integration-a', 'decision': 'retry',
+            'reason': 'synthetic peer confirmed no scan'}
+    assert invoke('resolve_barricade_scan_review', 'POST', set(), body).status_code == 403
+    with mock.patch('rcon.barricade_scan_dispatch.dispatch') as dispatch:
+        response = invoke('resolve_barricade_scan_review', 'POST', {'api.can_change_blacklists'}, body)
+    assert response.status_code == 200 and json.loads(response.content)['result'] is True
+    dispatch.assert_not_called()
+    with database() as session:
+        assert session.get(journal.BarricadeScanDelivery, local_id).status == 'queued'
+        audit = session.scalar(select(journal.BarricadeScanReviewAudit))
+        assert audit.actor == 'Operator' and audit.reason == body['reason']
+        assert session.scalars(select(journal.BarricadeScanDelivery).where(
+            journal.BarricadeScanDelivery.server_number == 4)).one().status == 'review'
+
+
+def test_ended_session_reason_and_retry_rejection_through_api(database, monkeypatch):
+    prepare(database, monkeypatch)
+    monkeypatch.setattr('rcon.api_commands.get_server_number', lambda: '3')
+    namespace = 'integration:01234567-89ab-4def-8012-0123456789ab'
+    with journal.delivery_scope(3, namespace):
+        journal.mark_activation_review(3, namespace, 99, 'synthetic-eos', 'HLLV', 'session_ended_before_scan')
+    response = invoke('get_barricade_scan_reviews', 'GET', {'api.can_view_blacklists'})
+    row = json.loads(response.content)['result']['results'][0]
+    assert row['review_cause'] == 'session_ended_before_scan'
+    body = {'delivery_id': row['id'], 'integration_id': namespace, 'decision': 'retry', 'reason': 'synthetic'}
+    with mock.patch('rcon.barricade_scan_dispatch.dispatch') as dispatch:
+        response = invoke('resolve_barricade_scan_review', 'POST', {'api.can_change_blacklists'}, body)
+    assert response.status_code == 400
+    assert json.loads(response.content)['failed'] is True
+    assert 'session ended' in json.loads(response.content)['error']
+    dispatch.assert_not_called()
+    with database() as session:
+        assert session.get(journal.BarricadeScanDelivery, row['id']).status == 'review'
+        assert session.scalars(select(journal.BarricadeScanReviewAudit)).all() == []
+    body['decision'] = 'dismissed'
+    response = invoke('resolve_barricade_scan_review', 'POST', {'api.can_change_blacklists'}, body)
+    assert json.loads(response.content)['result'] is True
+    with database() as session:
+        assert session.get(journal.BarricadeScanDelivery, row['id']).status == 'reviewed'
+        assert session.scalar(select(journal.BarricadeScanReviewAudit)).actor == 'Operator'
+
+
+def test_interrupted_send_is_visible_and_operator_can_mark_review(database, monkeypatch):
+    prepare(database, monkeypatch)
+    monkeypatch.setattr('rcon.api_commands.get_server_number', lambda: '3')
+    with journal.delivery_scope(3, 'integration-a'):
+        delivery_id = journal.reserve(3, 'integration-a', 88, 'synthetic-eos', 'HLLV')
+    response = invoke('get_barricade_scan_reviews', 'GET', {'api.can_view_blacklists'})
+    row = json.loads(response.content)['result']['results'][0]
+    assert row['id'] == delivery_id and row['status'] == 'sending'
+    body = {'delivery_id': delivery_id, 'integration_id': 'integration-a',
+            'decision': 'recover', 'reason': 'Disconnected peer; inspect'}
+    assert invoke('resolve_barricade_scan_review', 'POST', {'api.can_view_blacklists'}, body).status_code == 403
+    with mock.patch('rcon.barricade_scan_dispatch.dispatch') as dispatch:
+        response = invoke('resolve_barricade_scan_review', 'POST', {'api.can_change_blacklists'}, body)
+    assert response.status_code == 200 and json.loads(response.content)['result'] is True
+    dispatch.assert_not_called()
+    with database() as session:
+        row = session.get(journal.BarricadeScanDelivery, delivery_id)
+        assert (row.status, row.review_cause) == ('review', 'uncertain_delivery')
+        assert session.scalar(select(journal.BarricadeScanReviewAudit)).actor == 'Operator'

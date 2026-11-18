@@ -49,6 +49,8 @@ export function makeServer({ environment = "development" } = {}) {
   };
   let seedVipReviewResolved = false;
   let blacklistSyncReviewResolved = false;
+  let barricadeScanReviewResolved = false;
+  let barricadeScanRecovered = false;
   let sessionEventReviewResolved = false;
   let automodActionReviewResolved = false;
   let demoServerName = "[GER] Frontline Network | #2";
@@ -928,6 +930,26 @@ export function makeServer({ environment = "development" } = {}) {
         const reviewKind = fixture === "ownership" ? "hllv_ownership" : fixture === "identity" ? "hllv_identity" : null;
         const results = showFixture ? [{ id: 1, command: "EXPIRE_ALL", review_kind: reviewKind, payload: { player_id: "fake-console-id" }, updated_at: "2026-01-02T12:00:00Z" }] : [];
         return ok({ total: results.length, results });
+      });
+      this.get("/get_barricade_scan_status", () => ok({ state: "disabled" }));
+      this.get("/get_barricade_scan_reviews", () => {
+        const show = typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("demo_barricade_review") === "1" &&
+          !barricadeScanReviewResolved;
+        const results = show ? [{ id: 1, player_id: "synthetic-eos", player_session_id: 1,
+          integration_id: "integration:01234567-89ab-4def-8012-0123456789ab", game: "HLLV",
+          status: barricadeScanRecovered ? "review" : new URLSearchParams(window.location.search).get("demo_barricade_status") || "review",
+          review_cause: new URLSearchParams(window.location.search).get("demo_barricade_cause") || "uncertain_delivery",
+          updated_at: "2026-01-02T12:00:00Z" }] : [];
+        return ok({ total: results.length, results });
+      });
+      this.post("/resolve_barricade_scan_review", (_schema, request) => {
+        const { delivery_id, decision, reason } = JSON.parse(request.requestBody);
+        if (delivery_id !== 1 || !["confirmed", "dismissed", "retry", "recover"].includes(decision) ||
+            !reason?.trim() || barricadeScanReviewResolved) return ok(false);
+        if (decision === "recover") { barricadeScanRecovered = true; return ok(true); }
+        barricadeScanReviewResolved = true;
+        return ok(true);
       });
       this.post("/acknowledge_blacklist_sync_review", (_schema, request) => {
         const { delivery_id } = JSON.parse(request.requestBody);

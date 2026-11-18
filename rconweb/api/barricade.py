@@ -1,7 +1,10 @@
 import asyncio
 import itertools
+import os
+import time
 from datetime import datetime
 from logging import getLogger
+from urllib.parse import parse_qsl
 
 import pydantic
 from cachetools import TTLCache
@@ -25,6 +28,18 @@ from rcon.vip_rewards.locking import lock
 from rcon.utils import get_server_number
 
 logger = getLogger("rconweb")
+
+
+def _explicit_durable_request(query_string):
+    """Recognize a peer requesting the registered integration namespace."""
+    if not isinstance(query_string, bytes) or len(query_string) > 2048:
+        return True
+    try:
+        pairs = parse_qsl(query_string.decode('utf-8'), keep_blank_values=True,
+                          encoding='utf-8', errors='strict', max_num_fields=16)
+    except (UnicodeError, ValueError):
+        return True
+    return any(key == 'frontline_integration' for key, _ in pairs)
 
 
 @database_sync_to_async
@@ -113,19 +128,80 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         self._scan_players_task = None
 
     async def connect(self):
+        enabled = os.getenv('HLL_BARRICADE_DURABLE_SCANS') == '1'
+        durable = (enabled and self.scope.get('barricade_scan_namespace')
+                   and self.scope.get('barricade_credential_id'))
+        if (self.scope.get('barricade_registered_namespace') or self.scope.get('barricade_scan_namespace') or
+                _explicit_durable_request(self.scope.get('query_string', b''))) and not durable:
+            logger.warning('Rejected Barricade durable integration: disabled or not registered')
+            await self.close(code=4403)
+            return
         logger.info("Accepted connection with Barricade client")
-
         await self.accept()
-
         if self._scan_players_task and not self._scan_players_task.done():
             self._scan_players_task.cancel()
-        self._scan_players_task = asyncio.create_task(self._scan_players_loop())
+        self._scan_players_task = asyncio.create_task(
+            self._durable_scan_loop() if durable else self._scan_players_loop())
 
     async def disconnect(self, code):
         logger.info("Closed connection with Barricade client")
 
         if self._scan_players_task and not self._scan_players_task.done():
             self._scan_players_task.cancel()
+
+    async def _durable_scan_once(self):
+        """Experimental only: missing evidence defers a scan, never invents it."""
+        from rcon import barricade_scan_dispatch, barricade_scan_presence
+        from rcon.cache_utils import get_redis_client
+        from rcon.player_presence import database_scope
+
+        server_number = int(get_server_number())
+        scope = database_scope(os.environ['HLL_DB_URL'])
+        redis = get_redis_client(global_pool=True)
+        from rcon.player_presence import redis_time
+        # One barrier per pass; each player is still individually rechecked
+        # against the current roster, session and non-superseded log poll.
+        barrier = await asyncio.to_thread(redis_time, redis)
+
+        async def verify_session(session_id, player_id):
+            return await barricade_scan_presence.confirm_with_fresh_poll(
+                redis, scope=scope, server_number=server_number, session_id=session_id, player_id=player_id,
+                barrier=barrier)
+
+        roster = None
+        roster_checked = float('-inf')
+        async def get_roster():
+            nonlocal roster, roster_checked
+            if time.monotonic() - roster_checked >= 5:
+                deadline = time.monotonic() + 20
+                while True:
+                    roster = await asyncio.to_thread(barricade_scan_presence.observed_players_after,
+                        redis, scope=scope, server_number=server_number, barrier=barrier)
+                    if roster is not None or time.monotonic() >= deadline:
+                        break
+                    await asyncio.sleep(.25)
+                roster_checked = time.monotonic()
+            return roster
+
+        async def observed_player(_session_id, player_id):
+            roster = await get_roster()
+            return player_id in roster if roster is not None else None
+
+        async def send_scan(player_id, game):
+            return await self.send_request(ServerRequestType.SCAN_PLAYERS,
+                ScanPlayersRequestPayload(player_ids=[player_id], game=game).model_dump())
+
+        return await barricade_scan_dispatch.scan_once(server_number,
+            self.scope['barricade_scan_namespace'], barricade_game_for_server(), send_scan, verify_session,
+            credential_id=self.scope['barricade_credential_id'], is_observed=observed_player, get_roster=get_roster)
+
+    async def _durable_scan_loop(self):
+        while True:
+            await asyncio.sleep(60)
+            try:
+                await self._durable_scan_once()
+            except Exception:
+                logger.exception('Experimental Barricade scan pass failed; no legacy fallback')
 
     async def _scan_players_loop(self):
         # Session starts are stored as local wall time. Keep a non-null cursor

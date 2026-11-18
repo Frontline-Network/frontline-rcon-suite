@@ -887,6 +887,11 @@ class PendingPlayerDisconnect(Base):
 
 class PlayerSession(Base):
     __tablename__ = "player_sessions"
+    __table_args__ = (
+        Index('ix_player_sessions_server_id_scan', 'server_number', 'id'),
+        Index('ix_player_sessions_server_open_id_scan', 'server_number', 'id',
+              postgresql_where=text('"end" IS NULL AND end_event_us IS NULL')),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     player_id_id: Mapped[int] = mapped_column(

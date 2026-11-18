@@ -1424,6 +1424,22 @@ class RconAPI(Rcon):
         from rcon.blacklist_sync_journal import list_reviews
         return list_reviews(int(get_server_number()), offset, limit)
 
+    def get_barricade_scan_reviews(self, offset=0, limit=50):
+        from rcon.barricade_scan_journal import list_reviews
+        return list_reviews(int(get_server_number()), offset, limit)
+
+    def get_barricade_scan_status(self):
+        from rcon.barricade_scan_status import scan_status
+        return scan_status(int(get_server_number()))
+
+    def resolve_barricade_scan_review(self, delivery_id: int, integration_id: str, decision: str, reason: str, by: str):
+        from rcon.barricade_scan_journal import resolve_review
+        try:
+            resolve_review(int(get_server_number()), integration_id, delivery_id, decision=decision, actor=by, reason=reason)
+        except ValueError as exc:
+            raise HLLCommandFailedError(str(exc)) from exc
+        return True
+
     def acknowledge_blacklist_sync_review(self, delivery_id: int, by: str):
         from rcon.blacklist_sync_journal import acknowledge_review
         return acknowledge_review(int(get_server_number()), delivery_id, by)
