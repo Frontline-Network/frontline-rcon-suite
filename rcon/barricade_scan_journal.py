@@ -12,11 +12,11 @@ from threading import get_ident
 import asyncio
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, String, TIMESTAMP, UniqueConstraint, and_, func, or_, select, union_all, update
+from sqlalchemy import BigInteger, CheckConstraint, String, TIMESTAMP, UniqueConstraint, and_, func, or_, select, union_all, update, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Mapped, mapped_column
 
-from rcon.models import Base, PlayerID, PlayerSession, get_session_maker
+from rcon.models import Base, PlayerID, PlayerSession, SessionEventResolution, get_session_maker
 from rcon.vip_rewards.locking import lock
 
 _active_scope = ContextVar('barricade_scan_scope', default=None)
@@ -85,6 +85,14 @@ class BarricadeScanDelivery(Base):
         CheckConstraint("game IN ('HLL', 'HLLV')", name='ck_barricade_scan_game'),
         CheckConstraint("status IN ('queued', 'sending', 'done', 'review', 'reviewed')", name='ck_barricade_scan_status'),
     )
+
+
+class BarricadeScanBaseline(Base):
+    """Sessions present at cutover; no assertion about earlier scan outcome."""
+    __tablename__ = 'barricade_scan_baseline'
+    server_number: Mapped[int] = mapped_column(primary_key=True)
+    integration_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    player_session_id: Mapped[int] = mapped_column(primary_key=True)
 
 
 class BarricadeScanIntegration(Base):
@@ -225,6 +233,16 @@ def set_integration_credential(server_number: int, integration_id: str, *, expec
             if old == new_credential_id:
                 return False
             if row is None:
+                # Block legacy INSERT writers through the snapshot and commit.
+                # A READ COMMITTED transaction must obtain a fresh statement
+                # snapshot after waiting on the table lock.
+                session.execute(text("SET LOCAL lock_timeout = '5s'"))
+                session.execute(text('LOCK TABLE player_sessions IN SHARE MODE'))
+                session.execute(text('''INSERT INTO barricade_scan_baseline
+                    (server_number, integration_id, player_session_id)
+                    SELECT :server, :integration, id FROM player_sessions
+                    WHERE server_number = :server'''),
+                    {'server': server_number, 'integration': integration_id})
                 session.add(BarricadeScanIntegration(server_number=server_number, integration_id=integration_id,
                     credential_id=new_credential_id,
                     registered_at_us=int(datetime.now(timezone.utc).timestamp() * 1_000_000)))
@@ -269,6 +287,16 @@ def registration_boundary(server_number: int, namespace: str, credential_id: int
         return row.registered_at_us if row is not None and row.credential_id == credential_id else None
 
 
+def is_manually_reconstructed_session(server_number: int, session_id: int) -> bool:
+    """A post-cutover row can represent an older manually reconstructed event."""
+    with get_session_maker()() as session:
+        return bool(session.scalar(select(SessionEventResolution.session_id).where(
+            SessionEventResolution.server_number == server_number,
+            SessionEventResolution.session_id == session_id,
+            SessionEventResolution.event_kind == 'connect',
+            SessionEventResolution.decision == 'create').limit(1)))
+
+
 def find_unreserved_open_sessions(server_number: int, integration_id: str, *, after_id: int = 0,
                                   limit: int = 100, after_event_us: int | None = None,
                                   include_start: bool = False, player_ids=None):
@@ -283,6 +311,10 @@ def find_unreserved_open_sessions(server_number: int, integration_id: str, *, af
             after_id < 0 or not 1 <= limit <= 1000 or
             (after_event_us is not None and (type(after_event_us) is not int or after_event_us < 0))):
         raise ValueError('Invalid Barricade scan query')
+    baseline = select(BarricadeScanBaseline.player_session_id).where(
+        BarricadeScanBaseline.server_number == server_number,
+        BarricadeScanBaseline.integration_id == integration_id.removeprefix('integration:'),
+        BarricadeScanBaseline.player_session_id == PlayerSession.id).exists()
     stmt = (select(PlayerSession.id, PlayerID.player_id, PlayerSession.start_event_us, BarricadeScanDelivery.status)
             .join(PlayerID, PlayerID.id == PlayerSession.player_id_id)
             .outerjoin(BarricadeScanDelivery, and_(
@@ -290,7 +322,7 @@ def find_unreserved_open_sessions(server_number: int, integration_id: str, *, af
                 BarricadeScanDelivery.server_number == server_number,
                 BarricadeScanDelivery.integration_id == integration_id))
             .where(PlayerSession.server_number == server_number, PlayerSession.end.is_(None),
-                   PlayerSession.end_event_us.is_(None), PlayerSession.id > after_id,
+                   PlayerSession.end_event_us.is_(None), PlayerSession.id > after_id, ~baseline,
                    or_(BarricadeScanDelivery.id.is_(None), BarricadeScanDelivery.status == 'queued'))
             .order_by(PlayerSession.id).limit(limit))
     if after_event_us is not None:
@@ -312,7 +344,7 @@ def mark_activation_review(server_number: int, integration_id: str, session_id: 
                            player_id: str, game: str, cause: str) -> None:
     """Record an ambiguous pre-send candidate; no remote action has occurred."""
     _require_scope(server_number, integration_id)
-    if (cause not in ('activation_before', 'activation_ambiguous', 'activation_unknown',
+    if (cause not in ('activation_before', 'activation_ambiguous', 'activation_unknown', 'reconstructed_session',
                       'session_ended_before_scan') or
             game not in ('HLL', 'HLLV') or type(session_id) is not int or session_id <= 0 or
             not isinstance(player_id, str) or not 0 < len(player_id) <= 100):
@@ -342,7 +374,10 @@ def find_unreserved_recent_closed_sessions(server_number: int, integration_id: s
             type(boundary_us) is not int or boundary_us < 0 or
             type(after_id) is not int or after_id < 0 or type(limit) is not int or not 1 <= limit <= 1000):
         raise ValueError('Invalid Barricade closed session query')
-    floor = boundary_us // 1_000_000 * 1_000_000
+    baseline = select(BarricadeScanBaseline.player_session_id).where(
+        BarricadeScanBaseline.server_number == server_number,
+        BarricadeScanBaseline.integration_id == integration_id.removeprefix('integration:'),
+        BarricadeScanBaseline.player_session_id == PlayerSession.id).exists()
     matching_delivery = select(BarricadeScanDelivery.id).where(
         BarricadeScanDelivery.player_session_id == PlayerSession.id,
         BarricadeScanDelivery.server_number == server_number,
@@ -351,8 +386,7 @@ def find_unreserved_recent_closed_sessions(server_number: int, integration_id: s
     recent = (select(PlayerSession.id.label('session_id'), PlayerID.player_id)
         .join(PlayerID, PlayerID.id == PlayerSession.player_id_id)
         .where(PlayerSession.server_number == server_number, PlayerSession.id > after_id, closed,
-            or_(PlayerSession.start_event_us >= floor, PlayerSession.end_event_us >= floor),
-            ~matching_delivery))
+            ~baseline, ~matching_delivery))
     queued = (select(PlayerSession.id.label('session_id'), PlayerID.player_id)
         .select_from(BarricadeScanDelivery)
         .join(PlayerSession, PlayerSession.id == BarricadeScanDelivery.player_session_id)

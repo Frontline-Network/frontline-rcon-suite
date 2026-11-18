@@ -20,11 +20,7 @@ def key_is_live(credential_id):
 
 async def scan_once(server_number, integration_id, game, sender, is_present, *, credential_id,
                     is_observed=None, get_roster=None, page_size=100):
-    """Traverse once; ambiguous activation or presence is deferred, not sent.
-
-    This is experimental: a boundary compares two clocks and cannot prove that
-    a game server exposes all log events promptly or uses a synchronized clock.
-    """
+    """Traverse once; the database snapshot separates old from new rows."""
     boundary = await asyncio.to_thread(journal.registration_boundary, server_number, integration_id, credential_id)
     if boundary is None:
         return 'unauthorized'
@@ -65,15 +61,8 @@ async def scan_once(server_number, integration_id, game, sender, is_present, *, 
             break
         for session_id, player_id, start_event_us, delivery_status in rows:
             after_id = session_id
-            classification = journal.classify_activation_start(boundary, start_event_us)
-            if delivery_status != 'queued' and classification in ('before', 'ambiguous', 'unknown'):
-                # Historical open rows alone do not mean the player is online.
-                # Do not flood the review queue with stale records. Unknown
-                # roster state is retried on the next traversal.
-                if is_observed is not None and await is_observed(session_id, player_id) is True:
-                    await record_review(session_id, player_id, 'activation_' + classification)
-                continue
-            if delivery_status != 'queued' and classification != 'after':
+            if await asyncio.to_thread(journal.is_manually_reconstructed_session, server_number, session_id):
+                await record_review(session_id, player_id, 'reconstructed_session')
                 continue
             await dispatch(server_number, integration_id, session_id, player_id, game, sender,
                            credential_id=credential_id, verify_session=is_present)

@@ -157,10 +157,15 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         server_number = int(get_server_number())
         scope = database_scope(os.environ['HLL_DB_URL'])
         redis = get_redis_client(global_pool=True)
+        from rcon.player_presence import redis_time
+        # One barrier per pass; each player is still individually rechecked
+        # against the current roster, session and non-superseded log poll.
+        barrier = await asyncio.to_thread(redis_time, redis)
 
         async def verify_session(session_id, player_id):
             return await barricade_scan_presence.confirm_with_fresh_poll(
-                redis, scope=scope, server_number=server_number, session_id=session_id, player_id=player_id)
+                redis, scope=scope, server_number=server_number, session_id=session_id, player_id=player_id,
+                barrier=barrier)
 
         roster = None
         roster_checked = float('-inf')

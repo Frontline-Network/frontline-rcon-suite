@@ -95,7 +95,7 @@ def session_has_bounded_evidence(red, *, scope: str, server_number: int, session
 
 
 async def confirm_with_fresh_poll(red, *, scope: str, server_number: int, session_id: int,
-                                  player_id: str, timeout: float = 8):
+                                  player_id: str, timeout: float = 8, barrier=None):
     """Require a collector poll begun after a Redis-time barrier.
 
     This prevents a still-readable old observation from authorizing a scan
@@ -103,7 +103,10 @@ async def confirm_with_fresh_poll(red, *, scope: str, server_number: int, sessio
     game-server log events have arrived or eliminate a later disconnect race.
     """
     try:
-        barrier = await asyncio.to_thread(redis_time, red)
+        if barrier is None:
+            barrier = await asyncio.to_thread(redis_time, red)
+        if type(barrier) not in (int, float) or not math.isfinite(barrier):
+            return None
         deadline = time.monotonic() + timeout
         while True:
             result = await asyncio.to_thread(session_has_bounded_evidence, red,

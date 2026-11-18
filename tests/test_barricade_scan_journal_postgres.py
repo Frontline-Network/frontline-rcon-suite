@@ -43,6 +43,7 @@ def test_activation_boundary_at_exact_second_does_not_assume_event_order():
 
 
 def prepare(database, monkeypatch):
+    journal.BarricadeScanBaseline.__table__.create(database.kw['bind'])
     journal.BarricadeScanDelivery.__table__.create(database.kw['bind'])
     journal.BarricadeScanIntegration.__table__.create(database.kw['bind'])
     journal.BarricadeScanIntegrationAudit.__table__.create(database.kw['bind'])

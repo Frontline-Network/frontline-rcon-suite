@@ -13,6 +13,15 @@ depends_on = None
 
 
 def upgrade():
+    op.create_index('ix_player_sessions_server_id_scan', 'player_sessions', ['server_number', 'id'])
+    op.create_index('ix_player_sessions_server_open_id_scan', 'player_sessions', ['server_number', 'id'],
+                    postgresql_where=sa.text('"end" IS NULL AND end_event_us IS NULL'))
+    op.create_table(
+        'barricade_scan_baseline',
+        sa.Column('server_number', sa.Integer, primary_key=True),
+        sa.Column('integration_id', sa.String(36), primary_key=True),
+        sa.Column('player_session_id', sa.Integer, primary_key=True),
+    )
     op.create_table(
         'barricade_scan_integration',
         sa.Column('server_number', sa.Integer, primary_key=True),
@@ -64,9 +73,12 @@ def upgrade():
 
 
 def downgrade():
-    if op.get_bind().execute(sa.text('SELECT EXISTS (SELECT 1 FROM barricade_scan_delivery) OR EXISTS (SELECT 1 FROM barricade_scan_integration) OR EXISTS (SELECT 1 FROM barricade_scan_integration_audit) OR EXISTS (SELECT 1 FROM barricade_scan_review_audit)')).scalar():
+    if op.get_bind().execute(sa.text('SELECT EXISTS (SELECT 1 FROM barricade_scan_baseline) OR EXISTS (SELECT 1 FROM barricade_scan_delivery) OR EXISTS (SELECT 1 FROM barricade_scan_integration) OR EXISTS (SELECT 1 FROM barricade_scan_integration_audit) OR EXISTS (SELECT 1 FROM barricade_scan_review_audit)')).scalar():
         raise RuntimeError('Cannot remove Barricade scan delivery history; it prevents duplicate scans')
     op.drop_table('barricade_scan_delivery')
     op.drop_table('barricade_scan_integration')
+    op.drop_table('barricade_scan_baseline')
+    op.drop_index('ix_player_sessions_server_open_id_scan', table_name='player_sessions')
+    op.drop_index('ix_player_sessions_server_id_scan', table_name='player_sessions')
     op.drop_table('barricade_scan_integration_audit')
     op.drop_table('barricade_scan_review_audit')

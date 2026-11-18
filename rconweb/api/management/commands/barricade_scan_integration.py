@@ -24,6 +24,8 @@ class Command(BaseCommand):
         parser.add_argument('--credential-id', required=True, type=int)
         parser.add_argument('--integration-id', help='Existing integration UUID for rotation')
         parser.add_argument('--expected-credential-id', type=int)
+        parser.add_argument('--legacy-scanner-stopped', action='store_true',
+                            help='Confirm every old scanner is stopped and cannot reconnect')
 
     def handle(self, *args, **options):
         try:
@@ -35,6 +37,8 @@ class Command(BaseCommand):
         if not current_credential_is_authorized(options['credential_id']):
             raise CommandError('The new key is missing or lacks Barricade permissions')
         if options['action'] == 'register':
+            if not options['legacy_scanner_stopped']:
+                raise CommandError('Stop all legacy scanners before registering the cutover')
             if options['integration_id'] is not None or options['expected_credential_id'] is not None:
                 raise CommandError('Register creates a new integration UUID')
             integration_id, expected = str(uuid4()), None
