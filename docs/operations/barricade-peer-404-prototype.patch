@@ -33,10 +33,26 @@ index c0f2c32..efe7e60 100644
      result = await db.scalars(stmt)
      return result.all()
 diff --git a/barricade/integrations/crcon/integration.py b/barricade/integrations/crcon/integration.py
-index 783e5fe..231189f 100644
+index 783e5fe..62db75a 100644
 --- a/barricade/integrations/crcon/integration.py
 +++ b/barricade/integrations/crcon/integration.py
-@@ -24,6 +24,7 @@ from barricade.integrations.mixins import (
+@@ -5,14 +5,8 @@ from typing import TypedDict
+ from aiohttp import ClientResponseError
+ 
+ from barricade import schemas
+-from barricade.crud.bans import (
+-    expire_bans_of_player,
+-    get_bans_by_integration,
+-)
+-from barricade.crud.communities import get_community_by_id
++from barricade.crud.bans import get_bans_by_integration
+ from barricade.db import session_factory
+-from barricade.discord.communities import safe_send_to_community
+-from barricade.discord.utils import get_danger_embed
+ from barricade.enums import Emojis, Game, IntegrationType
+ from barricade.exceptions import (
+     IntegrationValidationError,
+@@ -24,6 +18,7 @@ from barricade.integrations.mixins import (
      IntegrationScopedMixin,
  )
  from barricade.integrations.scope import Scope
@@ -44,7 +60,7 @@ index 783e5fe..231189f 100644
  from barricade.utils import async_ttl_cache, game_switch
  
  RE_VERSION = re.compile(r"v(?P<major>\d+).(?P<minor>\d+).(?P<patch>\d+)")
-@@ -127,6 +128,7 @@ class CRCONIntegration(
+@@ -127,62 +122,37 @@ class CRCONIntegration(
  
      @is_enabled
      @is_websocket_enabled
@@ -52,6 +68,72 @@ index 783e5fe..231189f 100644
      async def synchronize(self):
          if not self.config.id:
              raise RuntimeError("Integration has not yet been saved")
+ 
+         async with session_factory.begin() as db:
+-            # Get community details
+-            db_community = await get_community_by_id(db, self.config.community_id)
+-            community = schemas.CommunityRef.model_validate(db_community)
+-
+             # Bans are grouped by game. Iterate over each game.
+             for game in Game:
+                 # Fetch bans from remote list
+                 remote_bans = await self.get_blacklist_bans(game)
+ 
+-                # Iterate over bans from local database. Update to match remote bans.
++                # A remote scan can be incomplete even when all pages returned
++                # successfully. Retain existing references on any discrepancy.
++                missing = inactive = 0
+                 async for db_ban in get_bans_by_integration(
+                     db, self.config.id, game=game
+                 ):
+                     # Find matching remote ban
+                     remote_ban = remote_bans.pop(db_ban.remote_id, None)
+ 
+-                    # Delete local ban if no remote ban exists
+                     if not remote_ban:
+-                        await db.delete(db_ban)
+-
+-                    # Expire local ban if remote ban is expired
++                        missing += 1
+                     elif not remote_ban["is_active"]:
+-                        # The player was unbanned, change responses of all reports where
+-                        # the player is banned
+-                        async with session_factory.begin() as _db:
+-                            # TODO: Remove the remote ban?
+-                            await expire_bans_of_player(
+-                                _db, db_ban.player_id, db_ban.integration.community_id
+-                            )
+-
+-                # Iterate over remaining remote bans of which no local ban exists. Expire them.
+-                for remote_ban in remote_bans.values():
+-                    # Skip already expired bans
+-                    if not remote_ban["is_active"]:
+-                        continue
+-
+-                    embed = get_danger_embed(
+-                        "Found unrecognized ban on CRCON blacklist!",
+-                        (
+-                            f"-# Your Barricade blacklist contained [an active ban]({self.config.api_url.removesuffix('api')}#/blacklists) that Barricade does not recognize."
+-                            " Please do not put any of your own bans on this blacklist."
+-                            "\n\n"
+-                            "-# The ban has been expired. If you wish to restore it, move it to a different blacklist first. If this is a Barricade ban, feel free to ignore this."
+-                        ),
+-                    )
++                        inactive += 1
++
++                unrecognized = sum(1 for item in remote_bans.values() if item['is_active'])
++                if missing or inactive or unrecognized:
+                     self.logger.warning(
+-                        "Ban exists on the remote but not locally, expiring: %r",
+-                        remote_ban,
++                        "CRCON reconciliation requires review for %s: missing=%s inactive=%s unrecognized=%s",
++                        game, missing, inactive, unrecognized,
+                     )
+-                    await self.expire_ban(remote_ban["id"])
+-                    safe_send_to_community(community, embed=embed, game=game)
+ 
+     # --- Scoped integration mixin
+ 
 diff --git a/barricade/integrations/custom/integration.py b/barricade/integrations/custom/integration.py
 index 20a04c9..ba6336d 100644
 --- a/barricade/integrations/custom/integration.py

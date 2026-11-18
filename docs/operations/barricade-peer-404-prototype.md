@@ -15,6 +15,13 @@ and list creation across patched processes. Automatic replacement of an
 existing remote list is refused rather than silently deleting its references.
 Empty lists can still be created for a new integration.
 
+The proposed CRCON synchronization is non-destructive: missing or inactive
+remote records do not delete existing Barricade references or change report
+decisions, and unrecognized remote records are not expired. It logs aggregate
+discrepancy counts. This preserves records through shifted or incomplete pages
+but also means a genuine remote unban cannot be propagated automatically by
+this reconciliation path; it requires a separately verified resolution.
+
 Use separate integration IDs and dedicated new HLL and HLLV lists. Keep the
 historical Custom integration and its lists active during any proposed
 transition. The peer's `/repopulate-integration` is an explicit backfill of
@@ -34,3 +41,13 @@ patched code. Advisory-lock disconnection, deployment with mixed old and new
 workers, and all other code paths that mutate references require further
 fault-injection and review. It also does not establish that the external peer
 would accept, deploy or operate this patch.
+
+In particular, non-destructive synchronization alone does not stop a later
+repopulate from retrying a ban whose remote reply was lost. That requires a
+durable intent written before sending, keyed at least by integration, game and
+player, with a unique operation generation and an explicit uncertain outcome
+that survives process restarts. The intent and reference confirmation must be
+committed atomically after a confirmed result; recovery of uncertain operations
+must not automatically submit a new ban. This needs a peer schema migration,
+recovery workflow, and tests for partial bulk replies, process death, network
+loss, concurrent retries and mixed games. No such journal is included here.

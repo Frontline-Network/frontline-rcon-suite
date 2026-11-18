@@ -200,13 +200,13 @@ def test_public_repopulate_reports_partial_failures_correctly(mode):
 
 
 def test_public_sync_can_delete_reference_created_after_a_complete_snapshot():
-    if os.getenv('BARRICADE_EXPECT_FIXED'):
-        pytest.skip('negative control extracts the undecorated original peer method')
     root = os.getenv('BARRICADE_PUBLIC_SOURCE_DIR')
     if not root:
         pytest.skip('requires pinned public Barricade integration sources')
     data = (Path(root) / 'crcon.py').read_bytes().replace(b'\r\n', b'\n')
-    assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == '783e5fe6d52071d68b652e39a1fd8c91990d4b22'
+    expected = ('62db75a2d4f2bc517d0b75bbc1058c06f41aede7' if os.getenv('BARRICADE_EXPECT_FIXED')
+                else '783e5fe6d52071d68b652e39a1fd8c91990d4b22')
+    assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == expected
     tree = ast.parse(data.decode())
     klass = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CRCONIntegration')
     function = next(n for n in klass.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'synchronize')
@@ -246,7 +246,108 @@ def test_public_sync_can_delete_reference_created_after_a_complete_snapshot():
     peer = SimpleNamespace(config=SimpleNamespace(id=20, community_id=10),
                            get_blacklist_bans=snapshot, logger=logging.getLogger('synthetic-barricade'))
     asyncio.run(ns['synchronize'](peer))
-    db.delete.assert_awaited_once_with(reference)
+    if os.getenv('BARRICADE_EXPECT_FIXED'):
+        db.delete.assert_not_awaited()
+    else:
+        db.delete.assert_awaited_once_with(reference)
+
+
+def test_sync_preserves_references_when_offset_pages_shift():
+    root = os.getenv('BARRICADE_PUBLIC_SOURCE_DIR')
+    if not root:
+        pytest.skip('requires pinned public Barricade integration sources')
+    data = (Path(root) / 'crcon.py').read_bytes().replace(b'\r\n', b'\n')
+    expected = ('62db75a2d4f2bc517d0b75bbc1058c06f41aede7' if os.getenv('BARRICADE_EXPECT_FIXED')
+                else '783e5fe6d52071d68b652e39a1fd8c91990d4b22')
+    assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == expected
+    tree = ast.parse(data.decode())
+    klass = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CRCONIntegration')
+    methods = [n for n in klass.body if isinstance(n, ast.AsyncFunctionDef) and n.name in ('synchronize', 'get_blacklist_bans')]
+    assert len(methods) == 2
+    for method in methods:
+        method.decorator_list = []
+    module = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), *methods], type_ignores=[])
+    ast.fix_missing_locations(module)
+    db = SimpleNamespace(delete=AsyncMock())
+    records = [{'id': i, 'is_active': True} for i in range(101, 0, -1)]
+    references = [SimpleNamespace(remote_id=str(i)) for i in range(101, 0, -1)]
+
+    class Factory:
+        def begin(self):
+            return self
+        async def __aenter__(self):
+            return db
+        async def __aexit__(self, *args):
+            pass
+
+    async def community(*args):
+        return object()
+    async def local_bans(*args, **kwargs):
+        for reference in references:
+            yield reference
+    async def request(method, endpoint, data):
+        if data['page'] == 2:
+            records.pop(0)
+        start = (data['page'] - 1) * data['page_size']
+        return {'result': {'records': records[start:start + data['page_size']], 'total': len(records)}}
+
+    ns = {'session_factory': Factory(), 'get_community_by_id': community,
+          'schemas': SimpleNamespace(CommunityRef=SimpleNamespace(model_validate=lambda x: x)),
+          'Game': ('HLLV',), 'get_bans_by_integration': local_bans,
+          'game_switch': lambda game, h, v: v}
+    exec(compile(module, '<peer-pagination-sync>', 'exec'), ns)
+    peer = SimpleNamespace(config=SimpleNamespace(id=20, community_id=10, hll_banlist_id='hll', hllv_banlist_id='hllv'),
+                           _make_request=request, logger=logging.getLogger('synthetic-barricade'))
+    peer.get_blacklist_bans = lambda game: ns['get_blacklist_bans'](peer, game)
+    asyncio.run(ns['synchronize'](peer))
+    assert any(r['id'] == 1 for r in records)
+    omitted = references[-1]
+    if os.getenv('BARRICADE_EXPECT_FIXED'):
+        db.delete.assert_not_awaited()
+    else:
+        assert omitted in [call.args[0] for call in db.delete.await_args_list]
+
+
+def test_sync_does_not_expire_unrecognized_remote_ban():
+    root = os.getenv('BARRICADE_PUBLIC_SOURCE_DIR')
+    if not root:
+        pytest.skip('requires pinned public Barricade integration sources')
+    data = (Path(root) / 'crcon.py').read_bytes().replace(b'\r\n', b'\n')
+    expected = ('62db75a2d4f2bc517d0b75bbc1058c06f41aede7' if os.getenv('BARRICADE_EXPECT_FIXED')
+                else '783e5fe6d52071d68b652e39a1fd8c91990d4b22')
+    assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == expected
+    tree = ast.parse(data.decode())
+    klass = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CRCONIntegration')
+    method = next(n for n in klass.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'synchronize')
+    method.decorator_list = []
+    module = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), method], type_ignores=[])
+    ast.fix_missing_locations(module)
+    class Factory:
+        def begin(self):
+            return self
+        async def __aenter__(self):
+            return SimpleNamespace(delete=AsyncMock())
+        async def __aexit__(self, *args):
+            pass
+    async def local_bans(*args, **kwargs):
+        if False:
+            yield None
+    async def community(*args):
+        return object()
+    async def remote(*args):
+        return {'new': {'id': 99, 'is_active': True}}
+    ns = {'session_factory': Factory(), 'get_community_by_id': community,
+          'schemas': SimpleNamespace(CommunityRef=SimpleNamespace(model_validate=lambda x: x)),
+          'Game': ('HLLV',), 'get_bans_by_integration': local_bans,
+          'get_danger_embed': lambda *args: None, 'safe_send_to_community': lambda *args, **kwargs: None}
+    exec(compile(module, '<peer-unrecognized-sync>', 'exec'), ns)
+    peer = SimpleNamespace(config=SimpleNamespace(id=20, community_id=10, api_url='https://example.invalid/api'),
+                           get_blacklist_bans=remote, expire_ban=AsyncMock(), logger=logging.getLogger('synthetic-barricade'))
+    asyncio.run(ns['synchronize'](peer))
+    if os.getenv('BARRICADE_EXPECT_FIXED'):
+        peer.expire_ban.assert_not_awaited()
+    else:
+        peer.expire_ban.assert_awaited_once_with(99)
 
 
 def test_patch_serializes_cross_instance_peer_sync_and_ban(monkeypatch):
@@ -372,3 +473,46 @@ def test_patch_does_not_delete_references_when_existing_list_is_missing():
     assert asyncio.run(ns['create_ban_list'](peer, object(), 'HLL')) == 'new-list'
     assert peer.config.hll_banlist_id == 'new-list'
     peer.update.assert_awaited_once()
+
+
+def test_patch_still_needs_durable_intent_for_lost_replies():
+    root = os.getenv('BARRICADE_PUBLIC_SOURCE_DIR')
+    if not root or not os.getenv('BARRICADE_EXPECT_FIXED'):
+        pytest.skip('requires patched peer sources')
+    data = (Path(root) / 'custom.py').read_bytes().replace(b'\r\n', b'\n')
+    assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == 'ba6336d449f4b72f3459aff64d6a4b49207fd284'
+    tree = ast.parse(data.decode())
+    klass = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CustomIntegration')
+    method = next(n for n in klass.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'bulk_ban_players')
+    method.decorator_list = []
+    module = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), method], type_ignores=[])
+    ast.fix_missing_locations(module)
+
+    class Factory:
+        def begin(self):
+            return self
+        async def __aenter__(self):
+            return object()
+        async def __aexit__(self, *args):
+            pass
+
+    ns = {'session_factory': Factory(), 'itertools': itertools, 'batched': itertools.batched}
+    exec(compile(module, '<patched-peer-bulk>', 'exec'), ns)
+    attempts = []
+    player = SimpleNamespace(id=1, get_game_id=lambda game: 'synthetic-eos')
+    response = SimpleNamespace(player_report=SimpleNamespace(player_id=1, player=player, report=SimpleNamespace(game='HLLV')))
+    class Peer:
+        logger = logging.getLogger('synthetic-barricade')
+        async def get_ban(self, *args, **kwargs):
+            return None
+        def get_ban_reason(self, response):
+            return 'synthetic'
+        async def add_multiple_bans(self, mapping, game):
+            attempts.append(dict(mapping))
+            # The remote side may have acted before its reply was lost.
+            raise ConnectionError('synthetic lost reply')
+            yield
+    for _ in range(2):
+        with pytest.raises(ConnectionError):
+            asyncio.run(ns['bulk_ban_players'](Peer(), [response]))
+    assert len(attempts) == 2
