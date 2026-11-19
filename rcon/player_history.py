@@ -579,27 +579,28 @@ def get_players_by_appearance(
         raise ValueError("page_size needs to be >= 1")
 
     with enter_session() as sess:
-        sub = (
-            sess.query(
-                PlayerSession.player_id_id,
-                func.min(
-                    func.coalesce(PlayerSession.start, PlayerSession.created)
-                ).label("first"),
-                func.max(func.coalesce(PlayerSession.end, PlayerSession.created)).label(
-                    "last"
-                ),
-                func.max(PlayerSession.end_event_us).label("last_end_event_us"),
-                func.min(PlayerSession.start_event_us).label("first_start_event_us"),
-                func.sum(case((PlayerSession.start_event_us.is_(None), 1), else_=0)).label(
-                    "unverified_start_count"
-                ),
-                func.sum(case((PlayerSession.end_event_us.is_(None), 1), else_=0)).label(
-                    "unverified_end_count"
-                ),
-            )
-            .group_by(PlayerSession.player_id_id)
-            .subquery()
+        sessions = sess.query(
+            PlayerSession.player_id_id,
+            func.min(
+                func.coalesce(PlayerSession.start, PlayerSession.created)
+            ).label("first"),
+            func.max(func.coalesce(PlayerSession.end, PlayerSession.created)).label(
+                "last"
+            ),
+            func.max(PlayerSession.end_event_us).label("last_end_event_us"),
+            func.min(PlayerSession.start_event_us).label("first_start_event_us"),
+            func.sum(case((PlayerSession.start_event_us.is_(None), 1), else_=0)).label(
+                "unverified_start_count"
+            ),
+            func.sum(case((PlayerSession.end_event_us.is_(None), 1), else_=0)).label(
+                "unverified_end_count"
+            ),
         )
+        if player_id:
+            id_match = PlayerID.player_id.ilike(f"%{player_id}%")
+            matching_ids = sess.query(PlayerID.id).filter(id_match)
+            sessions = sessions.filter(PlayerSession.player_id_id.in_(matching_ids))
+        sub = sessions.group_by(PlayerSession.player_id_id).subquery()
         is_online = PlayerID.player_id.in_(online_now_ids) if online_now_ids else None
         grouped_remote = {}
         grouped_remote_epoch = {}
@@ -655,7 +656,7 @@ def get_players_by_appearance(
         query = sess.query(PlayerID)
 
         if player_id:
-            query = query.filter(PlayerID.player_id.ilike("%{}%".format(player_id)))
+            query = query.filter(id_match)
 
         if player_name:
             soldier_name = PlayerName.name
