@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import asyncio
 import re
 from datetime import datetime, timedelta, timezone
 from http.client import HTTPSConnection
@@ -22,6 +23,7 @@ from .db import SessionLocal
 from .discord_client import DiscordClient
 from .models import EventReceipt, Integration
 from .player_callback import effective_origin
+from . import report_picker as picker
 from .player_models import PlayerDMPreference, PlayerPanel, PrivateReply
 from .security import decrypt, encrypt
 
@@ -136,7 +138,20 @@ FORM_FIELDS = {
     "link": (("player", 255, True),),
     "verify": (("code", 32, True),),
 }
-ACTIONS = {*FORM_FIELDS, "list", "home", "dm_on", "dm_off", "resolved", "persisting"}
+ACTIONS = {
+    *FORM_FIELDS,
+    "list",
+    "home",
+    "dm_on",
+    "dm_off",
+    "resolved",
+    "persisting",
+    "squad",
+    "pick_player",
+    "pick_report",
+    "pick_clarify",
+    "legacy_form",
+}
 COMPONENT = re.compile(r"vp:([0-9a-f]{32}):([a-z_]{2,16})(?::([0-9a-fA-F-]{36}))?")
 SNOWFLAKE = re.compile(r"[0-9]{1,32}")
 INCIDENT_ID = re.compile(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
@@ -144,7 +159,7 @@ INCIDENT_ID = re.compile(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"
 
 def ui(locale, key):
     lang = str(locale or "").lower().split("-")[0]
-    labels = UI[key]
+    labels = UI[key] if key in UI else picker.TEXT[key]
     return (
         labels[LANGUAGES.index(lang)]
         if lang in LANGUAGES
@@ -232,7 +247,31 @@ def modal(panel, op, case_id, locale, title=None):
 
 
 def operation_args(payload, op, case_id):
-    if op in FORM_FIELDS:
+    if op in {"pick_report", "pick_clarify"}:
+        if payload["type"] != 5 or bool(case_id) != (op == "pick_clarify"):
+            raise ValueError("Invalid roster form")
+        fields = {
+            row["component"]["custom_id"]: row["component"]
+            for row in payload["data"]["components"]
+            if row.get("type") == 18
+        }
+        target = fields["target_ref"]
+        values = target.get("values")
+        if (
+            target["type"] != 3
+            or not isinstance(values, list)
+            or len(values) != 1
+            or not picker.REF.fullmatch(values[0])
+        ):
+            raise ValueError("Invalid roster choice")
+        args = {"target_ref": values[0]}
+        op = "clarify" if case_id else "report"
+        if not case_id:
+            message = fields["message"]["value"].strip()
+            if not 0 < len(message) <= 2000:
+                raise ValueError("Invalid report text")
+            args["message"] = message
+    elif op in FORM_FIELDS:
         if payload["type"] != 5:
             raise ValueError("Expected a form submission")
         fields = {
@@ -300,6 +339,119 @@ def active_integration(session, panel):
     )
 
 
+def _panel_post(session, panel, integration, actor, interaction_id, op, args, post):
+    response = post(
+        f"{effective_origin(session, panel, integration)}/api/discord/v1/player-reports",
+        headers={
+            "Authorization": f"Bearer {decrypt(integration.action_capability_ciphertext)}"
+        },
+        json={
+            "interaction_id": interaction_id,
+            "discord_user_id": actor,
+            "guild_id": panel.guild_id,
+            "channel_id": panel.channel_id,
+            "installation_id": panel.installation_id,
+            "server_number": panel.server_number,
+            "operation": op,
+            "arguments": args,
+        },
+        timeout=10 if op == "roster" else 30,
+        follow_redirects=False,
+    )
+    response.raise_for_status()
+    return response.json()["result"]
+
+
+def _fetch_picker(panel_id, actor, interaction_id, selected, locale, post):
+    with SessionLocal() as session:
+        panel = session.get(PlayerPanel, panel_id)
+        integration = active_integration(session, panel)
+        if not integration:
+            return "unavailable", []
+        try:
+            data = _panel_post(
+                session, panel, integration, actor, interaction_id, "roster", {}, post
+            )
+        except httpx.HTTPStatusError as exc:
+            # Older paired RCONs reject unknown operations; their existing form still works.
+            if exc.response.status_code == 400:
+                return "legacy", []
+            raise
+        if not isinstance(data.get("players"), list):
+            return "unavailable", []
+        return picker.picker_view(
+            data["players"], selected, lambda key: ui(locale, key)
+        )
+
+
+def _picker_modal(panel, case, locale, options):
+    op = "pick_clarify" if case else "pick_report"
+    return picker.player_modal(
+        button(panel, op, "", case)["custom_id"],
+        ui(locale, "clarify" if case else "report"),
+        ui(locale, "select_player"),
+        ui(locale, "message"),
+        options,
+        clarify=bool(case),
+    )
+
+
+def _picker_response(panel, case, locale, view, *, deferred=False):
+    kind, options = view
+    if kind == "player" and not deferred:
+        return _picker_modal(panel, case, locale, options)
+    if kind == "legacy" and not deferred:
+        return modal(panel, "clarify" if case else "report", case, locale)
+    if kind in {"empty", "gone", "unavailable", "legacy"}:
+        retry_op = (
+            "legacy_form" if kind == "legacy" else "clarify" if case else "report"
+        )
+        text = ui(locale, "report" if kind == "legacy" else kind)
+        component = button(
+            panel, retry_op, ui(locale, "report" if kind == "legacy" else "retry"), case
+        )
+    else:
+        text = ui(locale, "group" if kind == "group" else "select_player")
+        op = "squad" if kind == "group" else "pick_player"
+        component = {
+            "type": 3,
+            "custom_id": button(panel, op, "", case)["custom_id"],
+            "options": options,
+            "placeholder": text[:150],
+            "min_values": 1,
+            "max_values": 1,
+        }
+    data = private_data(text, [{"type": 1, "components": [component]}])
+    return {"type": 4, "data": {**data, "flags": 64}}
+
+
+async def _open_picker(panel, case, locale, actor, payload, selected, tasks, post):
+    async def load():
+        try:
+            return await asyncio.to_thread(
+                _fetch_picker, panel.id, actor, payload["id"], selected, locale, post
+            )
+        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+            return "unavailable", []
+
+    # A modal must be the initial Discord response. A slow RCON still gets
+    # a private acknowledgement and a selectable result without repeating the read.
+    result = asyncio.create_task(load())
+    done, _ = await asyncio.wait({result}, timeout=1.0)
+    if done:
+        return _picker_response(panel, case, locale, result.result())
+
+    async def finish():
+        reply = _picker_response(panel, case, locale, await result, deferred=True)[
+            "data"
+        ]
+        reply.pop("flags", None)
+        await asyncio.to_thread(private_reply, payload["token"], reply)
+
+    tasks.add_task(finish)
+    return {"type": 5, "data": {"flags": 64}}
+
+
 def handle_interaction(session, payload, background_tasks, post):
     data = payload.get("data") or {}
     custom_id = str(data.get("custom_id", ""))
@@ -327,6 +479,54 @@ def handle_interaction(session, payload, background_tasks, post):
         or (op in {"clarify", "resolved", "persisting"} and not case_id)
     ):
         return reject
+    if payload.get("type") == 3 and op in {
+        "report",
+        "clarify",
+        "squad",
+        "pick_player",
+        "legacy_form",
+    }:
+        if not payload.get("token"):
+            return reject
+        if op == "legacy_form":
+            return modal(panel, "clarify" if case_id else "report", case_id, locale)
+        values = data.get("values")
+        if op in {"squad", "pick_player"}:
+            if (
+                not isinstance(values, list)
+                or len(values) != 1
+                or not isinstance(values[0], str)
+            ):
+                return reject
+            if op == "pick_player":
+                option = next(
+                    (
+                        opt
+                        for row in (payload.get("message") or {}).get("components", [])
+                        for menu in row.get("components", [])
+                        if menu.get("custom_id") == custom_id
+                        for opt in menu.get("options", [])
+                        if opt.get("value") == values[0]
+                    ),
+                    None,
+                )
+                if not option or not picker.REF.fullmatch(values[0]):
+                    return reject
+                return _picker_modal(
+                    panel, case_id, locale, [{**option, "default": True}]
+                )
+            if not picker.GROUP.fullmatch(values[0]):
+                return reject
+        return _open_picker(
+            panel,
+            case_id,
+            locale,
+            actor,
+            payload,
+            values[0] if op == "squad" else None,
+            background_tasks,
+            post,
+        )
     if payload.get("type") == 3 and op in FORM_FIELDS:
         # Private case buttons already contain the reporter’s translated label.
         # Preserve it when opening a clarification, even if the account UI is
@@ -396,26 +596,9 @@ def finish_interaction(panel_id, actor, interaction_id, token, locale, op, args,
             integration = active_integration(session, panel)
             if not integration:
                 raise ValueError("Inactive panel")
-            response = post(
-                f"{effective_origin(session, panel, integration)}/api/discord/v1/player-reports",
-                headers={
-                    "Authorization": f"Bearer {decrypt(integration.action_capability_ciphertext)}"
-                },
-                json={
-                    "interaction_id": interaction_id,
-                    "discord_user_id": actor,
-                    "guild_id": panel.guild_id,
-                    "channel_id": panel.channel_id,
-                    "installation_id": panel.installation_id,
-                    "server_number": panel.server_number,
-                    "operation": op,
-                    "arguments": args,
-                },
-                timeout=30,
-                follow_redirects=False,
+            result = _panel_post(
+                session, panel, integration, actor, interaction_id, op, args, post
             )
-            response.raise_for_status()
-            result = response.json()["result"]
             preference = session.get(PlayerDMPreference, (panel.installation_id, actor))
             if op in {"list", "home"}:
                 actions = list(result.get("actions", []))

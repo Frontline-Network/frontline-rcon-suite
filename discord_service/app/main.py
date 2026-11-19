@@ -9,6 +9,7 @@ import secrets
 import socket
 import uuid
 from datetime import datetime, timedelta, timezone
+from inspect import isawaitable
 from threading import Lock
 from time import monotonic, time
 from urllib.parse import urlencode, urlsplit
@@ -359,11 +360,14 @@ def _pairing_guild_options(payload: PairingDiscoveryRequest, session: Session) -
 
 
 def _purge_expired_relays(session: Session) -> None:
-    session.execute(
-        delete(PreparedActionRelay).where(
-            PreparedActionRelay.expires_at <= datetime.now(tz=timezone.utc)
-        )
-    )
+    expired = PreparedActionRelay.expires_at <= datetime.now(tz=timezone.utc)
+    if session.get_bind().dialect.name == "postgresql":
+        available = select(PreparedActionRelay.handle).where(expired).with_for_update(skip_locked=True)
+        expired = PreparedActionRelay.handle.in_(available)
+    session.execute(delete(PreparedActionRelay).where(expired).execution_options(synchronize_session=False))
+    # Both callers run this housekeeping at request entry, before any business
+    # writes. Release its row locks before Discord or RCON network calls.
+    session.commit()
 
 
 def _crcon_interaction_error(exc: httpx.HTTPError, language: str = "de") -> str:
@@ -1650,6 +1654,8 @@ async def discord_interaction(
     _check_rate_limit(f"interaction:{payload.get('guild_id')}:{rate_user.get('id')}")
     player_response = player_panel.handle_interaction(session, payload, background_tasks, _crcon_post)
     if player_response is not None:
+        if isawaitable(player_response):
+            return await player_response
         return player_response
     custom_id = str((payload.get("data") or {}).get("custom_id") or "")
     if payload.get("type") == 3 and custom_id.startswith("confirm:"):
