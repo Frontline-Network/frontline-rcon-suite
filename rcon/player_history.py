@@ -578,9 +578,8 @@ def get_players_by_appearance(
     if page_size <= 0:
         raise ValueError("page_size needs to be >= 1")
 
-    with enter_session() as sess:
-        sessions = sess.query(
-            PlayerSession.player_id_id,
+    def fetch_page(sess, recent_ids=None, cutoff_us=None):
+        stats = (
             func.min(
                 func.coalesce(PlayerSession.start, PlayerSession.created)
             ).label("first"),
@@ -596,10 +595,13 @@ def get_players_by_appearance(
                 "unverified_end_count"
             ),
         )
+        sessions = sess.query(PlayerSession.player_id_id, *stats)
         if player_id:
             id_match = PlayerID.player_id.ilike(f"%{player_id}%")
             matching_ids = sess.query(PlayerID.id).filter(id_match)
             sessions = sessions.filter(PlayerSession.player_id_id.in_(matching_ids))
+        if recent_ids is not None:
+            sessions = sessions.filter(PlayerSession.player_id_id.in_(recent_ids))
         sub = sessions.group_by(PlayerSession.player_id_id).subquery()
         is_online = PlayerID.player_id.in_(online_now_ids) if online_now_ids else None
         grouped_remote = {}
@@ -702,9 +704,8 @@ def get_players_by_appearance(
             )
 
         if flags:
-            if not isinstance(flags, list):
-                flags = [flags]
-            query = query.join(PlayerID.flags).filter(PlayerFlag.flag.in_(flags))
+            selected_flags = flags if isinstance(flags, list) else [flags]
+            query = query.join(PlayerID.flags).filter(PlayerFlag.flag.in_(selected_flags))
 
         if country:
             query = query.filter(
@@ -760,11 +761,14 @@ def get_players_by_appearance(
 
         if total is None:
             total = query.count()
-        page = min(max(math.ceil(total / page_size), 1), page)
+        result_page = min(max(math.ceil(total / page_size), 1), page)
+        rank = func.coalesce(effective_sort, created_sort)
+        if recent_ids is not None:
+            query = query.filter(PlayerID.id.in_(recent_ids), rank >= cutoff_us)
         players = (
-            query.order_by(func.coalesce(effective_sort, created_sort).desc())
+            query.order_by(rank.desc(), PlayerID.id.asc())
             .limit(page_size)
-            .offset((page - 1) * page_size)
+            .offset((result_page - 1) * page_size)
             # All relations used in PlayerID.to_dict should be loaded here to avoid lazyloading in the for loop below
             .options(
                 selectinload(PlayerID.names),
@@ -779,6 +783,39 @@ def get_players_by_appearance(
             )
             .all()
         )
+
+        return players, total, result_page
+
+    with enter_session() as sess:
+        unfiltered = not any((player_id, player_name, last_seen_from, last_seen_till,
+                              blacklisted, is_watched, flags, country))
+        if page == 1 and unfiltered and sess.get_bind().dialect.name == "postgresql":
+            # Every possible ranking source is included. Evaluate the original
+            # rank against complete histories for these candidates in one snapshot.
+            sess.connection(execution_options={"isolation_level": "REPEATABLE READ"})
+            utc_now = observed_at.astimezone(datetime.timezone.utc).replace(microsecond=0)
+            utc_cutoff = utc_now - datetime.timedelta(hours=6)
+            cutoff_us = int(utc_cutoff.timestamp() * 1_000_000)
+            utc_wall = utc_cutoff.replace(tzinfo=None)
+            local_wall = utc_wall + observed_at.astimezone().utcoffset()
+            seen_ids = set(online_now_ids).union(remote_observations)
+            recent = sess.query(PlayerID.id).filter(or_(
+                PlayerID.created >= utc_wall, PlayerID.player_id.in_(seen_ids),
+            )).union(sess.query(PlayerSession.player_id_id).filter(or_(
+                PlayerSession.end_event_us >= cutoff_us,
+                PlayerSession.end >= local_wall,
+                and_(PlayerSession.end.is_(None), PlayerSession.created >= local_wall),
+            )))
+            # Bound the IN list. A busy installation or a quiet server can both
+            # use the general query when the shortlist cannot supply a full page.
+            recent_ids = [row[0] for row in recent.limit(4097)]
+            players = []
+            if 0 < len(recent_ids) <= 4096:
+                players, total, page = fetch_page(sess, recent_ids, cutoff_us)
+            if len(players) < page_size:
+                players, total, page = fetch_page(sess)
+        else:
+            players, total, page = fetch_page(sess)
 
         identity_links = get_player_identity_links(
             sess, [player[0] for player in players]

@@ -440,6 +440,17 @@ def test_postgres_filters_order_and_console_ids_with_utc_offsets(monkeypatch):
                                        created=datetime(2026, 11, 16, 9), end=None,
                                        server_number=server, server_name="synthetic"))
             sess.commit()
+        # Equal activity times need a stable order across the first and later pages.
+        # The later observation time forces the complete-history fallback.
+        for stamp in (now, now + timedelta(days=2)):
+            for page in (1, 2):
+                args = dict(observed_at=stamp, online_now_ids=set(), page=page, page_size=1)
+                overview = player_history.get_players_by_appearance(**args)
+                full = player_history.get_players_by_appearance(player_id="%", **args)
+                assert overview == full
+                assert overview["players"][0]["player_id"] == (
+                    "console-online" if page == 1 else "orphan-other-server"
+                )
         if os.environ.get('TEST_REDIS_URL'):
             exercise_real_cross_server_pipeline(monkeypatch, 'orphan-other-server')
         threshold = datetime(2026, 11, 16, 12, 30, tzinfo=timezone(timedelta(hours=1)))
