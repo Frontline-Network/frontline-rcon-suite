@@ -42,6 +42,180 @@ def incident_database(monkeypatch):
     return engine
 
 
+def test_bare_admin_collects_reason_in_same_incident(incident_database, monkeypatch):
+    from unittest.mock import Mock
+    from rcon import report_chat_intake as intake
+
+    stamp = datetime.now(timezone.utc).timestamp()
+    clock = Mock(return_value=stamp)
+    monkeypatch.setattr(intake, "time", type("Clock", (), {"time": clock}))
+    token = Mock(return_value=41)
+    monkeypatch.setattr(intake.report_admin, "session_token", token)
+    enqueue = Mock()
+    monkeypatch.setattr(intake.report_admin, "enqueue", enqueue)
+    monkeypatch.setattr(incidents, "get_server_number", lambda: 3)
+    api = Mock()
+    api.message_player.return_value = True
+    log = {
+        "sub_content": "!admin",
+        "player_id_1": "reporter",
+        "timestamp_ms": int(stamp * 1000),
+    }
+    case, created = incidents.create_incident_from_chat(log)
+    assert created
+    intake.ask(api, case, log)
+    assert api.message_player.call_args.kwargs["player_id"] == "reporter"
+    assert api.message_player.call_args.kwargs["message"].startswith(
+        "Hi! How can I help?"
+    )
+    enqueue.assert_not_called()
+    clock.return_value = stamp + 4
+    reply = {
+        **log,
+        "timestamp_ms": int((stamp + 3) * 1000),
+        "sub_content": "Bravo redet nicht",
+    }
+    assert intake.pending(reply, 3) == case["id"]
+    vague = {**reply, "sub_content": "Hilfe!"}
+    assert intake.ask_for_detail(api, case["id"], vague)
+    assert (
+        "Was ist im Spiel passiert?" in api.message_player.call_args.kwargs["message"]
+    )
+    assert intake.ask_for_detail(api, case["id"], vague)
+    assert api.message_player.call_count == 2
+    assert not intake.ask_for_detail(api, case["id"], reply)
+    assert intake.pending({**reply, "player_id_1": "another"}, 3) is None
+    assert intake.pending(reply, 4) is None
+    assert intake.pending({**reply, "sub_content": "!yes"}, 3) is None
+    assert intake.pending({**reply, "timestamp_ms": int((stamp - 1) * 1000)}, 3) is None
+    token.return_value = 42
+    assert intake.pending(reply, 3) is None
+    token.return_value = 41
+    complete = lambda: incidents.create_incident_from_chat(
+        {**reply, "sub_content": "!admin " + reply["sub_content"]},
+        reason_prompt_id=case["id"],
+        leadership_context={"players": []},
+    )
+    updated, accepted = complete()
+    assert accepted and updated["id"] == case["id"] and updated["revision"] == 2
+    assert updated["reason"] == "Bravo redet nicht"
+    assert updated["raw_message"] == "!admin Bravo redet nicht"
+    assert len(incidents.list_incidents()) == 1
+    enqueue.assert_called_once()
+    assert intake.pending(reply, 3) is None and complete() is None
+    assert incidents.create_incident_from_chat(log)[1]
+
+
+@pytest.mark.parametrize(
+    "outcome", ["timed_out", "claimed", "send_failed", "no_session"]
+)
+def test_plain_chat_requires_a_live_confirmed_question(
+    incident_database, monkeypatch, outcome
+):
+    from unittest.mock import Mock
+    from rcon import report_chat_intake as intake
+
+    now = datetime.now(timezone.utc).timestamp()
+    monkeypatch.setattr(
+        intake, "time", type("Clock", (), {"time": staticmethod(lambda: now)})
+    )
+    monkeypatch.setattr(
+        intake.report_admin,
+        "session_token",
+        lambda *args: None if outcome == "no_session" else 8,
+    )
+    api = Mock()
+    api.message_player.return_value = outcome != "send_failed"
+    log = {
+        "sub_content": "!admin",
+        "player_id_1": "reporter",
+        "timestamp_ms": int(now * 1000),
+    }
+    case, _ = incidents.create_incident_from_chat(log)
+    intake.ask(api, case, log)
+    if outcome == "no_session":
+        assert "!admin" in api.message_player.call_args.kwargs["message"]
+    if outcome == "claimed":
+        with incidents.enter_session() as sess:
+            sess.get(AdminIncident, case["id"]).status = "claimed"
+    now += 121 if outcome == "timed_out" else 5
+    assert (
+        intake.pending(
+            {**log, "sub_content": "ordinary chat", "timestamp_ms": int(now * 1000)},
+            case["server_number"],
+        )
+        is None
+    )
+    if outcome == "no_session":
+        explicit = {
+            **log,
+            "sub_content": "!admin I am stuck",
+            "timestamp_ms": int(now * 1000),
+        }
+        assert intake.pending(explicit, case["server_number"]) == case["id"]
+    assert incidents.list_incidents()[0]["reason"] == "Admin assistance requested"
+
+
+def test_chat_hook_invites_then_routes_plain_reason(incident_database, monkeypatch):
+    from unittest.mock import Mock
+    from rcon import (
+        discord_chat,
+        incident_settings,
+        incident_notifications,
+        report_chat_intake as intake,
+    )
+    from rcon.leadership_vote import service as leadership
+    from rcon.user_config.report_admin import ReportAdminUserConfig
+
+    now = datetime.now(timezone.utc).timestamp()
+    monkeypatch.setattr(
+        intake, "time", type("Clock", (), {"time": staticmethod(lambda: now)})
+    )
+    monkeypatch.setattr(intake.report_admin, "session_token", lambda *args: 8)
+    monkeypatch.setattr(
+        ReportAdminUserConfig,
+        "load_from_db",
+        lambda: ReportAdminUserConfig(enabled=True, reason_mode="ai"),
+    )
+    monkeypatch.setattr(incident_settings, "incident_triggers", lambda: ("!admin",))
+    monkeypatch.setattr(incident_settings, "incident_context_mode", lambda: "disabled")
+    monkeypatch.setattr(
+        incident_notifications, "received_reporter_template", lambda: None
+    )
+    monkeypatch.setattr(leadership, "read_context", lambda api: {"players": []})
+    monkeypatch.setattr(discord_chat, "get_server_number", lambda: 3)
+    monkeypatch.setattr(incidents, "get_server_number", lambda: 3)
+    handler = Mock()
+    monkeypatch.setattr(discord_chat, "get_handler", lambda: handler)
+    enqueue = Mock()
+    monkeypatch.setattr(intake.report_admin, "enqueue", enqueue)
+    api = Mock()
+    api.message_player.return_value = True
+    api.get_team_view.return_value = {}
+
+    def chat(text):
+        discord_chat.handle_on_chat(
+            api,
+            {
+                "sub_content": text,
+                "player_id_1": "reporter",
+                "type": "CHAT[Allies][Team]",
+                "timestamp_ms": int(now * 1000),
+            },
+        )
+
+    chat(" !ADMIN ")
+    chat(" !ADMIN ")
+    api.message_player.assert_called_once()
+    now += 4
+    chat("Someone is blocking our truck")
+    (stored,) = incidents.list_incidents()
+    assert stored["reason"] == "Someone is blocking our truck"
+    assert stored["revision"] == 2
+    assert handler.send_chat_message.call_count == 2
+    assert enqueue.call_args.args[1].id == stored["id"]
+
+
 def test_incident_lists_eager_load_subjects_in_constant_queries(incident_database):
     for index in range(5):
         incidents.create_incident(

@@ -742,7 +742,10 @@ def parse_chat_report(
         return None
     remainder = message[match.end() :].strip(" :-\t")
     if not remainder:
-        remainder = "Admin assistance requested"
+        return {
+            "trigger": trigger, "target_id": None, "target_name": None,
+            "subjects": [], "reason": "Admin assistance requested", "raw_message": message[:4000],
+        }
 
     if context_mode == "disabled":
         target, reason = _legacy_player_target(remainder, current_players or ())
@@ -929,7 +932,7 @@ def create_incident(
                 select(AdminIncident).where(
                     AdminIncident.dedupe_key == dedupe_key,
                     AdminIncident.created_at >= now - timedelta(seconds=dedupe_seconds),
-                )
+                ).order_by(AdminIncident.created_at.desc()).limit(1)
             ).scalar_one_or_none()
             if existing:
                 return existing.to_dict(include_events=True), False
@@ -997,6 +1000,7 @@ def create_incident_from_chat(
     current_squads: Sequence[dict] | None = None,
     trigger_words: Iterable[str] = DEFAULT_TRIGGER_WORDS,
     leadership_context: dict | None = None,
+    reason_prompt_id: str | None = None,
 ) -> tuple[dict, bool] | None:
     players = [
         dict(player, online=player.get("online", True))
@@ -1029,11 +1033,18 @@ def create_incident_from_chat(
     )
     if not parsed:
         return None
+    if reason_prompt_id:
+        from rcon.leadership_vote.domain import event_time
+        from rcon.report_chat_intake import complete
+
+        return complete(reason_prompt_id, int(get_server_number()), reporter_id, event_time(log),
+                        parsed, reporter_context, leadership_context)
     return create_incident(
         server_number=int(get_server_number()),
         source="chat",
         reason=parsed["reason"],
         raw_message=parsed["raw_message"],
+        dedupe_seconds=120 if parsed["raw_message"].strip().lower() == "!admin" else 60,
         actor="system:chat",
         reporter_id=reporter_id,
         reporter_name=str(log.get("player_name_1") or "") or None,
