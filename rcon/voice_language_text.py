@@ -44,25 +44,25 @@ TEXT = {
         "De verzending van het bericht kon niet worden bevestigd. Een beheerder moet de melding bekijken.",
     ),
     "question": (
-        "Klappt die Sprachkommunikation mit {target} jetzt?",
-        "Is voice communication with {target} working now?",
-        "La communication vocale avec {target} fonctionne-t-elle maintenant ?",
-        "Czy komunikacja głosowa z {target} już działa?",
-        "Werkt het spraakcontact met {target} nu?",
+        "Antwortet {target} jetzt im Voice?",
+        "Is {target} answering in voice chat now?",
+        "{target} répond maintenant en vocal ?",
+        "Czy {target} już odpowiada na czacie głosowym?",
+        "Reageert {target} nu via voicechat?",
     ),
     "fixed": (
-        "Klappt wieder",
-        "Working again",
-        "Ça fonctionne",
-        "Już działa",
-        "Werkt weer",
+        "Ja",
+        "Yes",
+        "Oui",
+        "Tak",
+        "Ja",
     ),
     "still_silent": (
-        "Weiterhin keine Antwort",
-        "Still no response",
-        "Toujours sans réponse",
-        "Nadal brak odpowiedzi",
-        "Nog geen antwoord",
+        "Nein",
+        "No",
+        "Non",
+        "Nie",
+        "Nee",
     ),
     "resolved": (
         "Die Kommunikation klappt wieder. Deine Meldung ist abgeschlossen.",
@@ -121,11 +121,11 @@ TEXT = {
         "Welke speler bedoel je? Geef de exacte naam uit het spel op.",
     ),
     "pc_reply": (
-        "Antwort im Chat: !voice {case} ok / !voice {case} still",
-        "Reply in chat: !voice {case} ok / !voice {case} still",
-        "Réponds dans le chat : !voice {case} ok / !voice {case} still",
-        "Odpowiedz na czacie: !voice {case} ok / !voice {case} still",
-        "Antwoord in de chat: !voice {case} ok / !voice {case} still",
+        "Antworte im Chat mit {yes} oder {no}.",
+        "Reply in chat with {yes} or {no}.",
+        "Réponds dans le chat par {yes} ou {no}.",
+        "Odpowiedz na czacie: {yes} lub {no}.",
+        "Antwoord in de chat met {yes} of {no}.",
     ),
     "pc_clarify": (
         "Antworte mit !voice {case} target <Spielername>. Deine Antwort im Chat kann sichtbar sein.",
@@ -135,11 +135,11 @@ TEXT = {
         "Antwoord met !voice {case} target <spelersnaam>. Je chatantwoord kan zichtbaar zijn.",
     ),
     "discord_reply": (
-        "Konsole: Öffne im Community-Discord „Meine Meldungen“. Verknüpfe bei Bedarf zuerst dein Spielkonto.",
-        "Console: open My reports in the community Discord. Link your game account first if needed.",
-        "Console : ouvre Mes signalements sur le Discord de la communauté. Lie d’abord ton compte de jeu si nécessaire.",
-        "Konsola: otwórz Moje zgłoszenia na Discordzie społeczności. W razie potrzeby najpierw połącz konto gry.",
-        "Console: open Mijn meldingen op de community-Discord. Koppel zo nodig eerst je spelaccount.",
+        "Discord → Meine Meldungen",
+        "Discord → My reports",
+        "Discord → Mes signalements",
+        "Discord → Moje zgłoszenia",
+        "Discord → Mijn meldingen",
     ),
     "link": (
         "Spielkonto verknüpfen",
@@ -180,6 +180,12 @@ TEXT = {
 }
 
 BUILTIN = ("de", "en", "fr", "pl", "nl")
+# Keep the fallback readable on console. A long player handle occupies just one line.
+BILINGUAL = {
+    "question": "Antwortet {target} jetzt im Voice? / Replying in voice chat now?",
+    "pc_reply": "Chat: Ja/Yes · Nein/No",
+    "discord_reply": "Discord → Meine Meldungen / My reports",
+}
 ENGLISH = {key: row[1] for key, row in TEXT.items()}
 VERSION = hashlib.sha256(json.dumps(ENGLISH, sort_keys=True).encode()).hexdigest()[:16]
 
@@ -227,9 +233,7 @@ def valid_templates(texts):
             r"!\w+", value
         ) != re.findall(r"!\w+", source):
             return False
-        if key == "pc_reply" and any(
-            part not in value for part in ("!voice {case} ok", "!voice {case} still")
-        ):
+        if key == "pc_reply" and fields != expected:
             return False
         if key == "pc_clarify" and "!voice {case} target " not in value:
             return False

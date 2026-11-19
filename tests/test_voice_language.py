@@ -40,7 +40,7 @@ def test_polish_report_unknown_target_then_explicit_french(db):
     assert lang.render(db, "notice_sent", locale, target="Alex").startswith(
         "Wysłaliśmy"
     )
-    assert lang.render(db, "fixed", locale) == "Już działa"
+    assert lang.render(db, "fixed", locale) == "Tak"
     lang.set_language(db, "fr-FR", discord_id="202")
     with pytest.raises(ValueError, match="Unverified"):
         lang.preferred_language(db, game_id="target-eos", discord_id="202")
@@ -129,6 +129,40 @@ def test_catalog_integrity_and_service_pin():
         pinned
         == hashlib.sha256(json.dumps(ENGLISH, sort_keys=True).encode()).hexdigest()
     )
+
+
+def test_console_question_and_buttons_fit_without_case_number_or_chat_commands(db):
+    question = lang.render(db, "question", "de+en", target="Mira", case="9876")
+    hint = lang.render(db, "discord_reply", "de+en")
+    assert question.count("Mira") == 1 and len(question + hint) < 110
+    assert "!voice" not in hint and "9876" not in question
+    assert lang.render(db, "fixed", "de+en") == "Ja / Yes"
+    assert lang.render(db, "still_silent", "de+en") == "Nein / No"
+
+
+def test_pc_reply_preserves_bare_words_and_polarity_in_translated_catalogs(db):
+    for locale, yes, no in (
+        ("de", "ja", "nein"),
+        ("en", "yes", "no"),
+        ("fr", "oui", "non"),
+        ("pl", "tak", "nie"),
+        ("nl", "ja", "nee"),
+    ):
+        text = lang.render(db, "pc_reply", locale, case="9876")
+        words = text.casefold().split()
+        assert yes in words and no + "." in words
+        assert "!" not in text and "9876" not in text
+    translated = {**ENGLISH, "pc_reply": "Responde con {yes} o {no}."}
+    assert valid_templates(translated)
+    language = lang.VoiceTranslationCache(
+        language="es", version=VERSION, texts=translated, next_attempt=-1
+    )
+    db.add(language)
+    db.flush()
+    assert lang.render(db, "pc_reply", "es") == "Responde con Yes o No."
+    assert lang.render(db, "pc_reply", "de+en") == "Chat: Ja/Yes · Nein/No"
+    for invalid in ["Chat: !voice {yes} / !voice {no}", "Chat: {no} / {yes}", "Chat: sí / no"]:
+        assert not valid_templates({**ENGLISH, "pc_reply": invalid})
 
 
 def test_explicit_language_outside_detector_survives_cold_and_warmed_catalogs(db):

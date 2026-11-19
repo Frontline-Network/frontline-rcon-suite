@@ -331,7 +331,12 @@ def _list(sess, server, actor, locale):
         text = language.render(
             sess, key, case_locale, target=case.target_name or "", case=case.id[:8]
         )
-        lines.append(f"#{case.id[:8]} · {text}")
+        created = (
+            case.created_at
+            if case.created_at.tzinfo
+            else case.created_at.replace(tzinfo=timezone.utc)
+        )
+        lines.append(f"<t:{int(created.timestamp())}:t> · {text}")
     if pid:
         pending = sess.scalars(
             select(AdminIncidentEvent)
@@ -346,9 +351,12 @@ def _list(sess, server, actor, locale):
             .order_by(AdminIncidentEvent.id.desc())
             .limit(2)
         )
-        for event in pending:
-            if (event.payload["voice"].get("deadline") or 0) < time.time():
-                continue
+        questions = [
+            event
+            for event in pending
+            if (event.payload["voice"].get("deadline") or 0) > time.time()
+        ]
+        for event in questions:
             witness_locale = (
                 event.payload["voice"].get("reporter_language") or locale
                 if pid == event.incident.reporter_id
@@ -365,7 +373,10 @@ def _list(sess, server, actor, locale):
                 ),
             )
             for action in answer_actions(sess, event.incident_id, witness_locale):
-                action["label"] = f"{event.incident_id[:5]} · {action['label']}"[:80]
+                if len(questions) > 1:
+                    action["label"] = (
+                        f"{action['label']} · {event.incident.target_name or ''}"[:80]
+                    )
                 actions.append(action)
     labels = {
         key: language.render(sess, name, locale)

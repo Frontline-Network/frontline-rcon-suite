@@ -14,7 +14,9 @@ from .models import TechnicalUsageMetric
 
 # The Discord service is built separately from RCON. Pin its shipped catalog by
 # hash; an integration cannot turn the translation relay into a free-form prompt.
-CATALOG_HASH = "3fc258e5f85e41d88fc81dc6e3b8421f11f5661d9f15eb75cc0144b170d88daf"
+CATALOG_HASH = "3d8ec3c3fe4f34d76e34d5d0fa62960422e0ac128a2d813a555b87a4bc40bdcf"
+# Keep one previous release usable while RCON and its shared Discord worker roll independently.
+PREVIOUS_CATALOG_HASH = "3fc258e5f85e41d88fc81dc6e3b8421f11f5661d9f15eb75cc0144b170d88daf"
 ShortText = Annotated[str, Field(min_length=1, max_length=500)]
 
 
@@ -119,7 +121,7 @@ def build_translation_router(check_capability, check_rate, session_dependency):
         check_capability(session, job.installation_id, authorization)
         if (
             hashlib.sha256(json.dumps(job.texts, sort_keys=True).encode()).hexdigest()
-            != CATALOG_HASH
+            not in (CATALOG_HASH, PREVIOUS_CATALOG_HASH)
         ):
             raise HTTPException(422, "unsupported_voice_catalog")
         check_rate("voice-translation:" + job.installation_id)

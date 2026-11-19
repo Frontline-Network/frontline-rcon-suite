@@ -40,3 +40,15 @@ class PlayerDMPreference(Base):
     discord_user_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     interaction_id: Mapped[str] = mapped_column(String(32))
+
+
+class PlayerPanelCallback(Base):
+    """An operator-selected origin for one panel, scoped to its original pairing."""
+
+    __tablename__ = "discord_player_panel_callback"
+
+    panel_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    installation_id: Mapped[str] = mapped_column(String(64))
+    guild_id: Mapped[str] = mapped_column(String(32))
+    server_number: Mapped[int]
+    origin: Mapped[str] = mapped_column(String(255))

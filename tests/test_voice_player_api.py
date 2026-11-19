@@ -46,7 +46,7 @@ def test_console_report_polish_receipt_and_german_english_target(panel):
     with database() as s:
         assert s.get(AdminIncident, iid).reporter_id is None
         assert lang.preferred_language(s, game_id=players[0]["player_id"]) == "de+en"
-        assert iid[:8] not in api._list(s, 1, "9876", "en")["content"]
+        assert api._list(s, 1, "9876", "en")["content"] == "No reports yet."
     complete(setup, iid, decision(target=name, excerpt=text))
     service.tick(game, 1)
     service.tick(game, 1)
@@ -58,7 +58,9 @@ def test_console_report_polish_receipt_and_german_english_target(panel):
             select(VoicePlayerDelivery).where(VoicePlayerDelivery.incident_id == iid)
         )
         assert delivery.discord_id == "1234" and delivery.payload["locale"] == "pl"
-        assert "Wysłaliśmy" in api._list(s, 1, "1234", "en")["content"]
+        listing = api._list(s, 1, "1234", "en")["content"]
+        assert "Wysłaliśmy" in listing
+        assert iid[:8] not in listing and re.search(r"<t:\d+:t>", listing)
     game.kick.assert_not_called()
 
 

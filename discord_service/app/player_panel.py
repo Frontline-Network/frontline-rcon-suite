@@ -21,6 +21,7 @@ from .config import get_settings
 from .db import SessionLocal
 from .discord_client import DiscordClient
 from .models import EventReceipt, Integration
+from .player_callback import effective_origin
 from .player_models import PlayerDMPreference, PlayerPanel, PrivateReply
 from .security import decrypt, encrypt
 
@@ -396,7 +397,7 @@ def finish_interaction(panel_id, actor, interaction_id, token, locale, op, args,
             if not integration:
                 raise ValueError("Inactive panel")
             response = post(
-                f"{integration.crcon_base_url}/api/discord/v1/player-reports",
+                f"{effective_origin(session, panel, integration)}/api/discord/v1/player-reports",
                 headers={
                     "Authorization": f"Bearer {decrypt(integration.action_capability_ciphertext)}"
                 },
@@ -411,6 +412,7 @@ def finish_interaction(panel_id, actor, interaction_id, token, locale, op, args,
                     "arguments": args,
                 },
                 timeout=30,
+                follow_redirects=False,
             )
             response.raise_for_status()
             result = response.json()["result"]
@@ -464,7 +466,14 @@ def finish_interaction(panel_id, actor, interaction_id, token, locale, op, args,
                 )
                 session.commit()
                 return
-    except (httpx.HTTPError, ValueError, KeyError, IntegrityError, OSError):
+    except (
+        httpx.HTTPError,
+        HTTPException,
+        ValueError,
+        KeyError,
+        IntegrityError,
+        OSError,
+    ):
         reply = private_data(ui(locale, "help"))
     try:
         private_reply(token, reply)

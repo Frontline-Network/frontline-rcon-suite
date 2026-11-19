@@ -2,6 +2,8 @@ from hashlib import sha256
 import json
 from unittest.mock import Mock
 
+import pytest
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -23,13 +25,13 @@ def test_model_review_rejects_changed_meaning(monkeypatch):
         ]
     )
     monkeypatch.setattr(vt, "_structured", fake)
-    import pytest
 
     with pytest.raises(ValueError, match="review_failed"):
         vt.translate(job)
 
 
-def test_route_authenticates_and_only_sends_pinned_templates(monkeypatch):
+@pytest.mark.parametrize("pin", ["CATALOG_HASH", "PREVIOUS_CATALOG_HASH"])
+def test_route_authenticates_and_only_sends_pinned_templates(monkeypatch, pin):
     session = Mock()
     checked = Mock()
     app = FastAPI()
@@ -50,7 +52,7 @@ def test_route_authenticates_and_only_sends_pinned_templates(monkeypatch):
     worker.assert_not_called()
     monkeypatch.setattr(
         vt,
-        "CATALOG_HASH",
+        pin,
         sha256(json.dumps(texts, sort_keys=True).encode()).hexdigest(),
     )
     response = client.post("/v1/voice-translations", json=payload)

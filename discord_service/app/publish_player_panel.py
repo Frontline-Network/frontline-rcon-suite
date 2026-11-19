@@ -9,11 +9,22 @@ from sqlalchemy import select
 from .db import SessionLocal
 from .discord_client import DiscordClient
 from .models import Integration
-from .player_models import PlayerPanel
+from .player_callback import verify_and_bind
+from .player_models import PlayerPanel, PlayerPanelCallback
 from .player_panel import SNOWFLAKE, public_message
 
 
-def publish(session, installation_id, server, guild, channel, discord):
+def publish(
+    session,
+    installation_id,
+    server,
+    guild,
+    channel,
+    discord,
+    *,
+    callback_origin=None,
+    use_installation_callback=False,
+):
     if (
         not SNOWFLAKE.fullmatch(guild)
         or not SNOWFLAKE.fullmatch(channel)
@@ -48,6 +59,14 @@ def publish(session, installation_id, server, guild, channel, discord):
         )
         session.add(panel)
         session.flush()
+    if callback_origin is not None and use_installation_callback:
+        raise ValueError("Choose only one callback setting")
+    if callback_origin is not None:
+        verify_and_bind(session, panel, integration, callback_origin)
+    elif use_installation_callback:
+        prior = session.get(PlayerPanelCallback, panel.id)
+        if prior is not None:
+            session.delete(prior)
     payload = public_message(panel)
     if not panel.message_id:
         payload.update(
@@ -67,6 +86,16 @@ def main():
     parser.add_argument("--server", type=int, required=True)
     parser.add_argument("--guild", required=True)
     parser.add_argument("--channel", required=True)
+    routing = parser.add_mutually_exclusive_group()
+    routing.add_argument(
+        "--callback-origin",
+        help="Use an explicitly allowed HTTPS origin for this panel",
+    )
+    routing.add_argument(
+        "--use-installation-callback",
+        action="store_true",
+        help="Clear the panel override",
+    )
     args = parser.parse_args()
     with SessionLocal() as session:
         result = publish(
@@ -76,6 +105,8 @@ def main():
             args.guild,
             args.channel,
             DiscordClient(),
+            callback_origin=args.callback_origin,
+            use_installation_callback=args.use_installation_callback,
         )
     print(f"https://discord.com/channels/{args.guild}/{args.channel}/{result}")
 

@@ -365,3 +365,141 @@ def test_transient_webhook_retries_even_after_dm_while_stale_and_expired_edits_s
         and reply.call_count == 5
     )
     assert database.get(PrivateReply, (PANEL, "123", CASE)) is None
+
+
+def test_mixed_version_player_route_is_paired_per_panel_and_can_be_cleared(
+    database, monkeypatch
+):
+    from discord_service.app import main, player_callback
+    from discord_service.app.player_models import PlayerPanelCallback
+
+    settings = main.get_settings()
+    monkeypatch.setattr(settings, "allowed_crcon_hosts", "rcon3.example,rcon4.example")
+    monkeypatch.setattr(settings, "discord_application_id", "111")
+    binding = database.get(Integration, "mine")
+    binding.crcon_base_url = "https://rcon4.example"
+    database.add(
+        PlayerPanel(
+            id="b" * 32,
+            installation_id="mine",
+            server_number=4,
+            guild_id="1",
+            channel_id="55",
+            message_id="56",
+        )
+    )
+    database.commit()
+    discord = Mock()
+    discord.settings.dry_run = False
+    discord.upsert.return_value = "3"
+    check = Mock()
+    ping = Mock()
+    ping.json.return_value = {"result": {"installation_id": "mine"}}
+    listing = Mock()
+    listing.json.return_value = {"result": {"content": "No cases"}}
+    check.side_effect = [ping, listing]
+    monkeypatch.setattr(main, "_crcon_post", check)
+    assert (
+        publish(
+            database,
+            "mine",
+            3,
+            "1",
+            "2",
+            discord,
+            callback_origin="https://rcon3.example",
+        )
+        == "3"
+    )
+    assert [c.args[0] for c in check.call_args_list] == [
+        "https://rcon3.example/api/discord/v1/diagnostics/ping",
+        "https://rcon3.example/api/discord/v1/player-reports",
+    ]
+    assert all(not c.kwargs["follow_redirects"] for c in check.call_args_list)
+    assert check.call_args.kwargs["json"]["operation"] == "list"
+    assert check.call_args.kwargs["json"]["guild_id"] == "1"
+    assert check.call_args.kwargs["json"]["server_number"] == 3
+    root = database.get(PlayerPanel, PANEL)
+    other = database.get(PlayerPanel, "b" * 32)
+    assert (
+        player_callback.effective_origin(database, root, binding)
+        == "https://rcon3.example"
+    )
+    assert (
+        player_callback.effective_origin(database, other, binding)
+        == "https://rcon4.example"
+    )
+    assert binding.crcon_base_url == "https://rcon4.example"
+    # Another active pairing cannot use this stored capability routing decision.
+    wrong = Mock(installation_id="other", guild_id="2")
+    with pytest.raises(ValueError):
+        player_callback.effective_origin(database, root, wrong)
+    relay = Mock()
+    relay.return_value.json.return_value = {"result": {"content": "No reports."}}
+    monkeypatch.setattr(ui, "private_reply", Mock())
+    ui.finish_interaction(PANEL, "123", "789", "token", "en", "list", {}, relay)
+    assert (
+        relay.call_args.args[0] == "https://rcon3.example/api/discord/v1/player-reports"
+    )
+    assert relay.call_args.kwargs["follow_redirects"] is False
+    with monkeypatch.context() as m:
+        m.setattr(settings, "allowed_crcon_hosts", "rcon4.example")
+        with pytest.raises(ValueError):
+            player_callback.effective_origin(database, root, binding)
+    publish(database, "mine", 3, "1", "2", discord, use_installation_callback=True)
+    assert database.get(PlayerPanelCallback, PANEL) is None
+    assert (
+        player_callback.effective_origin(database, root, binding)
+        == "https://rcon4.example"
+    )
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://rcon3.example",
+        "https://other.example",
+        "https://rcon3.example/abc",
+        "https://user@rcon3.example",
+        "https://rcon3.example:444",
+        "https://rcon3.example/#x",
+    ],
+)
+def test_override_rejects_untrusted_origin_before_any_relay(
+    database, monkeypatch, origin
+):
+    from discord_service.app import main
+
+    monkeypatch.setattr(main.get_settings(), "allowed_crcon_hosts", "rcon3.example")
+    post = Mock()
+    monkeypatch.setattr(main, "_crcon_post", post)
+    discord = Mock()
+    discord.settings.dry_run = False
+    with pytest.raises(ValueError):
+        publish(database, "mine", 3, "1", "2", discord, callback_origin=origin)
+    assert not post.called and not discord.upsert.called
+
+
+def test_override_rejects_other_installation_before_publication(database, monkeypatch):
+    from discord_service.app import main
+    from discord_service.app.player_models import PlayerPanelCallback
+
+    monkeypatch.setattr(main.get_settings(), "allowed_crcon_hosts", "rcon3.example")
+    post = Mock()
+    post.return_value.json.return_value = {"result": {"installation_id": "different"}}
+    monkeypatch.setattr(main, "_crcon_post", post)
+    discord = Mock()
+    discord.settings.dry_run = False
+    with pytest.raises(ValueError):
+        publish(
+            database,
+            "mine",
+            3,
+            "1",
+            "2",
+            discord,
+            callback_origin="https://rcon3.example",
+        )
+    assert (
+        not discord.upsert.called and database.get(PlayerPanelCallback, PANEL) is None
+    )

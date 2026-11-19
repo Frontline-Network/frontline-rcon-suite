@@ -101,3 +101,11 @@ server. Players can link their game account or change DM delivery through
 **My reports**. Case updates edit the author's private interaction for up to
 14 minutes. Later updates remain available through **My reports**, with
 additional DMs for players who enabled them.
+
+If profiles on one installation run different RCON versions, the panel can use
+a dedicated player callback. Add `--callback-origin https://<profile-host>` to
+the publish command. The host must appear in the Discord service’s existing
+`ALLOWED_CRCON_HOSTS` setting (environment prefix `DISCORD_SERVICE_`). The
+publisher verifies the installation and probes the selected profile before it
+posts or updates the panel. Other callbacks keep the paired installation URL.
+Use `--use-installation-callback` to restore that URL for this panel.

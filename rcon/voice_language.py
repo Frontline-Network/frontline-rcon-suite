@@ -11,7 +11,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Mapped, mapped_column
 
 from rcon.models import Base
-from rcon.voice_language_text import BUILTIN, TEXT, VERSION, valid_templates
+from rcon.voice_language_text import BILINGUAL, BUILTIN, TEXT, VERSION, valid_templates
 
 DEFAULT = "de+en"
 
@@ -266,7 +266,7 @@ def render(sess, key, locale, *, target="", case=""):
             elif valid_templates(cache.texts):
                 template = cache.texts[key]
         if template is None:
-            template = " / ".join(TEXT[key][:2])
+            template = BILINGUAL.get(key) or " / ".join(TEXT[key][:2])
             if locale != DEFAULT and key in {"received", "updated"}:
                 template += "\nÜbersetzung derzeit nicht verfügbar. / Translation currently unavailable."
     # Prevent handles from inserting extra lines, game commands or Discord mentions.
@@ -274,8 +274,14 @@ def render(sess, key, locale, *, target="", case=""):
     name = "".join(
         c for c in name if unicodedata.category(c) not in {"Cc", "Cf"}
     ).replace("@", "@\u200b")
+    # The game parser accepts these specific reply words. Localise the
+    # instruction freely; keep the two answer words usable on the server.
+    reply_index = BUILTIN.index(locale) if locale in BUILTIN else BUILTIN.index("en")
     result = template.format(
-        target=name, case=re.sub(r"[^a-zA-Z0-9_-]", "", str(case or ""))[:48]
+        target=name,
+        case=re.sub(r"[^a-zA-Z0-9_-]", "", str(case or ""))[:48],
+        yes=TEXT["fixed"][reply_index],
+        no=TEXT["still_silent"][reply_index],
     )
     if locale == DEFAULT and key in {"notice_sent", "notice_external"}:
         result += "\nSprache / Language → Discord: Meine Sprache / My language"
