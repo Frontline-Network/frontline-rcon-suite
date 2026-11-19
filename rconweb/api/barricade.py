@@ -2,7 +2,8 @@ import asyncio
 import itertools
 import os
 import time
-from datetime import datetime
+from contextvars import Context
+from threading import Event
 from logging import getLogger
 from urllib.parse import parse_qsl
 
@@ -11,7 +12,7 @@ from cachetools import TTLCache
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.urls import path
-from sqlalchemy import exists, func
+from sqlalchemy import exists
 
 from rcon import models
 from rcon.barricade import *
@@ -92,29 +93,6 @@ def unban_player(record_id: int, blacklist_id: int):
         return False
 
 
-@database_sync_to_async
-def get_joined_players_since(since: datetime):
-    with models.enter_session() as sess:
-        rows = (
-            sess.query(models.PlayerID.player_id, models.PlayerSession.start)
-            .filter(models.PlayerSession.start > since)
-            .filter(models.PlayerSession.server_number == int(get_server_number()))
-            .filter(models.PlayerSession.end.is_(None))
-            .order_by(models.PlayerSession.start)
-            .join(models.PlayerSession.player)
-            .all()
-        )
-        return rows
-
-
-@database_sync_to_async
-def get_most_recent_session_date():
-    with models.enter_session() as sess:
-        return (sess.query(func.max(models.PlayerSession.start))
-                .filter(models.PlayerSession.server_number == int(get_server_number()))
-                .scalar())
-
-
 class BarricadeConsumer(AsyncJsonWebsocketConsumer):
     groups = [GROUP_NAME]
 
@@ -124,11 +102,11 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         self._waiters: dict[int, asyncio.Future] = {}
         self._processing: set[int] = set()
         self._resp_cache = TTLCache(9999, ttl=60)
-        self._last_seen_session = datetime.utcnow()
         self._scan_players_task = None
+        self._report_scan_tasks = set()
 
     async def connect(self):
-        enabled = os.getenv('HLL_BARRICADE_DURABLE_SCANS') == '1'
+        enabled = os.getenv('HLL_BARRICADE_DURABLE_SCANS', '1') == '1'
         durable = (enabled and self.scope.get('barricade_scan_namespace')
                    and self.scope.get('barricade_credential_id'))
         if (self.scope.get('barricade_registered_namespace') or self.scope.get('barricade_scan_namespace') or
@@ -140,14 +118,16 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         await self.accept()
         if self._scan_players_task and not self._scan_players_task.done():
             self._scan_players_task.cancel()
-        self._scan_players_task = asyncio.create_task(
-            self._durable_scan_loop() if durable else self._scan_players_loop())
+        if durable:
+            self._scan_players_task = asyncio.create_task(self._durable_scan_loop())
 
     async def disconnect(self, code):
         logger.info("Closed connection with Barricade client")
 
         if self._scan_players_task and not self._scan_players_task.done():
             self._scan_players_task.cancel()
+        for task in tuple(self._report_scan_tasks):
+            task.cancel()
 
     async def _durable_scan_once(self):
         """Experimental only: missing evidence defers a scan, never invents it."""
@@ -202,41 +182,6 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
                 await self._durable_scan_once()
             except Exception:
                 logger.exception('Experimental Barricade scan pass failed; no legacy fallback')
-
-    async def _scan_players_loop(self):
-        # Session starts are stored as local wall time. Keep a non-null cursor
-        # for a new database and retry initialization if the database is down.
-        started = datetime.now()
-        initialization_failed = False
-        while True:
-            try:
-                latest = await get_most_recent_session_date()
-                # Preserve the start boundary if initialization had to wait,
-                # so connections during that outage are not silently skipped.
-                self._last_seen_session = started if initialization_failed else (latest or started)
-                break
-            except Exception as exc:
-                initialization_failed = True
-                logger.warning("Unable to initialize Barricade player scan (%s); retrying", type(exc).__name__)
-                await asyncio.sleep(60)
-
-        while True:
-            await asyncio.sleep(60)
-
-            try:
-                rows = await get_joined_players_since(self._last_seen_session)
-                if not rows:
-                    continue
-
-                self._last_seen_session = rows[-1][1]
-                await self.send_request(
-                    ServerRequestType.SCAN_PLAYERS,
-                    ScanPlayersRequestPayload(
-                        player_ids=[row[0] for row in rows], game=barricade_game_for_server()
-                    ).model_dump(),
-                )
-            except Exception:
-                logger.exception("Failed to perform scan_players task")
 
     async def receive_json(self, content, **kwargs):
         try:
@@ -374,6 +319,8 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
             waiter.set_result(response.response)
 
     async def handle_broadcast(self, event):
+        if event.get('request_type') == ServerRequestType.SCAN_PLAYERS.value:
+            return
         try:
             return await self.send_request(event["request_type"], event["payload"])
         except (asyncio.TimeoutError, BarricadeRequestError):
@@ -445,15 +392,28 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
 
     async def new_report(self, payload: NewReportRequestPayload):
         validate_barricade_game(payload.game)
-        BlacklistCommandHandler.send(
-            BlacklistCommand(
-                command=BlacklistCommandType.BARRICADE_WARN_ONLINE,
-                server_mask=None,
-                payload=BlacklistBarricadeWarnOnlineCommand(
-                    player_ids=[player.player_id for player in payload.players], game=payload.game
-                ).model_dump(),
-            )
-        )
+        namespace = self.scope.get('barricade_scan_namespace')
+        credential = self.scope.get('barricade_credential_id')
+        if (os.getenv('HLL_BARRICADE_DURABLE_SCANS', '1') != '1'
+                or not namespace or not credential):
+            raise BarricadeRequestError('Report scans require a registered integration')
+        server = int(get_server_number())
+        from rcon import barricade_scan_dispatch
+
+        async def send_scan(player_ids):
+            return await self.send_request(ServerRequestType.SCAN_PLAYERS,
+                ScanPlayersRequestPayload(player_ids=player_ids, game=barricade_game_for_server()).model_dump())
+
+        async def dispatch():
+            try:
+                await barricade_scan_dispatch.dispatch_report_scan(
+                    server, namespace, credential, [player.player_id for player in payload.players], send_scan)
+            except Exception:
+                logger.exception('Barricade report scan failed; no automatic retry')
+
+        task = asyncio.create_task(dispatch())
+        self._report_scan_tasks.add(task)
+        task.add_done_callback(self._report_scan_tasks.discard)
 
 
 from api.auth import APITokenAuthMiddleware

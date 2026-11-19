@@ -3,6 +3,7 @@ import asyncio
 import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
+from contextlib import nullcontext
 
 import django
 import pytest
@@ -17,23 +18,26 @@ from api import auth
 
 @pytest.mark.parametrize(('flag', 'namespace', 'credential', 'expected'), [
     ('0', 'integration:synthetic', 1, 'reject'),
-    ('1', None, 1, 'legacy'),
+    ('1', None, 1, 'none'),
+    (None, None, 1, 'none'),
+    (None, 'integration:synthetic', 1, 'durable'),
     ('1', 'integration:synthetic', None, 'reject'),
     ('1', 'integration:synthetic', 1, 'durable'),
 ])
 def test_consumer_selects_mode_only_for_registered_opt_in(monkeypatch, flag, namespace, credential, expected):
-    monkeypatch.setenv('HLL_BARRICADE_DURABLE_SCANS', flag)
+    if flag is None:
+        monkeypatch.delenv('HLL_BARRICADE_DURABLE_SCANS', raising=False)
+    else:
+        monkeypatch.setenv('HLL_BARRICADE_DURABLE_SCANS', flag)
     async def run():
         consumer = BarricadeConsumer()
         consumer.scope = {'barricade_scan_namespace': namespace, 'barricade_credential_id': credential}
         consumer.accept = AsyncMock()
         consumer.close = AsyncMock()
-        consumer._scan_players_loop = AsyncMock()
         consumer._durable_scan_loop = AsyncMock()
         await consumer.connect()
         await asyncio.sleep(0)
         assert consumer.close.await_count == (expected == 'reject')
-        assert consumer._scan_players_loop.await_count == (expected == 'legacy')
         assert consumer._durable_scan_loop.await_count == (expected == 'durable')
         await consumer.disconnect(1000)
     asyncio.run(run())
@@ -131,4 +135,48 @@ def test_authenticated_websocket_rejects_unregistered_requested_integration(monk
             assert output['type'] == 'websocket.close' and output['code'] == 4403
             await socket.send_input({'type': 'websocket.disconnect', 'code': 4403})
             await socket.wait(timeout=5)
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('bound', [False, True])
+def test_scan_broadcast_is_ignored_but_other_broadcasts_still_work(bound):
+    async def run():
+        consumer = BarricadeConsumer()
+        consumer.scope = {'barricade_scan_namespace': 'integration:synthetic' if bound else None}
+        consumer.send_request = AsyncMock()
+        await consumer.handle_broadcast({'request_type': 'scan_players', 'payload': {}})
+        consumer.send_request.assert_not_awaited()
+        await consumer.handle_broadcast({'request_type': 'other_event', 'payload': {'ok': True}})
+        consumer.send_request.assert_awaited_once_with('other_event', {'ok': True})
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('server,game', [(3, 'hllv'), (4, 'hllv'), (3, 'hll'), (4, 'hll')])
+def test_report_schedules_only_origin_socket_without_blocking_receive(monkeypatch, server, game):
+    from rcon import barricade_scan_dispatch as dispatch
+    from rcon.barricade import NewReportRequestPayload
+    monkeypatch.setenv('SERVER_NUMBER', str(server))
+    monkeypatch.setenv('HLL_GAME', game)
+    monkeypatch.delenv('HLL_BARRICADE_DURABLE_SCANS', raising=False)
+    async def run():
+        consumer = BarricadeConsumer()
+        consumer.scope = {'barricade_scan_namespace': 'integration:synthetic', 'barricade_credential_id': 1}
+        consumer.send_request = AsyncMock()
+        started = asyncio.Event()
+        release = asyncio.Event()
+        async def dispatch_report(server_arg, namespace, credential, player_ids, sender):
+            assert (server_arg, namespace, credential, player_ids) == (server, 'integration:synthetic', 1, ['synthetic'])
+            started.set()
+            await release.wait()
+            await sender(player_ids)
+        monkeypatch.setattr(dispatch, 'dispatch_report_scan', dispatch_report)
+        payload = NewReportRequestPayload.model_validate({'game': game.upper(), 'created_at': '2026-01-01T00:00:00Z',
+            'body': '', 'reasons': [], 'attachment_urls': [], 'players': [
+                {'player_id': 'synthetic', 'player_name': 'Synthetic', 'bm_rcon_url': None}]})
+        await consumer.new_report(payload)
+        await asyncio.wait_for(started.wait(), 1)
+        consumer.send_request.assert_not_awaited()
+        release.set()
+        await asyncio.gather(*consumer._report_scan_tasks)
+        assert consumer.send_request.await_args.args[1] == {'player_ids': ['synthetic'], 'game': game.upper()}
     asyncio.run(run())
