@@ -107,10 +107,11 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
 
     async def connect(self):
         enabled = os.getenv('HLL_BARRICADE_DURABLE_SCANS', '1') == '1'
-        durable = (enabled and self.scope.get('barricade_scan_namespace')
-                   and self.scope.get('barricade_credential_id'))
+        bound = (self.scope.get('barricade_scan_namespace')
+                 and self.scope.get('barricade_credential_id'))
+        durable = enabled and bound
         if (self.scope.get('barricade_registered_namespace') or self.scope.get('barricade_scan_namespace') or
-                _explicit_durable_request(self.scope.get('query_string', b''))) and not durable:
+                _explicit_durable_request(self.scope.get('query_string', b''))) and not bound:
             logger.warning('Rejected Barricade durable integration: disabled or not registered')
             await self.close(code=4403)
             return
@@ -396,7 +397,8 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         credential = self.scope.get('barricade_credential_id')
         if (os.getenv('HLL_BARRICADE_DURABLE_SCANS', '1') != '1'
                 or not namespace or not credential):
-            raise BarricadeRequestError('Report scans require a registered integration')
+            # This acknowledges receipt of the report, not delivery of a scan.
+            return
         server = int(get_server_number())
         from rcon import barricade_scan_dispatch
 

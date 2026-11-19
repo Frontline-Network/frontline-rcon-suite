@@ -17,7 +17,7 @@ from api import auth
 
 
 @pytest.mark.parametrize(('flag', 'namespace', 'credential', 'expected'), [
-    ('0', 'integration:synthetic', 1, 'reject'),
+    ('0', 'integration:synthetic', 1, 'none'),
     ('1', None, 1, 'none'),
     (None, None, 1, 'none'),
     (None, 'integration:synthetic', 1, 'durable'),
@@ -83,7 +83,7 @@ def test_requested_unregistered_integration_is_rejected_instead_of_legacy(monkey
     asyncio.run(run())
 
 
-def test_disabled_durable_namespace_does_not_fall_back_to_legacy(monkeypatch):
+def test_disabled_durable_namespace_keeps_incoming_connection(monkeypatch):
     monkeypatch.setenv('HLL_BARRICADE_DURABLE_SCANS', '0')
     async def run():
         consumer = BarricadeConsumer()
@@ -94,8 +94,8 @@ def test_disabled_durable_namespace_does_not_fall_back_to_legacy(monkeypatch):
         consumer.close = AsyncMock()
         consumer._scan_players_loop = AsyncMock()
         await consumer.connect()
-        consumer.close.assert_awaited_once_with(code=4403)
-        consumer.accept.assert_not_awaited()
+        consumer.close.assert_not_awaited()
+        consumer.accept.assert_awaited_once()
         consumer._scan_players_loop.assert_not_called()
     asyncio.run(run())
 
@@ -148,6 +148,21 @@ def test_scan_broadcast_is_ignored_but_other_broadcasts_still_work(bound):
         consumer.send_request.assert_not_awaited()
         await consumer.handle_broadcast({'request_type': 'other_event', 'payload': {'ok': True}})
         consumer.send_request.assert_awaited_once_with('other_event', {'ok': True})
+    asyncio.run(run())
+
+
+def test_unregistered_report_is_acknowledged_without_scan(monkeypatch):
+    from rcon.barricade import NewReportRequestPayload
+    monkeypatch.setenv('HLL_GAME', 'hllv')
+    async def run():
+        consumer = BarricadeConsumer()
+        consumer.scope = {'barricade_scan_namespace': None, 'barricade_credential_id': 1}
+        consumer.send_request = AsyncMock()
+        payload = NewReportRequestPayload.model_validate({'game': 'HLLV', 'created_at': '2026-01-01T00:00:00Z',
+            'body': '', 'reasons': [], 'attachment_urls': [], 'players': []})
+        assert await consumer.new_report(payload) is None
+        assert consumer._report_scan_tasks == set()
+        consumer.send_request.assert_not_awaited()
     asyncio.run(run())
 
 

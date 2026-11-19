@@ -28,7 +28,6 @@ def test_authorized_websocket_returns_partial_unban_failure():
         with patch.object(auth, 'get_user', AsyncMock(return_value=(object(), None))), \
              patch.object(auth, 'has_perms', AsyncMock(return_value=True)), \
              patch('channels.consumer.get_channel_layer', return_value=channel_layer), \
-             patch.object(barricade, 'get_most_recent_session_date', AsyncMock(return_value=datetime.utcnow())), \
              patch.object(barricade, 'assert_blacklist_exists', AsyncMock()), \
              patch.object(barricade, 'unban_player', AsyncMock(side_effect=[True, False])) as unban:
             socket = ApplicationCommunicator(app, scope)
@@ -64,8 +63,7 @@ def test_websocket_unban_checks_real_postgres_list_and_queues_deletion(database,
                  'query_string': b'', 'subprotocols': []}
         with patch.object(auth, 'get_user', AsyncMock(return_value=(object(), None))), \
              patch.object(auth, 'has_perms', AsyncMock(return_value=True)), \
-             patch('channels.consumer.get_channel_layer', return_value=InMemoryChannelLayer()), \
-             patch.object(barricade, 'get_most_recent_session_date', AsyncMock(return_value=datetime.utcnow())):
+             patch('channels.consumer.get_channel_layer', return_value=InMemoryChannelLayer()):
             socket = ApplicationCommunicator(app, scope)
             await socket.send_input({'type': 'websocket.connect'})
             assert (await socket.receive_output(timeout=5))['type'] == 'websocket.accept'
@@ -102,8 +100,7 @@ def test_websocket_ban_uses_requested_list_and_retry_reuses_record(database, exi
                  'query_string': b'', 'subprotocols': []}
         with patch.object(auth, 'get_user', AsyncMock(return_value=(object(), None))), \
              patch.object(auth, 'has_perms', AsyncMock(return_value=True)), \
-             patch('channels.consumer.get_channel_layer', return_value=InMemoryChannelLayer()), \
-             patch.object(barricade, 'get_most_recent_session_date', AsyncMock(return_value=datetime.utcnow())):
+             patch('channels.consumer.get_channel_layer', return_value=InMemoryChannelLayer()):
             socket = ApplicationCommunicator(app, scope)
             await socket.send_input({'type': 'websocket.connect'})
             assert (await socket.receive_output(timeout=5))['type'] == 'websocket.accept'
