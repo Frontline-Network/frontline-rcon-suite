@@ -28,7 +28,6 @@ import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
 import { demoPlayerRecords, isFakeMode } from "@/mirage/demo-data";
 import { useStorageState } from "@/hooks/useStorageState";
-import SessionEventReview from "./SessionEventReview";
 import AutomodActionReview from "./AutomodActionReview";
 
 // Create a memoized version of PlayerCard
@@ -99,19 +98,19 @@ export const loader = async ({ request }) => {
   };
 
   // In the background, this command is POST request therefore the payload and not params
-  const playersRecords = isFakeMode()
-    ? {
-        result: { players: demoPlayerRecords, total: demoPlayerRecords.length },
-      }
-    : await cmd.GET_PLAYERS_RECORDS({
+  const [playersRecords, bans] = isFakeMode()
+    ? [{ result: { players: demoPlayerRecords, total: demoPlayerRecords.length } }, []]
+    : await Promise.all([
+      cmd.GET_PLAYERS_RECORDS({
+        signal: request.signal,
         payload: Object.fromEntries(
           Object.entries(fields).filter(
             ([_, value]) => value !== "" && value !== null
           )
         ),
-      });
-
-  const bans = isFakeMode() ? [] : await cmd.GET_BANS();
+      }),
+      cmd.GET_BANS({ signal: request.signal }),
+    ]);
   const bannedPlayerIds = new Set(bans.map((ban) => ban.player_id));
 
   return {
@@ -304,7 +303,6 @@ export default function PlayersRecords() {
       {localOnlineSnapshotAvailable === false && (
         <Alert severity="warning">{t("records.players.liveSnapshotUnavailable")}</Alert>
       )}
-      <SessionEventReview />
       <AutomodActionReview />
       {selectedPlayerIds.size > 0 ? (
         <Stack data-theme-surface="panel"

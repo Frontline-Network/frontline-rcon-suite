@@ -4913,6 +4913,7 @@ const en = {
       vips: "VIPs",
       blacklist: "Blacklist",
       gameLogs: "Game logs",
+      sessionEvents: "Session events",
       auditLogs: "Audit logs",
       general: "General",
       services: "Services",

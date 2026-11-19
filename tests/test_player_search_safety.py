@@ -71,3 +71,36 @@ def test_account_name_and_country_work_without_soldier_or_steam_profile(database
     result = player_history.get_players_by_appearance(player_name="AccountName", country="FR", ignore_accent=False)
     assert result["total"] == 1
     assert result["players"][0]["player_id"] == "account-only"
+
+
+def test_page_loads_vips_once_and_returns_local_expiration(database, monkeypatch):
+    from sqlalchemy import event
+
+    monkeypatch.setenv("SERVER_NUMBER", "3")
+    expires = datetime(2030, 1, 1)
+    with Session(database) as sess:
+        local = PlayerID(player_id="local")
+        remote = PlayerID(player_id="remote")
+        sess.add_all([local, remote])
+        sess.flush()
+        sess.add_all([PlayerVIP(player_id_id=player.id, server_number=server, expiration=expires)
+                      for player, server in ((local, 3), (local, 4), (remote, 4))])
+        sess.commit()
+
+    vip_queries = []
+
+    @event.listens_for(database, "before_cursor_execute")
+    def record_vip_query(_conn, _cursor, statement, *_args):
+        if "FROM player_vip" in statement:
+            vip_queries.append(statement)
+
+    def profile(player, *, limit_sessions, preloaded_vips):
+        return {"player_id": player.player_id, "servers": sorted(v.server_number for v in preloaded_vips)}
+
+    monkeypatch.setattr(PlayerID, "to_dict", profile)
+    result = player_history.get_players_by_appearance(page_size=2)
+    assert result["total"] == 2
+    assert len(vip_queries) == 1
+    assert {p["player_id"]: (p["servers"], p["vip_expiration"]) for p in result["players"]} == {
+        "local": ([3, 4], expires), "remote": ([4], None),
+    }

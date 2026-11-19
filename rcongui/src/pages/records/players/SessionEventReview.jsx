@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Box, Button, Divider, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, LinearProgress, Divider, Stack, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { execute, get } from "@/utils/fetchUtils";
@@ -12,7 +12,7 @@ export default function SessionEventReview() {
     permissions?.permissions?.some((entry) => entry.permission === key);
   const canInspect = !!has("can_view_player_profile");
   const canResolve = canInspect && !!has("can_run_raw_commands");
-  const [journal, setJournal] = useState({ results: [] });
+  const [journal, setJournal] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
@@ -50,17 +50,19 @@ export default function SessionEventReview() {
     }
   }
 
-  if (!canInspect || (!error && journal.results.length === 0)) return null;
+  if (!canInspect) return <Typography>{t("sessionEventReview.noAccess")}</Typography>;
   return (
-    <Box component="section" data-testid="session-event-review" sx={{ border: 1, borderColor: "warning.main", p: 2 }}>
+    <Box component="section" data-testid="session-event-review" sx={{ p: 2 }}>
       <Stack spacing={1.5}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
-          <Typography variant="subtitle1" fontWeight={700}>{t("sessionEventReview.title")}</Typography>
+          <Typography component="h1" variant="h5">{t("sessionEventReview.title")}</Typography>
           <Button size="small" onClick={load} disabled={busy}>{t("sessionEventReview.refresh")}</Button>
         </Stack>
         <Typography variant="body2" color="text.secondary">{t("sessionEventReview.help")}</Typography>
         {error && <Alert severity="error">{error}</Alert>}
-        {journal.results.map((row) => (
+        {!error && !journal && <LinearProgress aria-label={t("sessionEventReview.title")} />}
+        {!error && journal?.results.length === 0 && <Typography>{t("sessionEventReview.empty")}</Typography>}
+        {journal?.results.map((row) => (
           <Box key={row.fingerprint || `${row.kind}:${row.player_id}:${row.event_us}`}>
             <Divider sx={{ mb: 1 }} />
             <Stack spacing={1}>
@@ -81,7 +83,7 @@ export default function SessionEventReview() {
             </Stack>
           </Box>
         ))}
-        {(journal.more_connects || journal.more_disconnects || journal.more_unidentified) && <Typography variant="body2">{t("sessionEventReview.more")}</Typography>}
+        {(journal?.more_connects || journal?.more_disconnects || journal?.more_unidentified) && <Typography variant="body2">{t("sessionEventReview.more")}</Typography>}
       </Stack>
     </Box>
   );

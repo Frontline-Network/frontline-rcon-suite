@@ -652,11 +652,7 @@ def get_players_by_appearance(
         created_sort = func.extract('epoch', PlayerID.created) * 1_000_000
         sort_cases.append((sub.c.unverified_end_count == 0, sub.c.last_end_event_us))
         effective_sort = case(*sort_cases, else_=legacy_sort)
-        query = sess.query(PlayerID, sub.c.first, effective_last,
-                           sub.c.last_end_event_us, sub.c.unverified_end_count,
-                           sub.c.first_start_event_us, sub.c.unverified_start_count).outerjoin(
-            sub, sub.c.player_id_id == PlayerID.id
-        )
+        query = sess.query(PlayerID)
 
         if player_id:
             query = query.filter(PlayerID.player_id.ilike("%{}%".format(player_id)))
@@ -717,6 +713,12 @@ def get_players_by_appearance(
                 )
             )
 
+        # Only date filters need session history to count the matching players.
+        total = None if last_seen_from or last_seen_till else query.count()
+        query = query.outerjoin(sub, sub.c.player_id_id == PlayerID.id).add_columns(
+            sub.c.first, effective_last, sub.c.last_end_event_us, sub.c.unverified_end_count,
+            sub.c.first_start_event_us, sub.c.unverified_start_count,
+        )
         if last_seen_from:
             historical = case(
                 (sub.c.unverified_end_count == 0,
@@ -755,7 +757,8 @@ def get_players_by_appearance(
                 historical = and_(historical, ~PlayerID.player_id.in_(uncertain_or_newer))
             query = query.filter(historical)
 
-        total = query.count()
+        if total is None:
+            total = query.count()
         page = min(max(math.ceil(total / page_size), 1), page)
         players = (
             query.order_by(func.coalesce(effective_sort, created_sort).desc())
@@ -779,6 +782,13 @@ def get_players_by_appearance(
         identity_links = get_player_identity_links(
             sess, [player[0] for player in players]
         )
+
+        vips_by_player = _get_vips_by_player(sess, [row[0].id for row in players])
+        server_number = int(get_server_number())
+        vip_expirations = {
+            vip.player_id_id: vip.expiration for vips in vips_by_player.values()
+            for vip in vips if vip.server_number == server_number
+        }
 
         def sort_name_match(v, v2):
             if not player_name:
@@ -817,7 +827,7 @@ def get_players_by_appearance(
             "local_online_snapshot_available": local_online_snapshot_available,
             "players": [
                 {
-                    **p[0].to_dict(limit_sessions=0),
+                    **p[0].to_dict(limit_sessions=0, preloaded_vips=vips_by_player.get(p[0].id, [])),
                     "identity": identity_links[p[0].player_id],
                     "names_by_match": sorted(
                         (n.name for n in p[0].names), key=cmp_to_key(sort_name_match)
@@ -828,7 +838,7 @@ def get_players_by_appearance(
                     ),
                     "last_seen_timestamp_ms": last_seen_metadata(p[0].player_id, p[2], p[3], p[4])[0],
                     "last_seen_observation_window_ms": last_seen_metadata(p[0].player_id, p[2], p[3], p[4])[1],
-                    "vip_expiration": p[0].vip.expiration if p[0].vip else None,
+                    "vip_expiration": vip_expirations.get(p[0].id),
                 }
                 for p in players
             ],

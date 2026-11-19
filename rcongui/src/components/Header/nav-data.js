@@ -152,6 +152,11 @@ const rawNavMenus = [
         icon: <TextSnippetIcon />,
       },
       {
+        name: "Session events",
+        to: "/records/session-events",
+        icon: <BrowseGalleryIcon />,
+      },
+      {
         name: "Audit Logs",
         to: "/records/audit-logs",
         icon: <TextSnippetIcon />,
@@ -419,6 +424,7 @@ const linkTranslationKeys = {
   "/records/blacklists": "navigation.links.blacklist",
   "/records/game-logs": "navigation.links.gameLogs",
   "/records/audit-logs": "navigation.links.auditLogs",
+  "/records/session-events": "navigation.links.sessionEvents",
   "/settings/general": "navigation.links.general",
   "/settings/services": "navigation.links.services",
   "/settings/welcome-message": "navigation.links.welcomeMessage",
@@ -558,6 +564,7 @@ const taskGroupDefinitions = [
     routes: [
       "/records/game-logs",
       "/records/audit-logs",
+      "/records/session-events",
       "/stats/live-sessions",
       "/stats/games",
     ],
@@ -640,6 +647,7 @@ const linkPermissionKeys = {
   ],
   "/records/game-logs": ["can_view_game_logs"],
   "/records/audit-logs": ["can_view_audit_logs"],
+  "/records/session-events": ["can_view_player_profile"],
   "/settings/services": ["can_view_available_services"],
   "/settings/others/game-server": ["can_view_rcon_connection_settings_config"],
   "/settings/others/crcon": ["can_view_rcon_server_settings_config"],

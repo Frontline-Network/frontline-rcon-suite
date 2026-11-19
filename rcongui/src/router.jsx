@@ -199,6 +199,11 @@ const router = createBrowserRouter([
             errorElement: <RouteError />,
           },
           {
+            path: "session-events",
+            lazy: lazyPage(() => import("./pages/records/players/SessionEventReview")),
+            errorElement: <RouteError />,
+          },
+          {
             path: "players/:playerId",
             lazy: lazyPage(() => import("./pages/records/players/[playerId]"), {
               loaderImport: () =>

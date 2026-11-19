@@ -4959,6 +4959,7 @@ const de = {
       vips: "VIPs",
       blacklist: "Sperrlisten",
       gameLogs: "Spielprotokolle",
+      sessionEvents: "Sitzungsereignisse",
       auditLogs: "Audit-Protokolle",
       general: "Allgemein",
       services: "Dienste",

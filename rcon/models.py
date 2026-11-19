@@ -429,9 +429,7 @@ class PlayerID(Base):
             "steam_id": self.steam_id,
             "created": self.created,
             "names": [name.to_dict() for name in self.names],
-            "sessions": [session.to_dict() for session in self.sessions][
-                :limit_sessions
-            ],
+            "sessions": [session.to_dict() for session in self.sessions[:limit_sessions]],
             "sessions_count": len(self.sessions),
             "current_session_start": (current_session.to_dict()["start"]
                                       if current_session else None),

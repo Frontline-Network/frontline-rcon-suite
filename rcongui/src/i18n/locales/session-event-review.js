@@ -1,5 +1,6 @@
 export const sessionEventReviewCopy = {
   de: {
+    empty: "Es stehen keine Sitzungsereignisse zur Prüfung aus.", noAccess: "Für diese Ansicht fehlt dir die Berechtigung.",
     title: "Spielersitzungen: Ereignisse prüfen",
     help: "Diese Ereignisse konnten nicht sicher einer Sitzung zugeordnet werden. Prüfe die Serverprotokolle und historische Zeitzone, bevor du eine Entscheidung triffst.",
     refresh: "Aktualisieren", player: "Spieler", event: "Ereignis", connect: "Connect", disconnect: "Disconnect", legacy: "Bisherige lokale Uhrzeit", noEnd: "kein Ende", missingIdentity: "Die Spielerkennung ist noch nicht im Profilbestand vorhanden.",
@@ -11,6 +12,7 @@ export const sessionEventReviewCopy = {
     reasonPrompt: "Warum ist diese Entscheidung richtig? Die Begründung wird protokolliert.", loadError: "Sitzungsereignisse konnten nicht geladen werden.", saveError: "Die Entscheidung konnte nicht gespeichert werden.", more: "Weitere Ereignisse werden nach der Bearbeitung angezeigt.",
   },
   en: {
+    empty: "There are no session events to review.", noAccess: "You do not have permission to view session events.",
     title: "Player sessions: review events",
     help: "These events could not be matched safely to a session. Check server logs and the historical timezone before making a decision.",
     refresh: "Refresh", player: "Player", event: "Event", connect: "Connect", disconnect: "Disconnect", legacy: "Recorded local time", noEnd: "no end", missingIdentity: "The player identity is not yet present in the profile records.",
@@ -22,6 +24,7 @@ export const sessionEventReviewCopy = {
     reasonPrompt: "Why is this decision correct? The reason will be recorded.", loadError: "Could not load session events.", saveError: "Could not save the decision.", more: "Further events will appear after these are handled.",
   },
   fr: {
+    empty: "Aucun événement de session à vérifier.", noAccess: "Vous n’avez pas la permission de consulter les événements de session.",
     title: "Sessions des joueurs : vérifier les événements",
     help: "Ces événements n’ont pas pu être associés sûrement à une session. Vérifiez les journaux du serveur et le fuseau horaire historique avant de décider.",
     refresh: "Actualiser", player: "Joueur", event: "Événement", connect: "Connexion", disconnect: "Déconnexion", legacy: "Heure locale enregistrée", noEnd: "sans fin", missingIdentity: "L’identité du joueur n’est pas encore présente dans les profils.",
