@@ -14,12 +14,6 @@ from pydantic.dataclasses import dataclass
 from sqlalchemy import and_, func, literal, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from rcon.barricade import (
-    ScanPlayersRequestPayload,
-    ServerRequestType,
-    barricade_game_for_server,
-    send_to_barricade,
-)
 from rcon.barricade_hllv_identity import (prepare_online_identity_snapshot,
                                           prepare_online_steam_identity, verified_steam_id)
 from rcon.cache_utils import get_redis_client
@@ -1703,17 +1697,6 @@ class BlacklistCommandHandler:
     def handle_barricade_warn_online(
         self, payload: BlacklistBarricadeWarnOnlineCommand
     ):
-        game = barricade_game_for_server()
-        if payload.game is not None and payload.game != game:
-            return
-        online_player_ids = [
-            player_id
-            for _, player_id in self.rcon.get_player_ids()
-            if player_id in payload.player_ids
-        ]
-
-        if online_player_ids:
-            send_to_barricade(
-                request_type=ServerRequestType.SCAN_PLAYERS,
-                payload=ScanPlayersRequestPayload(player_ids=online_player_ids, game=game).model_dump(),
-            )
+        # Queued by older releases without an originating integration. New
+        # reports are handled on the authenticated socket that received them.
+        logger.info("Skipped a legacy Barricade report notification without an integration binding")
