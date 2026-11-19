@@ -108,6 +108,15 @@ def deliver_one(http):
         ):
             row.due = datetime.now(timezone.utc) + timedelta(seconds=2)
         elif row:
+            if (
+                row.kind == "question"
+                and receipt.get("delivery") == "disabled"
+                and not receipt.get("dm_sent")
+                and not receipt.get("ephemeral_updated")
+            ):
+                from rcon.voice_reports import private_question_unavailable
+
+                private_question_unavailable(sess, row)
             row.done = True
     return True
 

@@ -278,7 +278,7 @@ def get_handler():
 @on_chat
 def handle_on_chat(rcon, log):
     from rcon import voice_reports
-    if str(log.get("sub_content") or "").lstrip().lower().startswith("!voice"):
+    if voice_reports.chat_candidate(log.get("sub_content")):
         if voice_reports.handle_chat(rcon, log, int(get_server_number())):
             return
     from rcon.leadership_vote.service import read_context

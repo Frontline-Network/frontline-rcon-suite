@@ -13,6 +13,8 @@ from rcon.voice_player_store import VoicePlayerDelivery
 @pytest.fixture
 def pilot(setup, monkeypatch):
     database, players, ctx = setup
+    for player in players:
+        player.setdefault("platform", "EPlatformFamily::Steam")
     monkeypatch.setenv("FRONTLINE_VOICE_REPORT_SERVERS", "1")
     monkeypatch.setenv("FRONTLINE_VOICE_LIVE_KICK_SERVERS", "1")
     with database() as sess:
@@ -279,3 +281,267 @@ def test_active_legacy_config_cannot_bypass_pilot_dry_run(
     assert snapshot(database, iid)["voice"]["phase"] == "dry_run"
     assert snapshot(database, iid)["voice"]["message_key"] == "dry_run"
     api.kick.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("command", "works"),
+    [
+        ("!voice ja", True),
+        ("!voice YES", True),
+        ("!voice non", False),
+        ("!voice nie", False),
+        ("!voice nee", False),
+    ],
+)
+def test_private_voice_short_answers_do_not_capture_leadership_votes(
+    pilot, command, works
+):
+    setup, advance = pilot
+    database, _, ctx = setup
+    iid = report(setup, reporter_id="member")["id"]
+    api = transport()
+    service.tick(api, 1)
+    advance(60)
+    service.tick(api, 1)
+    message = api.message_player.call_args.args[1]
+    assert "!voice" not in message and "Discord" not in message
+
+    def reply(word, pid="member", age=0):
+        return voice_reports.handle_chat(
+            api,
+            {
+                "sub_content": word,
+                "player_id_1": pid,
+                "timestamp_ms": int((database.clock.now - age) * 1000),
+            },
+            1,
+        )
+
+    assert not reply("!yes") and not reply("!no")
+    assert reply(command, pid="target")
+    assert reply(command, age=5)
+    assert snapshot(database, iid)["voice"]["phase"] == "awaiting_answer"
+    assert reply(command)
+    assert snapshot(database, iid)["voice"]["phase"] == (
+        "resolved" if works else "kick_ready"
+    )
+
+
+def test_two_pc_questions_do_not_apply_an_old_answer_to_new_case(pilot):
+    setup, advance = pilot
+    database, players, ctx = setup
+    next(p for p in players if p["player_id"] == "v2")["name"] = "MicrophoneJohn"
+    first = report(setup, "!admin BattlefieldHero no comms", reporter_id="v0")["id"]
+    api = transport()
+    service.tick(api, 1)
+    advance(1)
+    ctx["event_time"] = database.clock.now
+    second = report(setup, "!admin MicrophoneJohn no comms", reporter_id="v0")["id"]
+    service.tick(api, 1)
+    advance(59)
+    service.tick(api, 1)
+    advance(1)
+    service.tick(api, 1)
+    assert snapshot(database, first)["voice"]["phase"] == "awaiting_answer"
+    assert snapshot(database, second)["voice"]["phase"] == "notice_sent"
+    advance(119)
+    service.tick(api, 1)
+    advance(1)
+    service.tick(api, 1)
+    assert snapshot(database, first)["voice"]["phase"] == "manual"
+    assert snapshot(database, second)["voice"]["phase"] == "manual"
+    voice_reports.handle_chat(
+        api,
+        {
+            "player_id_1": "v0",
+            "sub_content": "!voice nein",
+            "timestamp_ms": int(database.clock.now * 1000),
+        },
+        1,
+    )
+    api.kick.assert_not_called()
+
+
+@pytest.mark.parametrize("linked", [True, False])
+def test_external_console_witness_needs_existing_link_and_no_pc_instructions(
+    pilot, linked
+):
+    setup, advance = pilot
+    database, players, _ = setup
+    next(p for p in players if p["player_id"] == "v0")["team"] = "axis"
+    for p in players:
+        p["platform"] = "EPlatformFamily::PS5"
+    if linked:
+        with database() as sess:
+            voice_language.link_verified(sess, game_id="member", discord_id="8790")
+    iid = report(setup, "!admin BattlefieldHero no comms", reporter_id="v0")["id"]
+    api = transport()
+    service.tick(api, 1)
+    advance(60)
+    service.tick(api, 1)
+    v = snapshot(database, iid)["voice"]
+    if linked:
+        assert v["witness_route"] == "discord" and v["phase"] == "awaiting_answer"
+        with database() as sess:
+            delivery = sess.scalar(
+                select(VoicePlayerDelivery).where(
+                    VoicePlayerDelivery.incident_id == iid,
+                    VoicePlayerDelivery.kind == "question",
+                )
+            )
+            assert delivery.discord_id == "8790" and delivery.payload["send_dm"] is True
+        assert not any(c.args[0] == "member" for c in api.message_player.call_args_list)
+    else:
+        assert v["witness_id"] is None and v["phase"] == "manual"
+    api.kick.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("locale", "positive", "negative"),
+    [
+        ("de", "Ja", "Nein"),
+        ("en", "Yes", "No"),
+        ("fr", "Oui", "Non"),
+        ("pl", "Tak", "Nie"),
+        ("nl", "Ja", "Nee"),
+    ],
+)
+@pytest.mark.parametrize("working", [True, False])
+def test_real_chat_hook_uses_only_addressed_single_local_word(
+    pilot, monkeypatch, locale, positive, negative, working
+):
+    from unittest.mock import Mock
+    from rcon import discord_chat, incident_settings, moderation_candidates
+
+    setup, advance = pilot
+    database, _, _ = setup
+    handler = Mock()
+    monkeypatch.setattr(discord_chat, "get_handler", lambda: handler)
+    monkeypatch.setattr(incident_settings, "incident_capture_enabled", lambda: False)
+    monkeypatch.setattr(moderation_candidates, "enqueue_candidate", Mock())
+    api = transport()
+    with database() as sess:
+        voice_language.set_language(sess, locale, game_id="member")
+    iid = report(setup, "!admin BattlefieldHero no VOIP", reporter_id="member")["id"]
+    service.tick(api, 1)
+
+    def chat(word, pid="member", age=0):
+        before = handler.send_chat_message.call_count
+        discord_chat.handle_on_chat(
+            api,
+            {
+                "action": "CHAT[Team][Allies]",
+                "player_id_1": pid,
+                "sub_content": word,
+                "timestamp_ms": int((database.clock.now - age) * 1000),
+            },
+        )
+        return handler.send_chat_message.call_count == before
+
+    assert not chat(positive)
+    advance(60)
+    service.tick(api, 1)
+    v = snapshot(database, iid)["voice"]
+    assert v["reply_language"] == locale
+    assert not chat(positive, pid="v0")
+    assert not chat(positive, age=1)
+    assert not chat("!yes") and not chat("!no")
+    assert not chat(positive + " today")
+    assert not chat("Nie" if locale != "pl" else "No")
+    assert chat((positive if working else negative).upper())
+    assert not chat(positive)
+    assert snapshot(database, iid)["voice"]["phase"] == (
+        "resolved" if working else "kick_ready"
+    )
+
+
+def test_delayed_old_log_never_answers_next_serialised_question(pilot):
+    setup, advance = pilot
+    database, players, ctx = setup
+    next(p for p in players if p["player_id"] == "v2")["name"] = "MicrophoneJohn"
+    first = report(setup, "!admin BattlefieldHero no comms", reporter_id="v0")["id"]
+    api = transport()
+    service.tick(api, 1)
+    advance(5)
+    ctx["event_time"] = database.clock.now
+    second = report(setup, "!admin MicrophoneJohn no comms", reporter_id="v0")["id"]
+    service.tick(api, 1)
+    advance(55)
+    service.tick(api, 1)
+    assert voice_reports.answer(1, first, "v0", True, ctx)
+    old_stamp = database.clock.now
+    advance(5)
+    service.tick(api, 1)
+    assert snapshot(database, second)["voice"]["phase"] == "notice_sent"
+    advance(116)
+    service.tick(api, 1)
+    assert snapshot(database, second)["voice"]["phase"] == "awaiting_answer"
+    assert not voice_reports.handle_chat(
+        api,
+        {"player_id_1": "v0", "sub_content": "Nein", "timestamp_ms": old_stamp * 1000},
+        1,
+    )
+    assert snapshot(database, second)["voice"]["phase"] == "awaiting_answer"
+    assert voice_reports.handle_chat(
+        api,
+        {
+            "player_id_1": "v0",
+            "sub_content": "Ja",
+            "timestamp_ms": database.clock.now * 1000,
+        },
+        1,
+    )
+    assert snapshot(database, second)["voice"]["phase"] == "resolved"
+
+
+def test_linked_discord_reporter_only_gets_buttons_as_the_question(pilot):
+    from tests.test_report_reason import decision, complete
+    from rcon import admin_incidents
+
+    setup, advance = pilot
+    database, players, ctx = setup
+    next(p for p in players if p["player_id"] == "member")[
+        "platform"
+    ] = "EPlatformFamily::PS5"
+    with database() as sess:
+        voice_language.link_verified(sess, game_id="member", discord_id="827")
+    iid = admin_incidents.create_incident(
+        server_number=1,
+        source="manual",
+        reason="no comms",
+        actor="discord:voice-player",
+        reporter_context={"voice_discord_id": "827", "voice_locale": "pl"},
+        raw_message="!admin BattlefieldHero no comms",
+        reporter_id="member",
+        target_id="target",
+        target_name="BattlefieldHero",
+        leadership_context={**ctx, "voice_discord_intake": True},
+    )[0]["id"]
+    complete(setup, iid, decision(excerpt="no comms"))
+    api = transport()
+    service.tick(api, 1)
+    service.tick(api, 1)
+    advance(60)
+    service.tick(api, 1)
+    assert snapshot(database, iid)["voice"]["phase"] == "awaiting_answer"
+    assert (
+        api.message_player.call_count == 1
+        and api.message_player.call_args.args[0] == "target"
+    )
+    with database() as sess:
+        delivery = sess.scalar(
+            select(VoicePlayerDelivery).where(
+                VoicePlayerDelivery.incident_id == iid,
+                VoicePlayerDelivery.kind == "question",
+            )
+        )
+        assert delivery.discord_id == "827" and delivery.payload["send_dm"] is False
+        voice_reports.private_question_unavailable(sess, delivery)
+        voice_reports.private_question_unavailable(sess, delivery)
+    service.tick(api, 1)
+    service.tick(api, 1)
+    assert api.message_player.call_count == 2
+    assert (
+        api.message_player.call_args.args[0] == "member"
+        and "!voice" not in api.message_player.call_args.args[1]
+    )

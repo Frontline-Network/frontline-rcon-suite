@@ -106,6 +106,8 @@ def queue_update(sess, event, kind):
     )
     target = p.get("target_name") or incident.target_name or ""
     if kind == "question":
+        if voice.get("witness_route") == "pc":
+            return
         witness = voice.get("witness_id")
         discord_id = lang.linked_discord_id(sess, witness) if witness else None
         if discord_id:
@@ -123,6 +125,7 @@ def queue_update(sess, event, kind):
                 language,
                 target,
                 question=True,
+                dm=bool(voice.get("external")),
             )
     elif kind in {"notice", "final"} and reporter:
         key = (

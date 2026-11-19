@@ -12,6 +12,22 @@ from rcon.models import AdminIncident, AdminIncidentEvent
 from rcon.report_admin_rules import communication_identity, unique_communication_seat
 
 
+from rcon.voice_language_text import BUILTIN, TEXT
+
+_REPLIES = {
+    locale: (yes.casefold(), no.casefold())
+    for locale, yes, no in zip(
+        BUILTIN, TEXT["fixed"], TEXT["still_silent"], strict=True
+    )
+}
+_BARE = frozenset(word for pair in _REPLIES.values() for word in pair)
+
+
+def chat_candidate(message):
+    text = str(message or "").strip().casefold()
+    return text in _BARE or bool(re.match(r"^!voice\b", text))
+
+
 def _listed(server, setting):
     return str(server) in {part.strip() for part in os.getenv(setting, "").split(",")}
 
@@ -54,7 +70,19 @@ def max_age(payload):
     if payload["voice"]["phase"] == "clarify":
         return 120
     sent_at = payload["voice"].get("notice_sent_at")
-    return 60 if sent_at is None else sent_at - payload["report_time"] + 60 + 120
+    if sent_at is None:
+        return 60
+    # A witness with an existing prompt can receive the next one after its window.
+    horizon = max(
+        sent_at + 180,
+        payload["voice"].get("deadline", 0),
+        (
+            payload.get("ready_at", 0) + 15
+            if payload["voice"]["phase"] == "notice_sent"
+            else 0
+        ),
+    )
+    return horizon - payload["report_time"]
 
 
 def _reporter_language(sess, incident, players):
@@ -353,26 +381,26 @@ def begin(sess, event, players, now):
         channel = _channel(player, p["target"]["seat"])
         if not channel or not pid or pid == p["target_id"]:
             continue
-        # Game/platform adapters retain Xbox/PlayStation names; unknown or WinGDK
-        # may be console as well. Discord linking and confirmed PC transports are preferred.
         platform = str(player.get("platform") or "").lower().split("::")[-1]
-        reachable = (
-            platform in {"steam", "egs", "epic", "windows", "pc"} or pid in linked_ids
-        )
+        # Existing !admin chat is positive evidence that this witness can type.
+        # WinGDK alone cannot distinguish an Xbox from a Windows Store PC.
+        chat_reporter = pid == i.reporter_id and i.source == "chat"
+        if pid == i.reporter_id and i.source == "manual" and pid in linked_ids:
+            route = "discord"
+        elif chat_reporter or platform in {"steam", "egs", "epic", "windows", "pc"}:
+            route = "pc"
+        elif pid in linked_ids:
+            route = "discord"
+        else:
+            continue
         candidates.append(
-            (
-                pid != i.reporter_id,
-                not reachable,
-                channel != "squad",
-                pid,
-                player,
-                channel,
-            )
+            (pid != i.reporter_id, channel != "squad", pid, player, channel, route)
         )
     witness_id = witness_session = witness_seat = None
     channel = "command" if p["target"]["seat"]["kind"] == "commander" else "squad"
-    for _, _, _, pid, player, witness_channel in sorted(
-        candidates, key=lambda c: c[:4]
+    witness_route = None
+    for _, _, pid, player, witness_channel, route in sorted(
+        candidates, key=lambda c: c[:3]
     ):
         token = admin.session_token(sess, i.server_number, pid, p["report_time"])
         if token is not None:
@@ -382,12 +410,14 @@ def begin(sess, event, players, now):
                 communication_identity(player, True),
             )
             channel = witness_channel
+            witness_route = route
             break
     _replace(
         event,
         witness_id=witness_id,
         witness_session=witness_session,
         witness_seat=witness_seat,
+        witness_route=witness_route,
         channel=channel,
         external=not i.reporter_id or witness_id != i.reporter_id,
     )
@@ -429,6 +459,37 @@ def _send(api, pid, body):
     except Exception:
         admin.logger.exception("Voice message outcome unknown")
         return False
+
+
+def _pc_slot(sess, event, now):
+    """A simple reply must belong to just one question in this witness session."""
+    voice = event.payload["voice"]
+    v = AdminIncidentEvent.payload["voice"]
+    previous = sess.scalars(
+        select(AdminIncidentEvent)
+        .join(AdminIncident)
+        .where(
+            AdminIncident.server_number == event.incident.server_number,
+            AdminIncidentEvent.event_type == "report_admin",
+            AdminIncidentEvent.id != event.id,
+            AdminIncidentEvent.payload["round_id"].as_string()
+            == event.payload["round_id"],
+            v["witness_session"].as_integer() == voice["witness_session"],
+            v["witness_id"].as_string() == voice["witness_id"],
+            v["witness_route"].as_string() == "pc",
+            v["question_reserved_at"].as_float().is_not(None),
+        )
+    ).all()
+    ready = now
+    for other in previous:
+        prior = other.payload["voice"]
+        deadline = prior.get("deadline", prior["question_reserved_at"] + 120)
+        if not prior.get("answer_at") and now >= deadline:
+            # A late answer to the expired question would be indistinguishable.
+            # Do not ask this witness for another unnumbered reply in this round.
+            return None
+        ready = max(ready, deadline + 1)
+    return ready
 
 
 def advance(api, server, event_id, context):
@@ -477,13 +538,32 @@ def advance(api, server, event_id, context):
                     sess, event, "manual", "manual", "No verified participant available"
                 )
                 return
+            if v.get("witness_route") == "pc":
+                ready = _pc_slot(sess, event, now)
+                if ready is None or ready > v["notice_sent_at"] + 240:
+                    _final(
+                        sess,
+                        event,
+                        "manual",
+                        "manual",
+                        "Another voice question makes a short reply ambiguous",
+                    )
+                    return
+                if ready > now:
+                    event.payload = {**p, "ready_at": ready}
+                    return
             sending = "question_sending"
             recipient = v["witness_id"]
             key = "question"
         else:
             return
         # Persist reservation independently from transport. Never repeat on restart.
-        _change(sess, event, sending)
+        _change(
+            sess,
+            event,
+            sending,
+            **({"question_reserved_at": now} if sending == "question_sending" else {}),
+        )
     try:
         fresh = admin.read_context(api)
     except Exception:
@@ -503,15 +583,39 @@ def advance(api, server, event_id, context):
             if sending == "question_sending" and recipient == event.incident.reporter_id
             else preferred_language(sess, game_id=recipient)
         )
-        body = render(sess, key, locale, target=p["target_name"], case=str(event.id))
-        if sending == "question_sending":
-            body += (
-                "\n"
-                + render(sess, "pc_reply", locale, case=str(event.id))
-                + "\n"
-                + render(sess, "discord_reply", locale)
+        discord_question = (
+            sending == "question_sending" and v.get("witness_route") == "discord"
+        )
+        if discord_question:
+            from rcon.voice_language import linked_discord_id
+
+            if not linked_discord_id(sess, recipient):
+                _final(
+                    sess,
+                    event,
+                    "manual",
+                    "manual",
+                    "Witness Discord link is no longer available",
+                )
+                return
+        else:
+            body = render(
+                sess, key, locale, target=p["target_name"], case=str(event.id)
             )
-        sent = _send(api, recipient, body)
+            if sending == "question_sending":
+                hint = render(sess, "pc_reply", locale, case=str(event.id))
+                body += "\n" + hint
+                reply_language = (
+                    locale
+                    if locale in _REPLIES
+                    else (
+                        "de+en"
+                        if hint == render(sess, "pc_reply", "de+en", case=str(event.id))
+                        else "en"
+                    )
+                )
+                _replace(event, reply_language=reply_language)
+            sent = _send(api, recipient, body)
         now = time.time()
         if sending == "notice_sending":
             if not sent:
@@ -530,7 +634,7 @@ def advance(api, server, event_id, context):
             queue_update(sess, event, "notice")
         else:
             # Verified Discord witnesses can answer privately even without game chat.
-            if not sent:
+            if not discord_question and not sent:
                 _final(
                     sess,
                     event,
@@ -539,7 +643,7 @@ def advance(api, server, event_id, context):
                     "Witness question delivery not confirmed",
                 )
                 return
-            deadline = min(now + 120, v["notice_sent_at"] + 180)
+            deadline = now + 120
             _change(
                 sess,
                 event,
@@ -551,26 +655,69 @@ def advance(api, server, event_id, context):
             queue_update(sess, event, "question")
 
 
-def _answer(server, case, player_id, working, context, at, *, by_event=False):
+def _open_pc_questions(sess, server, player_id, stamp, now):
+    v = AdminIncidentEvent.payload["voice"]
+    return sess.scalars(
+        select(AdminIncidentEvent)
+        .join(AdminIncident)
+        .where(
+            AdminIncident.server_number == server,
+            AdminIncidentEvent.event_type == "report_admin",
+            AdminIncidentEvent.payload["status"].as_string() == "voice",
+            v["phase"].as_string() == "awaiting_answer",
+            v["witness_route"].as_string() == "pc",
+            v["witness_id"].as_string() == str(player_id),
+            v["question_at"].as_float() <= stamp,
+            v["deadline"].as_float() > now,
+        )
+        .limit(2)
+    ).all()
+
+
+def _announced(voice, word):
+    locale = voice.get("reply_language")
+    if not locale:
+        # A case created by older software advertised only a numbered command.
+        return False
+    if locale == "de+en":
+        return word in _REPLIES["de"] + _REPLIES["en"]
+    return word in _REPLIES.get(locale, _REPLIES["en"])
+
+
+def _answer(
+    server, case, player_id, working, context, at, *, by_event=False, bare_word=None
+):
     if not enabled(server) or type(working) is not bool or not player_id:
         return False
     now = time.time()
     stamp = now if at is None else at
     with admin.enter_session() as sess:
         admin.votes.lock(sess, server)
-        event = sess.scalar(
+        query = (
             select(AdminIncidentEvent)
             .join(AdminIncident)
             .where(
                 AdminIncident.server_number == server,
                 AdminIncidentEvent.event_type == "report_admin",
-                (
+            )
+        )
+        if case is None:
+            matches = _open_pc_questions(sess, server, player_id, stamp, now)
+            if len(matches) != 1:
+                return False
+            event = matches[0]
+            if bare_word is not None and not _announced(
+                event.payload["voice"], bare_word
+            ):
+                return False
+        else:
+            event = sess.scalar(
+                query.where(
                     AdminIncidentEvent.id == case
                     if by_event
                     else AdminIncident.id == case
-                ),
+                )
             )
-        )
         if not event or event.payload["status"] != "voice":
             return False
         v = event.payload.get("voice", {})
@@ -613,8 +760,56 @@ def answer(server, case_id, player_id, working, context, *, at=None):
 
 def handle_chat(api, log, server):
     text = str(log.get("sub_content") or "").strip()
-    if not enabled(server) or not re.match(r"^!voice\b", text, re.I):
+    word = text.casefold()
+    if not enabled(server):
         return False
+    if word in _BARE:
+        from rcon.leadership_vote.domain import event_time
+
+        stamp = event_time(log)
+        pid = str(log.get("player_id_1") or "")
+        now = time.time()
+        if stamp is None or not pid or stamp > now:
+            return False
+        try:
+            # A normal yes/no in team chat does not trigger a live server request.
+            with admin.enter_session() as sess:
+                matches = _open_pc_questions(sess, server, pid, stamp, now)
+                if len(matches) != 1 or not _announced(
+                    matches[0].payload["voice"], word
+                ):
+                    return False
+            return _answer(
+                server,
+                None,
+                pid,
+                any(word == yes for yes, _ in _REPLIES.values()),
+                admin.read_context(api),
+                stamp,
+                bare_word=word,
+            )
+        except Exception:
+            admin.logger.exception(
+                "Voice reply unavailable; ordinary chat flow continues"
+            )
+            return False
+    if not re.match(r"^!voice\b", text, re.I):
+        return False
+    short = re.fullmatch(r"!voice\s+(ja|nein|yes|no|oui|non|tak|nie|nee)", text, re.I)
+    if short:
+        from rcon.leadership_vote.domain import event_time
+
+        stamp = event_time(log)
+        if stamp is not None:
+            _answer(
+                server,
+                None,
+                str(log.get("player_id_1") or ""),
+                short[1].lower() in {"ja", "yes", "oui", "tak"},
+                admin.read_context(api),
+                stamp,
+            )
+        return True
     clarification = re.fullmatch(
         r"!voice\s+([1-9][0-9]{0,17})\s+target\s+([^\r\n]{1,255})", text, re.I
     )
@@ -649,6 +844,36 @@ def handle_chat(api, log, server):
             by_event=True,
         )
     return True
+
+
+def private_question_unavailable(sess, delivery):
+    """A single game hint only when Discord confirms the direct private reply was unavailable."""
+    admin.votes.lock(sess, delivery.payload["server_number"])
+    event = sess.scalar(
+        select(AdminIncidentEvent).where(
+            AdminIncidentEvent.incident_id == delivery.incident_id,
+            AdminIncidentEvent.event_type == "report_admin",
+        )
+    )
+    if not event:
+        return
+    v = event.payload.get("voice", {})
+    if (
+        v.get("phase") != "awaiting_answer"
+        or v.get("witness_route") != "discord"
+        or time.time() >= v["deadline"]
+        or v.get("discord_hint_queued")
+    ):
+        return
+    _message(
+        sess,
+        event,
+        "discord_reply",
+        v["witness_id"],
+        v["witness_session"],
+        locale=delivery.payload["locale"],
+    )
+    _replace(event, discord_hint_queued=True)
 
 
 def flush_messages(api, server):
@@ -687,6 +912,11 @@ def flush_messages(api, server):
             job.payload = {**p, "status": "expired"}
             return
         case = sess.get(AdminIncidentEvent, p["event_id"])
+        if p["key"] == "discord_reply":
+            v = case.payload.get("voice", {})
+            if v.get("phase") != "awaiting_answer" or now >= v["deadline"]:
+                job.payload = {**p, "status": "expired"}
+                return
         msg = render(
             sess,
             p["key"],
