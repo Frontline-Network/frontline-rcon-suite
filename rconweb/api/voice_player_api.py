@@ -21,7 +21,7 @@ from api.discord_integration import _authorized_integration
 from api.mobile import _error, _json_body
 from api.multi_servers import forward_mobile_request_to_server
 from rcon import voice_language as language
-from rcon.admin_incidents import create_incident
+from rcon.admin_incidents import _is_commander, create_incident
 from rcon.api_commands import get_rcon_api
 from rcon.leadership_vote.service import read_context
 from rcon.leadership_vote.storage import lock
@@ -47,6 +47,30 @@ def _exact(players, name):
         and p.get("online") is not False
     ]
     return matches[0] if len(matches) == 1 else None
+
+
+def _roster_ref(server, actor, player):
+    # Keep platform account IDs out of Discord components. In Vietnam player_id is the EOS ID.
+    data = f"voice-roster:{server}:{actor}:{player['player_id']}".encode()
+    return hmac.new(settings.SECRET_KEY.encode(), data, hashlib.sha256).hexdigest()[:32]
+
+
+def _roster(server, actor):
+    players = read_context(get_rcon_api())["players"]
+    return {
+        "players": [
+            {
+                "ref": _roster_ref(server, actor, p),
+                "name": str(p.get("name") or p.get("player_name") or "–"),
+                "team": str(p.get("faction") or p.get("team") or "").upper(),
+                "squad": str(p.get("unit_name") or ""),
+                "commander": _is_commander(p),
+                "role": str(p.get("role") or ""),
+            }
+            for p in players
+            if p.get("online") is not False and p.get("player_id")
+        ]
+    }
 
 
 def _content(sess, key, locale, **values):
@@ -200,7 +224,22 @@ def _report(server, actor, interaction, args, clarify=False):
             raise ValueError("Unknown draft")
         message = draft.message if draft else _arg(args, "message", 2000)
         name = _arg(args, "target", 255, optional=True)
-        target = _exact(context["players"], name)
+        if "target_ref" in args:
+            ref = _arg(args, "target_ref", 32)
+            if not re.fullmatch(r"[0-9a-f]{32}", ref):
+                raise ValueError("Invalid player selection")
+            target = next(
+                (
+                    p
+                    for p in context["players"]
+                    if p.get("online") is not False
+                    and p.get("player_id")
+                    and _roster_ref(server, actor, p) == ref
+                ),
+                None,
+            )
+        else:
+            target = _exact(context["players"], name)
         pid = language.linked_game_id(sess, actor)
         locale = (
             draft.language
@@ -401,6 +440,12 @@ def _list(sess, server, actor, locale):
 
 def _handle(server, actor, interaction, op, args):
     from rcon.voice_reports import answer
+
+    if op == "roster":
+        try:
+            return _roster(server, actor)
+        except ValueError:  # The recorder has no fresh roster during round changes.
+            return {"players": None}
 
     if op in {"report", "clarify"}:
         return _report(server, actor, interaction, args, clarify=op == "clarify")

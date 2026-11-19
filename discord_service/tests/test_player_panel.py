@@ -72,12 +72,157 @@ def interaction(op, kind=3, **changes):
 
 
 def test_public_entry_opens_private_form_in_user_interface_language(database):
-    response = ui.handle_interaction(
-        database, interaction("report"), BackgroundTasks(), Mock()
+    import asyncio
+
+    post = Mock()
+    post.return_value.json.return_value = {"result": {"players": [roster_player(0)]}}
+    response = asyncio.run(
+        ui.handle_interaction(database, interaction("report"), BackgroundTasks(), post)
     )
     assert response["type"] == 9
     assert response["data"]["title"] == "Zgłoś incydent"
     assert len(response["data"]["components"]) == 2
+    assert response["data"]["components"][0]["component"]["type"] == 3
+
+
+def roster_player(i, team="US", squad="Bravo", **extra):
+    return {
+        "name": f"Player {i}",
+        "ref": f"{i:032x}",
+        "team": team,
+        "squad": squad,
+        "role": "rifleman",
+        "commander": False,
+        **extra,
+    }
+
+
+@pytest.mark.parametrize("size", [1, 25, 26, 100])
+def test_picker_boundaries_and_reachable_groups(database, size):
+    from discord_service.app.report_picker import picker_view
+
+    players = [roster_player(i, team="NVA" if i % 2 else "US") for i in range(size)]
+    players[-1].update(squad="unassigned")
+    players[0].update(commander=True)
+    kind, opts = picker_view(players, None, lambda k: ui.ui("de", k))
+    if size <= 25:
+        assert kind == "player" and len(opts) == size
+        return
+    assert kind == "group" and len(opts) <= 25
+    assert any("Ohne Squad" in o["label"] for o in opts)
+    assert any("Commander" in o["label"] for o in opts)
+    seen = []
+    for g in opts:
+        k, rows = picker_view(players, g["value"], lambda k: ui.ui("de", k))
+        assert k == "player" and 1 <= len(rows) <= 25
+        seen.extend(p["value"] for p in rows)
+    assert sorted(seen) == sorted(p["ref"] for p in players)
+
+
+def test_select_squad_then_submit_modern_modal(database):
+    import asyncio
+
+    players = [roster_player(i, squad=f"Squad {i}") for i in range(29)]
+    players[0]["name"] = players[1]["name"]
+    post = Mock()
+    post.return_value.json.return_value = {"result": {"players": players}}
+
+    def click(op, **data):
+        event = interaction(op)
+        event["data"].update(data)
+        return asyncio.run(
+            ui.handle_interaction(database, event, BackgroundTasks(), post)
+        )
+
+    first = click("report")
+    menu = first["data"]["components"][0]["components"][0]
+    assert first["data"]["flags"] == 64 and len(menu["options"]) <= 25
+    more = click("squad", values=[menu["options"][-1]["value"]])
+    group = more["data"]["components"][0]["components"][0]["options"][0]["value"]
+    result = click("squad", values=[group])
+    assert result["type"] == 9
+    option = result["data"]["components"][0]["component"]["options"][0]
+    event = interaction("pick_report", 5)
+    event["data"]["components"] = [
+        {
+            "type": 18,
+            "component": {
+                "type": 3,
+                "custom_id": "target_ref",
+                "values": [option["value"]],
+            },
+        },
+        {
+            "type": 18,
+            "component": {"type": 4, "custom_id": "message", "value": "SL no mic"},
+        },
+    ]
+    assert ui.operation_args(event, "pick_report", None) == (
+        "report",
+        {"target_ref": option["value"], "message": "SL no mic"},
+    )
+
+
+def test_slow_roster_opens_private_picker_after_defer(database, monkeypatch):
+    import asyncio
+    import time
+
+    def slow(*args):
+        time.sleep(1.15)
+        return "player", [{"label": "Example", "value": "f" * 32}]
+
+    monkeypatch.setattr(ui, "_fetch_picker", slow)
+    reply = Mock()
+    monkeypatch.setattr(ui, "private_reply", reply)
+
+    async def exercise():
+        tasks = BackgroundTasks()
+        initial = await ui.handle_interaction(
+            database, interaction("report"), tasks, Mock()
+        )
+        assert initial == {"type": 5, "data": {"flags": 64}}
+        await tasks()
+
+    asyncio.run(exercise())
+    data = reply.call_args.args[1]
+    choose = interaction("pick_player", message=data)
+    choose["data"]["values"] = ["f" * 32]
+    final = ui.handle_interaction(database, choose, BackgroundTasks(), Mock())
+    assert (
+        final["type"] == 9
+        and final["data"]["components"][0]["component"]["options"][0]["default"]
+    )
+
+
+def test_empty_departed_and_older_rosters(database):
+    import asyncio
+    import httpx
+    from discord_service.app.report_picker import picker_view
+
+    post = Mock()
+    post.return_value.json.return_value = {"result": {"players": []}}
+    empty = asyncio.run(
+        ui.handle_interaction(database, interaction("report"), BackgroundTasks(), post)
+    )
+    assert empty["type"] == 4 and empty["data"]["flags"] == 64
+    assert empty["data"]["components"][0]["components"][0]["custom_id"].endswith(
+        ":report"
+    )
+    assert (
+        picker_view(
+            [roster_player(0)], "g:" + "a" * 20 + ":0", lambda k: ui.ui("de", k)
+        )[0]
+        == "gone"
+    )
+    request = httpx.Request("POST", "https://rcon.example")
+    post.return_value = httpx.Response(400, request=request)
+    form = asyncio.run(
+        ui.handle_interaction(database, interaction("report"), BackgroundTasks(), post)
+    )
+    assert (
+        form["type"] == 9
+        and form["data"]["components"][0]["components"][0]["custom_id"] == "target"
+    )
 
 
 @pytest.mark.parametrize(
@@ -491,7 +636,9 @@ def test_override_rejects_untrusted_origin_before_any_relay(
     assert not post.called and not discord.upsert.called
 
 
-def test_override_rejects_other_installation_before_publication(database, monkeypatch, panel_dns):
+def test_override_rejects_other_installation_before_publication(
+    database, monkeypatch, panel_dns
+):
     from discord_service.app import main
     from discord_service.app.player_models import PlayerPanelCallback
 

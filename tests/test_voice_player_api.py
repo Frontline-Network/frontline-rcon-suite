@@ -33,6 +33,33 @@ def panel(pilot, monkeypatch):
     return setup, advance, game
 
 
+def test_pick_online_identity_with_duplicate_names_and_revalidate_departure(panel):
+    setup, _, _ = panel
+    database, players, _ = setup
+    players[1]["name"] = players[0]["name"]
+    choices = api._handle(1, "1234", "300", "roster", {})["players"]
+    target_ref = api._roster_ref(1, "1234", players[1])
+    assert target_ref in {p["ref"] for p in choices} and "player_id" not in choices[0]
+    assert api._roster_ref(1, "4567", players[1]) != target_ref
+    args = {
+        "message": "Squad leader not answering in squad chat",
+        "target_ref": target_ref,
+    }
+    result = api._handle(1, "1234", "301", "report", args)
+    with database() as s:
+        assert (
+            s.get(AdminIncident, result["incident_id"]).target_id
+            == players[1]["player_id"]
+        )
+    players[1]["online"] = False
+    stale = api._handle(
+        1, "1234", "302", "report", {**args, "target": players[0]["name"]}
+    )
+    assert stale["actions"][0]["operation"] == "clarify"
+    with database() as s:
+        assert not s.get(AdminIncident, stale["incident_id"])
+
+
 def test_console_report_polish_receipt_and_german_english_target(panel):
     setup, advance, game = panel
     database, players, ctx = setup

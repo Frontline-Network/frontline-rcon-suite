@@ -19,6 +19,31 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def test_report_entry_cleanup_skips_locked_relays_and_releases_its_transaction():
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import select
+    from discord_service.app.main import _purge_expired_relays
+    from discord_service.app.models import PreparedActionRelay
+
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    now = datetime.now(timezone.utc)
+    with SessionLocal.begin() as session:
+        for handle, age in [("locked", -1), ("expired", -1), ("active", 10)]:
+            session.add(PreparedActionRelay(handle=handle, installation_id="test", incident_id="test",
+                preparation_id="test", confirmation_ciphertext="test", actor_id="1", guild_id="2",
+                channel_id="3", actual_action="message", expires_at=now + timedelta(minutes=age)))
+    with SessionLocal.begin() as owner, SessionLocal() as cleanup:
+        owner.scalar(select(PreparedActionRelay).where(PreparedActionRelay.handle == "locked").with_for_update())
+        cleanup.execute(text("SET LOCAL lock_timeout='1s'"))
+        _purge_expired_relays(cleanup)
+        assert not cleanup.in_transaction()
+        assert owner.get(PreparedActionRelay, "expired") is None
+    with SessionLocal() as cleanup:
+        _purge_expired_relays(cleanup)
+        assert cleanup.scalars(select(PreparedActionRelay.handle)).all() == ["active"]
+
+
 def test_postgres_old_mapping_migration_and_concurrent_startup():
     Base.metadata.drop_all(engine)
     with engine.begin() as connection:
