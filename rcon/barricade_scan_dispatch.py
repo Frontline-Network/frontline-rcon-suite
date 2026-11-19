@@ -18,6 +18,51 @@ def key_is_live(credential_id):
     return current_credential_is_authorized(credential_id)
 
 
+async def dispatch_report_scan(server_number, namespace, credential_id, player_ids, sender):
+    """Process a new report once on its originating socket, including for existing sessions."""
+    from rcon.rcon import get_rcon
+    from rcon.utils import get_server_number
+
+    wanted = set(player_ids)
+    if not wanted or server_number != int(get_server_number()):
+        return
+    loop = asyncio.get_running_loop()
+    cancelled = Event()
+
+    async def send_if_connected(online):
+        if not cancelled.is_set():
+            await sender(online)
+
+    def worker():
+        # Read the local game server outside the delivery lock. The game
+        # adapter returns Steam or EOS IDs as appropriate for this instance.
+        if journal.registration_boundary(server_number, namespace, credential_id) is None:
+            return
+        if cancelled.is_set() or not key_is_live(credential_id):
+            return
+        rcon = get_rcon()
+        with rcon.without_retries():
+            online = sorted(wanted.intersection(pid for _, pid in rcon.get_player_ids()))
+        if not online:
+            return
+        # Rotation and sending use the same scope lock. Use only the socket
+        # that received the report; two sockets can share the same binding.
+        with journal.delivery_scope(server_number, namespace):
+            if (cancelled.is_set() or not journal.credential_is_registered(server_number, namespace, credential_id)
+                    or not key_is_live(credential_id)):
+                return
+            response = Context().run(asyncio.run_coroutine_threadsafe, send_if_connected(online), loop)
+            try:
+                response.result(timeout=15)
+            finally:
+                response.cancel()
+
+    try:
+        await asyncio.to_thread(worker)
+    finally:
+        cancelled.set()
+
+
 async def scan_once(server_number, integration_id, game, sender, is_present, *, credential_id,
                     is_observed=None, get_roster=None, page_size=100):
     """Traverse once; the database snapshot separates old from new rows."""
