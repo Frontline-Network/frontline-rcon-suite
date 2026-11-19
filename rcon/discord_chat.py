@@ -284,8 +284,25 @@ def handle_on_chat(rcon, log):
     from rcon.leadership_vote.service import read_context
     from rcon.leadership_vote.domain import event_time, private_chat
     from rcon.user_config.report_admin import ReportAdminUserConfig
+    from rcon import report_chat_intake
+
+    text = str(log.get("sub_content") or "").strip()
+    reason_prompt_id = None
+    ai_intake = False
     try:
-        get_handler().send_chat_message(log)
+        report_cfg = ReportAdminUserConfig.load_from_db()
+        ai_intake = report_cfg.enabled and report_cfg.reason_mode == "ai"
+        if ai_intake and not voice_reports.chat_candidate(text):
+            reason_prompt_id = report_chat_intake.pending(log, int(get_server_number()))
+            if reason_prompt_id and report_chat_intake.ask_for_detail(rcon, reason_prompt_id, log):
+                return
+    except Exception:
+        logger.exception("Unable to look up an open report question")
+    if reason_prompt_id and not text.lower().startswith("!admin "):
+        log = {**log, "sub_content": "!admin " + text}
+    try:
+        if not reason_prompt_id:
+            get_handler().send_chat_message(log)
     except Exception:
         logger.exception("Discord chat delivery failed; local report processing continues")
     captured_report = False
@@ -375,11 +392,15 @@ def handle_on_chat(rcon, log):
                     current_squads=current_squads,
                     trigger_words=triggers,
                     leadership_context=leadership_context,
+                    reason_prompt_id=reason_prompt_id,
                 )
                 if result:
                     incident, created = result
                     captured_report = True
                     if created and incident.get("reporter_id"):
+                        if text.casefold() == "!admin" and ai_intake:
+                            report_chat_intake.ask(rcon, incident, log)
+                            return
                         from rcon.incident_notifications import (
                             notify_incident_reporter,
                             player_status_text,

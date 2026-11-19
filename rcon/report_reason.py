@@ -13,6 +13,8 @@ def enqueue(sess, incident, context, now, cfg, *, existing_event=None):
 
     raw = str(incident.raw_message or "")
     discord = voice_reports.discord_intake(incident, context)
+    if incident.source == "chat" and raw.strip().casefold() == "!admin":
+        return True  # The reporter supplies the reason before AI interpretation.
     if (incident.source != "chat" and not discord) or not re.match(
         r"^\s*!admin\b", raw, re.I
     ):
