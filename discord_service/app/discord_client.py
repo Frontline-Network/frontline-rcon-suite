@@ -9,6 +9,7 @@ import httpx
 from .config import Settings, get_settings
 from .contracts import IncidentEventEnvelope, ModerationAnalysis
 from .report_admin_display import case_fields
+from .report_card import TEXT as CARD_TEXT, summary as card_summary, voice_state
 
 SQUAD_LEADER_ROLES = {
     "officer",
@@ -740,8 +741,6 @@ def render_message(
         identity += f"\n👥 **{_display_unit(unit_name)}**"
     if not target_online:
         identity += "\n🔴 **Hors ligne**" if language == "fr" else "\n🔴 **Offline**"
-    if source in {"chat", "manual"}:
-        identity += f"\n\nℹ️ *{labels['check_match']}*"
     fields = []
     if source in {"chat", "manual"}:
         fields.append(
@@ -819,20 +818,21 @@ def render_message(
                         "🤖 KI-Einschätzung" if language == "de" else "🤖 Analyse IA" if language == "fr" else "🤖 AI assessment"
                     ),
                     "value": _truncate(
-                        f"**{'Risque' if language == 'fr' else 'Risiko'}:** {analysis.risk_score:.0%}\n"
-                        f"**{'Catégorie' if language == 'fr' else 'Kategorie'}:** {categories}\n{analysis.rationale}",
+                        f"**{ {'de': 'Risiko', 'en': 'Risk', 'fr': 'Risque'}[language]}:** {analysis.risk_score:.0%}\n"
+                        f"**{ {'de': 'Kategorie', 'en': 'Category', 'fr': 'Catégorie'}[language]}:** {categories}\n{analysis.rationale}",
                         1024,
                     ),
                     "inline": False,
                 },
             ]
         )
-    elif ai_unavailable and source in {"ai_chat", "ai_player_name"}:
-        fields.append(
-            {"name": "KI / AI", "value": labels["unavailable"], "inline": False}
-        )
+    elif source in {"ai_chat", "ai_player_name"}:
+        fields.append({"name": labels["reason"], "value": _truncate(incident.get("reason"), 1024), "inline": False})
+        if ai_unavailable:
+            fields.append({"name": "KI" if language == "de" else "IA" if language == "fr" else "AI", "value": labels["unavailable"], "inline": False})
     action_log = _action_log_field(incident, language)
     report_admin = incident.get("report_admin")
+    voice = voice_state(incident)
     automatic_kick = (
         isinstance(report_admin, dict)
         and report_admin.get("status") == "kicked"
@@ -898,7 +898,7 @@ def render_message(
             )
             fields.insert(0, admin_field)
             color = 0x2ECC71
-        else:
+        elif not voice and report_admin.get("status") != "voice":
             fields.append(admin_field)
         if report_admin.get("status") == "waiting" and isinstance(report_admin.get("ready_at"), (int, float)):
             admin_field["value"] = _truncate(admin_field["value"] + f"\n<t:{int(report_admin['ready_at'])}:R>", 1024)
@@ -1174,6 +1174,8 @@ def render_message(
         )
     else:
         title = labels["report_title"].format(name=target_name)
+    if voice and not automatic_kick:
+        title = CARD_TEXT["voice"][{"de": 0, "en": 1, "fr": 2}[language]] + " · " + str((report_admin or {}).get("target_name") or target_name)
     if automatic_kick:
         title = ("Automatisch gekickt – " if language == "de" else "Expulsion automatique – " if language == "fr" else "Automatically kicked – ") + str(report_admin.get("target_name") or target_name)
         team_emoji = "🤖"
@@ -1190,9 +1192,15 @@ def render_message(
             f"{envelope.server_name} · #{envelope.server_number} · {game_label}",
         ]
     )
+    overview = card_summary(incident, language, voice, automatic_kick=automatic_kick,
+                            unresolved=targetless_report, assignee=assigned_name)
+    if action_log:
+        latest_action = next((e for e in reversed(incident.get("events") or []) if e.get("event_type") in {"action", "action_failed"}), None)
+        if latest_action:
+            overview += "\n" + _truncate(_incident_log_entry(latest_action, incident, language), 220)
     primary_embed = {
         "title": _truncate(f"{team_emoji} {title}", 256),
-        "description": _truncate(identity, 4096),
+        "description": _truncate(overview + "\n\n" + identity, 4096),
         "color": color,
         "fields": fields[:25],
         "footer": {"text": _truncate(" | ".join(footer_parts), 2048)},

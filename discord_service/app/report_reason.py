@@ -178,6 +178,11 @@ def analyze_report_reason(job):
         if job.communication_squad_members
         else "\nSERVER POLICY: Communication reports cover only squadleaders and commanders, not ordinary members.\n"
     )
+    if job.voice_contact_check:
+        policy = ("\nSERVER POLICY: This server uses a private voice contact check. A player may report "
+                  "an explicitly named player of either team, including ordinary squad members or a leader. "
+                  "A reporter may have no linked game account. A unique named player needs no common team. "
+                  "Keep the existing certainty and meaning checks. Roster roles alone never prove silence.\n")
     prompt = PROMPT + policy
     # Build an explicit allowlist: credentials/installation identifiers must
     # never appear in prompts, even if the request schema grows later.

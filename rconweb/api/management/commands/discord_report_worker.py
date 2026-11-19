@@ -96,6 +96,12 @@ class Command(BaseCommand):
             from api.report_reason_worker import run as reason_loop
 
             Thread(target=reason_loop, name="report-reason", daemon=True).start()
+            if os.getenv("FRONTLINE_VOICE_REPORT_SERVERS", "").strip():
+                from api.voice_translation_worker import run as translation_loop
+                from api.voice_player_worker import run as player_loop
+
+                Thread(target=translation_loop, name="voice-translation", daemon=True).start()
+                Thread(target=player_loop, name="voice-player-delivery", daemon=True).start()
         active_sleep, maximum_idle_sleep = self._poll_intervals(
             moderation_only=moderation_only
         )

@@ -1,6 +1,7 @@
 """Bounded background model calls, separate from Discord delivery and RCON ticks."""
 
 import logging
+from uuid import NAMESPACE_URL, uuid5
 import time
 
 import requests
@@ -81,7 +82,15 @@ def process_one(http):
         request = event.payload["reason_request"]
         job = ReportReasonRequest(
             installation_id=str(integration.installation_id),
-            incident_id=event.incident_id,
+            incident_id=(
+                str(
+                    uuid5(
+                        NAMESPACE_URL, f"frontline:voice-clarified:{event.incident_id}"
+                    )
+                )
+                if event.payload.get("clarified")
+                else event.incident_id
+            ),
             server_number=server,
             message=event.incident.raw_message,
             roster=[
@@ -99,6 +108,7 @@ def process_one(http):
             communication_squad_members=event.payload["config"].get(
                 "communication_squad_members", False
             ),
+            voice_contact_check=bool(event.payload.get("voice_pilot")),
             ai_provider=provider,
             ai_model=model,
             api_key=api_key,
@@ -119,7 +129,9 @@ def process_one(http):
                 "Authorization": "Bearer "
                 + decrypt_capability(integration.outbound_capability_ciphertext)
             },
-            json=job.model_dump(),
+            json=job.model_dump(
+                exclude=set() if job.voice_contact_check else {"voice_contact_check"}
+            ),
             timeout=(3, 45),
             allow_redirects=False,
         )

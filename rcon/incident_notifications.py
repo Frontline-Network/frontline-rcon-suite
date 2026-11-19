@@ -9,6 +9,26 @@ from rcon.models import enter_session
 DEFAULT_RECEIVED_TEMPLATE = "Dein Admin-Report ist eingegangen."
 
 
+def player_status_text(incident, key, default, players=()):
+    """Localize messages for new pilot cases, including the first chat receipt."""
+    event = next((e for e in incident.get("events", ()) if e.get("event_type") == "report_admin"), {})
+    payload = event.get("payload") or {}
+    if not (payload.get("voice_pilot") or payload.get("voice")):
+        return default
+    if incident.get("source") != "chat":
+        # A Discord submission has its own private case and outbox.
+        return None
+    from rcon import voice_language
+    with enter_session() as sess:
+        locale = (payload.get("voice") or {}).get("reporter_language")
+        if not locale:
+            locale = voice_language.report_language(
+                sess, incident.get("raw_message") or "", game_id=incident.get("reporter_id"),
+                handles=[p.get("name") or p.get("player_name") or "" for p in players],
+            )
+        return voice_language.render(sess, key, locale)
+
+
 def notify_incident_reporter(
     rcon_api,
     incident: dict,

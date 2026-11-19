@@ -2,16 +2,20 @@
 
 import re
 
+from rcon import voice_reports
 from rcon.report_reason_contract import ReportReasonDecision
 from rcon.report_reason_policy import interpretation_failure
 
 
-def enqueue(sess, incident, context, now, cfg):
+def enqueue(sess, incident, context, now, cfg, *, existing_event=None):
     from rcon import report_admin as admin
     from rcon.models import AdminIncidentEvent
 
     raw = str(incident.raw_message or "")
-    if incident.source != "chat" or not re.match(r"^\s*!admin\b", raw, re.I):
+    discord = voice_reports.discord_intake(incident, context)
+    if (incident.source != "chat" and not discord) or not re.match(
+        r"^\s*!admin\b", raw, re.I
+    ):
         return True
     event = AdminIncidentEvent(
         actor=admin.ACTOR,
@@ -26,7 +30,11 @@ def enqueue(sess, incident, context, now, cfg):
             "updated_at": now,
         },
     )
-    incident.events.append(event)
+    if existing_event is None:
+        incident.events.append(event)
+    else:
+        existing_event.payload = event.payload
+        event = existing_event
     stamp = (context or {}).get("event_time")
     if (
         len(raw) > 4000
@@ -47,7 +55,9 @@ def enqueue(sess, incident, context, now, cfg):
     token = admin.session_token(
         sess, incident.server_number, incident.reporter_id, stamp
     )
-    if not reporter or reporter.get("online") is False or token is None:
+    if (not discord or incident.reporter_id) and (
+        not reporter or reporter.get("online") is False or token is None
+    ):
         return True
     roster = [
         {
@@ -75,7 +85,9 @@ def enqueue(sess, incident, context, now, cfg):
         "round_id": context["round_id"],
         "round_start": context["round_start"],
         "reporter_session": token,
-        "reporter_team": admin._normalize_team(reporter.get("team")),
+        "reporter_team": admin._normalize_team((reporter or {}).get("team")),
+        "voice_pilot": voice_reports.enabled(incident.server_number),
+        "discord_voice": discord,
         "incident_revision": incident.revision,
         "original_target_id": incident.target_id,
         "original_message": raw,
@@ -91,7 +103,7 @@ def invalid_request(sess, event, now):
     cfg = admin.config(sess, i.server_number)
     if (
         not cfg.enabled
-        or cfg.reason_mode != "ai"
+        or (cfg.reason_mode != "ai" and not p.get("discord_voice"))
         or cfg.model_dump() != p.get("config")
     ):
         return "Einstellungen geändert / Settings changed"
@@ -111,7 +123,12 @@ def invalid_request(sess, event, now):
 
 
 def target(
-    incident, players, decision, allow_self_reports, communication_squad_members=False
+    incident,
+    players,
+    decision,
+    allow_self_reports,
+    communication_squad_members=False,
+    voice_pilot=False,
 ):
     from rcon.admin_incidents import parse_chat_report
     from rcon.report_admin_rules import (
@@ -153,7 +170,16 @@ def target(
         allow_self_reports=allow_self_reports,
         communication_squad_members=communication_squad_members
         and d.target_kind == "player",
+        voice_contact_check=voice_pilot,
     )
+    if (
+        not found
+        and voice_pilot
+        and d.rule == "communication"
+        and named_player
+        and str(named_player["player_id"]) != incident.get("reporter_id")
+    ):
+        found = voice_reports.named_target(named_player, players)
     if not found or (
         named_player and found["player_id"] != str(named_player["player_id"])
     ):
@@ -223,14 +249,16 @@ def finish(sess, event, context, now):
             request["roster"],
             decision,
             cfg.allow_self_reports,
-            cfg.communication_squad_members,
+            cfg.communication_squad_members or bool(p.get("voice_pilot")),
+            bool(p.get("voice_pilot")),
         )
         after = target(
             i.to_dict(),
             context["players"],
             decision,
             cfg.allow_self_reports,
-            cfg.communication_squad_members,
+            cfg.communication_squad_members or bool(p.get("voice_pilot")),
+            bool(p.get("voice_pilot")),
         )
     except (ValueError, TypeError, KeyError):
         failure = "invalid_interpretation_or_roster"
@@ -240,7 +268,9 @@ def finish(sess, event, context, now):
         "prompt_version": str(assessment.get("prompt_version") or "")[:64],
     }
     if not failure:
-        if not before:
+        if p.get("discord_voice") and decision.rule != "communication":
+            failure = "manual_review_required"
+        elif not before:
             failure = "original_target_unresolved"
         elif not after:
             failure = "live_target_unresolved"
@@ -293,12 +323,20 @@ def finish(sess, event, context, now):
             "target_identity_changed": "Spieleridentität, Team oder Position während der KI-Prüfung geändert / Player identity, team or position changed during AI review",
             "rule_disabled": "Diese automatische Maßnahme ist deaktiviert / This automatic action is disabled",
         }
-        admin.publish(
-            sess,
-            event,
-            "manual",
-            reasons[failure],
-        )
+        if (
+            p.get("voice_pilot")
+            and decision
+            and decision.rule == "communication"
+            and failure
+            in {
+                "original_target_unresolved",
+                "live_target_unresolved",
+                "interpretation_uncertain",
+            }
+        ):
+            voice_reports.clarify(sess, event, request.get("roster", []), now)
+        else:
+            admin.publish(sess, event, "manual", reasons[failure])
         return
     intervention = p.get("player_interventions", {}).get(after["player_id"])
     if intervention:
@@ -310,7 +348,7 @@ def finish(sess, event, context, now):
             intervention_actor=intervention["actor"],
         )
         return
-    if (
+    if i.reporter_id and (
         admin.session_token(sess, i.server_number, i.reporter_id, now)
         != p["reporter_session"]
         or admin._normalize_team(
@@ -337,7 +375,11 @@ def finish(sess, event, context, now):
     admin.enqueue(
         sess,
         i,
-        {**context, "event_time": p["report_time"]},
+        {
+            **context,
+            "event_time": p["report_time"],
+            "voice_discord_intake": p.get("discord_voice", False),
+        },
         now,
         interpreted=(decision.rule, after),
         existing_event=event,

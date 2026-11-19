@@ -26,7 +26,7 @@ _rate_lock = Lock()
 _PATH_RE = re.compile(
     r"^/api/discord/v1/(?:"
     r"pairings/(?:verify|complete)|moderation-(?:feedback|results)|"
-    r"diagnostics/ping|"
+    r"diagnostics/ping|player-reports|"
     r"incidents/(?:transition|select-subject|logs)|action-templates|"
     r"actions/prepare|"
     r"actions/[0-9a-fA-F-]{36}/(?:prepare|execute)|"
