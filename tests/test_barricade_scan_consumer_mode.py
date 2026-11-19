@@ -25,6 +25,7 @@ from api import auth
     ('1', 'integration:synthetic', 1, 'durable'),
 ])
 def test_consumer_selects_mode_only_for_registered_opt_in(monkeypatch, flag, namespace, credential, expected):
+    monkeypatch.setenv('SERVER_NUMBER', '9')
     if flag is None:
         monkeypatch.delenv('HLL_BARRICADE_DURABLE_SCANS', raising=False)
     else:
@@ -35,7 +36,11 @@ def test_consumer_selects_mode_only_for_registered_opt_in(monkeypatch, flag, nam
         consumer.accept = AsyncMock()
         consumer.close = AsyncMock()
         consumer._durable_scan_loop = AsyncMock()
-        await consumer.connect()
+        with patch('api.barricade.logger.info') as accepted:
+            await consumer.connect()
+            if expected != 'reject':
+                mode = 'registered' if expected == 'durable' else 'off'
+                assert accepted.call_args.args[1:] == ('9', credential, mode)
         await asyncio.sleep(0)
         assert consumer.close.await_count == (expected == 'reject')
         assert consumer._durable_scan_loop.await_count == (expected == 'durable')

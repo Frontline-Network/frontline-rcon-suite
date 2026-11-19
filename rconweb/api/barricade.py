@@ -112,11 +112,14 @@ class BarricadeConsumer(AsyncJsonWebsocketConsumer):
         durable = enabled and bound
         if (self.scope.get('barricade_registered_namespace') or self.scope.get('barricade_scan_namespace') or
                 _explicit_durable_request(self.scope.get('query_string', b''))) and not bound:
-            logger.warning('Rejected Barricade durable integration: disabled or not registered')
+            logger.warning('Rejected Barricade connection with an invalid integration binding')
             await self.close(code=4403)
             return
-        logger.info("Accepted connection with Barricade client")
         await self.accept()
+        credential = self.scope.get('barricade_credential_id')
+        logger.info("Accepted connection with Barricade client on server %s; key record %s; scanner %s",
+                    get_server_number(), credential if type(credential) is int else None,
+                    'registered' if durable else 'off')
         if self._scan_players_task and not self._scan_players_task.done():
             self._scan_players_task.cancel()
         if durable:

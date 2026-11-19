@@ -96,8 +96,11 @@ a scan on the connection that submitted the report. Old queued report
 notifications lack a recipient binding and are skipped during an update.
 Existing ban-list deliveries are a separate queue.
 
-For a first-time registration, identify the exclusive key actually used by
-the peer. After all old scanners have stopped, run the following command in
+For a first-time registration, use the server's API log for a known reconnect
+of that Custom integration. The accepted connection lists the local key record
+number and the scanner mode. If several integrations connect, correlate the
+reconnect with the one being configured. After all old scanners have stopped,
+run the following command in
 the target server's backend, substituting its local record ID and operator.
 
 ```sh
