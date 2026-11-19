@@ -230,6 +230,8 @@ jobs:
           export POPULATION_TEST_DB_URL="$HLL_DB_URL"
           export VIP_REWARDS_TEST_DB_URL="$HLL_DB_URL"
           PYTHONPATH=. pytest tests/
+          TEST_POSTGRES_DSN="$HLL_DB_URL" TEST_REDIS_URL="$HLL_REDIS_URL" PYTHONPATH=. \
+            pytest tests/test_barricade_auto_activation_postgres.py tests/test_barricade_full_pipeline_postgres.py
           PYTHONPATH=. python -m django test api.test_release_updates --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_release_migrations --settings=rconweb.rconweb.test_settings --verbosity=1
           PYTHONPATH=. python -m django test api.test_account_password api.test_admin_theme api.test_permission_workflows api.test_api_descriptions api.test_appearance --settings=rconweb.rconweb.test_settings --verbosity=1
