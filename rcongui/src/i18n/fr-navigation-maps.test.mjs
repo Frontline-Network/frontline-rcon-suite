@@ -22,7 +22,8 @@ test("French navigation, sidebar and maps preserve all keys and placeholders", (
   compare(en.navigation, navigationFr, "navigation");
   compare(en.sidebar, sidebarFr, "sidebar");
   compare(en.maps, mapsFr, "maps");
-  assert.equal(count, 432);
+  assert.equal(count, 433);
+  assert.equal(navigationFr.links.sessionEvents, "Événements de session");
   assert.match(mapsFr.objectivesIntro, /redémarre immédiatement/);
   assert.match(mapsFr.votemapWorkbench.resetDescription, /irréversible/);
   assert.match(mapsFr.votemapWorkbench.winnerDescription, /immédiatement/);
