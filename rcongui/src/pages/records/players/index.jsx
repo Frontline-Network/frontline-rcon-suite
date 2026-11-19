@@ -5,6 +5,7 @@ import {
   Grid2 as Grid,
   Typography,
   Divider,
+  LinearProgress,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
@@ -14,8 +15,8 @@ import {
 } from "@mui/material";
 import ViewListIcon from "@mui/icons-material/ViewList";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
-import { useLoaderData, useNavigation } from "react-router-dom";
-import { useMemo, useState, memo, useCallback, useEffect } from "react";
+import { Await, defer, useLoaderData, useNavigation } from "react-router-dom";
+import { Suspense, useMemo, useState, memo, useCallback, useEffect } from "react";
 import PlayerCard from "@/components/shared/card/PlayerCard";
 import PlayerRecordsList from "./PlayerRecordsList";
 import NavPagination from "@/pages/stats/games/nav-pagination";
@@ -56,7 +57,7 @@ const PlayersGrid = memo(
   }
 );
 
-export const loader = async ({ request }) => {
+export const loader = ({ request }) => {
   const url = new URL(request.url);
 
   const player_name = url.searchParams.get("player_name") ?? "";
@@ -97,19 +98,23 @@ export const loader = async ({ request }) => {
     last_seen_till,
   };
 
-  // In the background, this command is POST request therefore the payload and not params
+  return defer({ fields, records: loadRecords(fields, request.signal) });
+};
+
+async function loadRecords(fields, signal) {
+  const { page, page_size } = fields;
   const [playersRecords, bans] = isFakeMode()
     ? [{ result: { players: demoPlayerRecords, total: demoPlayerRecords.length } }, []]
     : await Promise.all([
       cmd.GET_PLAYERS_RECORDS({
-        signal: request.signal,
+        signal,
         payload: Object.fromEntries(
           Object.entries(fields).filter(
             ([_, value]) => value !== "" && value !== null
           )
         ),
       }),
-      cmd.GET_BANS({ signal: request.signal }),
+      cmd.GET_BANS({ signal }),
     ]);
   const bannedPlayerIds = new Set(bans.map((ban) => ban.player_id));
 
@@ -134,21 +139,39 @@ export const loader = async ({ request }) => {
     total: Number(playersRecords.result.total),
     localOnlineSnapshotAvailable: playersRecords.result.local_online_snapshot_available,
     page: Number(page),
-    fields,
   };
-};
+}
 
 export default function PlayersRecords() {
+  const { t } = useTranslation();
+  const { fields, records } = useLoaderData();
+  return (
+    <Stack spacing={1} sx={{ mt: 2 }}>
+      <PageHeader
+        eyebrow={t("records.players.eyebrow")}
+        title={t("records.players.title")}
+        subtitle={t("records.players.subtitle")}
+      />
+      <PlayerFiltersForm fields={fields} />
+      <Suspense fallback={<LinearProgress aria-label={t("records.players.title")} />}>
+        <Await resolve={records}>
+          {(data) => <PlayerResults data={data} />}
+        </Await>
+      </Suspense>
+    </Stack>
+  );
+}
+
+function PlayerResults({ data }) {
   const { t } = useTranslation();
   const isWardogs = useTheme().frontline?.appearance?.preset === "wardogs";
   const {
     players: playersData,
-    fields,
     total_pages,
     total,
     page,
     localOnlineSnapshotAvailable,
-  } = useLoaderData();
+  } = data;
   const navigation = useNavigation();
   const isCompactViewport = useMediaQuery((theme) =>
     theme.breakpoints.down("md")
@@ -283,7 +306,6 @@ export default function PlayersRecords() {
     <Stack
       spacing={1}
       sx={{
-        mt: 2,
         pb: selectedPlayerIds.size ? { xs: 15, md: 0 } : 0,
         "& .MuiAlert-root": { borderRadius: 0 },
         "& .MuiButton-root": { borderRadius: 0 },
@@ -295,11 +317,6 @@ export default function PlayersRecords() {
         "& .MuiToggleButton-root": { borderRadius: 0 },
       }}
     >
-      <PageHeader
-        eyebrow={t("records.players.eyebrow")}
-        title={t("records.players.title")}
-        subtitle={t("records.players.subtitle")}
-      />
       {localOnlineSnapshotAvailable === false && (
         <Alert severity="warning">{t("records.players.liveSnapshotUnavailable")}</Alert>
       )}
@@ -353,7 +370,6 @@ export default function PlayersRecords() {
           </Box>
         </Stack>
       ) : null}
-      <PlayerFiltersForm fields={fields} />
       <Stack
         component="section"
         id="players-section"
