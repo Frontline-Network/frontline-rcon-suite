@@ -14,9 +14,15 @@ from tests.test_barricade_scan_journal_postgres import database, prepare
 
 
 def test_disabled_status_never_accesses_database(monkeypatch):
-    monkeypatch.delenv('HLL_BARRICADE_DURABLE_SCANS', raising=False)
+    monkeypatch.setenv('HLL_BARRICADE_DURABLE_SCANS', '0')
     monkeypatch.setattr(status, 'get_session_maker', lambda: pytest.fail('no database needed'))
     assert status.scan_status(3) == {'state': 'disabled'}
+
+
+def test_unset_flag_checks_registration_and_database_failure_is_unavailable(monkeypatch):
+    monkeypatch.delenv('HLL_BARRICADE_DURABLE_SCANS', raising=False)
+    monkeypatch.setattr(status, 'get_session_maker', lambda: (_ for _ in ()).throw(RuntimeError('unavailable')))
+    assert status.scan_status(3) == {'state': 'unavailable'}
 
 
 def test_aggregate_status_requires_registration_roster_and_current_log_observation(database, monkeypatch):
@@ -25,7 +31,7 @@ def test_aggregate_status_requires_registration_roster_and_current_log_observati
         pytest.skip('requires disposable Redis')
     prepare(database, monkeypatch)
     monkeypatch.setattr(status, 'get_session_maker', lambda: database)
-    monkeypatch.setenv('HLL_BARRICADE_DURABLE_SCANS', '1')
+    monkeypatch.delenv('HLL_BARRICADE_DURABLE_SCANS', raising=False)
     db_url = f'postgresql://synthetic@localhost/db_{uuid4().hex}'
     monkeypatch.setenv('HLL_DB_URL', db_url)
     scope = database_scope(db_url)

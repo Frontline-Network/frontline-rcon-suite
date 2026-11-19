@@ -163,6 +163,16 @@ class BarricadeScanIntegration(Base):
     )
 
 
+def has_registered_integration(server_number: int) -> bool:
+    """Check a single server's explicit registration; database errors propagate."""
+    if type(server_number) is not int or not 1 <= server_number <= 32:
+        raise ValueError('Invalid Barricade server number')
+    with get_session_maker()() as session:
+        return session.scalar(select(BarricadeScanIntegration.server_number)
+                              .where(BarricadeScanIntegration.server_number == server_number)
+                              .limit(1)) is not None
+
+
 class BarricadeScanIntegrationAudit(Base):
     __tablename__ = 'barricade_scan_integration_audit'
     id: Mapped[int] = mapped_column(primary_key=True)

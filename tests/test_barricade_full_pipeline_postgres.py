@@ -70,6 +70,7 @@ def test_scan_from_observations_through_websocket(database, monkeypatch, tmp_pat
         assert capture_observation(red, api, scope=scope, server_number=3)
         monkeypatch.setenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS', '1')
         collector = make_loop(tmp_path, monkeypatch, [])
+        monkeypatch.setattr(journal, 'has_registered_integration', lambda server: server == 3)
         if scenario == 'pending_event':
             collector.session_journal.remember(3, 'synthetic-eos', 'disconnect', int(time.time() * 1_000_000))
             monkeypatch.setattr(player_history, 'save_end_player_session', Mock(side_effect=OSError('synthetic outage')))
