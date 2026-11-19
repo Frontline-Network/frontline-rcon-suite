@@ -1,8 +1,9 @@
 from django.urls import path
 
-from . import discord_integration
+from . import discord_integration, voice_player_api
 
 urlpatterns = [
+    path("player-reports", voice_player_api.player_reports, name="discord-player-reports"),
     path(
         "integration",
         discord_integration.integration_detail,

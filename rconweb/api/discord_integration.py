@@ -30,7 +30,7 @@ from rcon.admin_incidents import (
     mutate_incident,
     reserve_incident_action,
 )
-from rcon.incident_notifications import notify_incident_reporter
+from rcon.incident_notifications import notify_incident_reporter, player_status_text
 from rcon.message_templates import get_message_templates
 from rcon.models import AdminIncidentDiscordDelivery, enter_session
 from rcon.moderation import (
@@ -1490,7 +1490,7 @@ def transition_incident(request):
                 notify_incident_reporter(
                     views.rcon_api,
                     result,
-                    message=template,
+                    message=player_status_text(result, "claimed" if template_key == "claimed" else "closed", template),
                     by=actor_name,
                     save_message=True,
                 )

@@ -1000,6 +1000,10 @@ invoke==3.0.3 \
     --hash=sha256:437b6a622223824380bfb4e64f612711a6b648c795f565efc8625af66fb57f0c \
     --hash=sha256:f11327165e5cbb89b2ad1d88d3292b5113332c43b8553b494da435d6ec6f5053
     # via paramiko
+langdetect==1.0.9 \
+    --hash=sha256:7cbc0746252f19e76f77c0b1690aadf01963be835ef0cd4b56dddf2a8f1dfc2a \
+    --hash=sha256:cbc1fef89f8d062739774bd51eda3da3274006b3661d199c2655f6b3f6d605a0
+    # via -r requirements.txt
 mako==1.4.1 \
     --hash=sha256:a359d9a94a541213958742b2698d0a7757bb83551767bc468a74b9905aba9617 \
     --hash=sha256:d7904710b662996425a21627710c4777c45053146942cf8a7aebf757c92b8c27
@@ -2063,6 +2067,7 @@ six==1.17.0 \
     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274 \
     --hash=sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81
     # via
+    #   langdetect
     #   python-dateutil
     #   steam
 sqlalchemy==2.0.49 \

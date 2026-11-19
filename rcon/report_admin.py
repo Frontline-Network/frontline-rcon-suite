@@ -36,14 +36,14 @@ from rcon.report_admin_rules import (
     QUALIFIED,
     MAX_REPORT_AGE,
 )
-from rcon import report_admin_evidence as evidence_rules
+from rcon import report_admin_evidence as evidence_rules, voice_reports
 from rcon.admin_incidents import _normalize_team, _normalize_message
 from rcon.user_config.report_admin import ReportAdminUserConfig as Config
 from rcon.user_config.utils import _invalidate_user_config_cache
 
 logger = logging.getLogger(__name__)
 ACTOR = "system:report-admin"
-OPEN = {"classifying", "queued", "waiting", "sending"}
+OPEN = {"classifying", "queued", "waiting", "sending", "voice"}
 CONTEXT_RETRY_SECONDS = 15
 enter_session = votes.enter_session  # Commit errors must propagate.
 
@@ -75,7 +75,7 @@ def pending(sess, server, limit=None, due_at=None):
     if due_at is not None:
         query = query.where(
             or_(
-                AdminIncidentEvent.payload["status"].as_string() != "waiting",
+                ~AdminIncidentEvent.payload["status"].as_string().in_({"waiting", "voice"}),
                 AdminIncidentEvent.payload["ready_at"].as_float() <= due_at,
                 AdminIncidentEvent.payload["report_time"].as_float()
                 <= due_at - evidence_rules.CASE_TTL,
@@ -117,6 +117,8 @@ def publish(sess, event, status, reason, **extra):
         "result": reason,
         "updated_at": stamp,
     }
+    if event.payload.get("voice"):
+        voice_reports.on_publish(sess, event, status, stamp)
     incident = event.incident
     incident.revision += 1
     incident.updated_at = utc(stamp)
@@ -273,7 +275,9 @@ def enqueue(sess, incident, context, now, *, interpreted=None, existing_event=No
     cfg = config(sess, incident.server_number)
     if not cfg.enabled:
         return False
-    if cfg.reason_mode == "ai" and interpreted is None:
+    discord_voice = voice_reports.discord_intake(incident, context)
+    pilot = (existing_event.payload.get("voice_pilot", False) if existing_event else voice_reports.enabled(incident.server_number))
+    if (cfg.reason_mode == "ai" or discord_voice) and interpreted is None:
         from rcon import report_reason
 
         return report_reason.enqueue(sess, incident, context, now, cfg)
@@ -282,7 +286,7 @@ def enqueue(sess, incident, context, now, *, interpreted=None, existing_event=No
     if not isinstance(players, list):
         players = []
     rule = interpreted[0] if interpreted else classify(incident.raw_message, players)
-    if incident.source != "chat" or not rule or not getattr(cfg, rule):
+    if (incident.source != "chat" and not discord_voice) or not rule or not getattr(cfg, rule):
         return True  # All other subjects remain strictly manual in this mode.
     resolution_subjects = data.get("subjects", [])
     target = (
@@ -293,7 +297,8 @@ def enqueue(sess, incident, context, now, *, interpreted=None, existing_event=No
             players,
             rule,
             allow_self_reports=cfg.allow_self_reports,
-            communication_squad_members=cfg.communication_squad_members,
+            communication_squad_members=cfg.communication_squad_members or (pilot and rule == "communication"),
+            voice_contact_check=bool(pilot and rule == "communication"),
         )
     )
     if not target and not any(
@@ -315,7 +320,8 @@ def enqueue(sess, incident, context, now, *, interpreted=None, existing_event=No
                 players,
                 rule,
                 allow_self_reports=cfg.allow_self_reports,
-                communication_squad_members=cfg.communication_squad_members,
+                communication_squad_members=cfg.communication_squad_members or (pilot and rule == "communication"),
+                voice_contact_check=bool(pilot and rule == "communication"),
             )
             if target:
                 resolution_subjects = parsed["subjects"]
@@ -344,12 +350,14 @@ def enqueue(sess, incident, context, now, *, interpreted=None, existing_event=No
         or not 0 <= now - stamp <= (MAX_REPORT_AGE if interpreted else 30)
         or not target
     ):
+        if pilot and rule == "communication" and not target:
+            voice_reports.clarify(sess, event, players, now, context)
         return True
     token = session_token(sess, incident.server_number, target["player_id"], stamp)
     reporter_token = session_token(
         sess, incident.server_number, incident.reporter_id, stamp
     )
-    if token is None or reporter_token is None:
+    if token is None or (reporter_token is None and not (discord_voice and not incident.reporter_id)):
         return True
     # Require a configured Discord destination; no silent moderation when unpaired.
     if not votes.discord_ready(sess):
@@ -410,9 +418,7 @@ def enqueue(sess, incident, context, now, *, interpreted=None, existing_event=No
         "session": token,
         "reporter_session": reporter_token,
         "reporter_team": _normalize_team(
-            next(
-                p for p in players if str(p.get("player_id")) == incident.reporter_id
-            ).get("team")
+            next((p for p in players if str(p.get("player_id")) == incident.reporter_id), {}).get("team")
         ),
         "report_time": stamp,
         "round_id": context["round_id"],
@@ -420,6 +426,8 @@ def enqueue(sess, incident, context, now, *, interpreted=None, existing_event=No
         "config": cfg.model_dump(),
         "incident_revision": incident.revision,
     }
+    if pilot and rule == "communication":
+        voice_reports.begin(sess, event, players, now)
     return True
 
 
@@ -522,7 +530,9 @@ def invalid_reason(sess, event, context, now):
         return (
             "Admin-Bearbeitung oder Ziel geändert / Admin handling or target changed"
         )
-    max_age = evidence_rules.CASE_TTL if p["rule"] == "teamkills" else MAX_REPORT_AGE
+    if p.get("voice") and not voice_reports.enabled(i.server_number):
+        return "Voice pilot disabled"
+    max_age = voice_reports.max_age(p) if p.get("voice") else (evidence_rules.CASE_TTL if p["rule"] == "teamkills" else MAX_REPORT_AGE)
     if not 0 <= now - p["report_time"] <= max_age:
         return "Report abgelaufen / Report expired"
     if not valid_context(context, now) or context["round_id"] != p["round_id"]:
@@ -541,16 +551,16 @@ def invalid_reason(sess, event, context, now):
 
     if (
         not target
-        or not reporter
+        or (i.reporter_id and not reporter)
         or target.get("online") is False
-        or reporter.get("online") is False
+        or (reporter or {}).get("online") is False
         or _normalize_team(target.get("team")) != p["target"]["team"]
-        or _normalize_team(reporter.get("team"))
+        or _normalize_team((reporter or {}).get("team"))
         != p.get("reporter_team", p["target"]["team"])
     ):
         return "Spieler offline oder Team geändert / Player offline or team changed"
     if p["rule"] == "communication" and (
-        communication_identity(target, cfg.communication_squad_members)
+        communication_identity(target, bool(p.get("voice")) or cfg.communication_squad_members)
         != p["target"]["seat"]
         or not unique_communication_seat(players, p["target"]["seat"])
     ):
@@ -559,8 +569,10 @@ def invalid_reason(sess, event, context, now):
         (p["target_id"], p["session"]),
         (i.reporter_id, p["reporter_session"]),
     ):
-        if session_token(sess, i.server_number, pid, now) != token:
+        if pid and session_token(sess, i.server_number, pid, now) != token:
             return "Sitzung geändert / Session changed"
+    if p.get("voice") and (problem := voice_reports.witness_problem(sess, event, players, now)):
+        return problem
     if not votes.discord_ready(sess):
         return "Discord nicht bereit / Discord unavailable"
     return None
@@ -820,6 +832,7 @@ def defer_unavailable_context(server, tasks, now):
                 "classifying",
                 "queued",
                 "waiting",
+                "voice",
             }:
                 continue
             p = event.payload
@@ -829,6 +842,8 @@ def defer_unavailable_context(server, tasks, now):
                 if p.get("rule") == "teamkills"
                 else MAX_REPORT_AGE
             )
+            if p.get("voice"):
+                ttl = voice_reports.max_age(p)
             if (
                 now - first >= CONTEXT_RETRY_SECONDS
                 or not 0 <= now - p["report_time"] <= ttl
@@ -848,6 +863,7 @@ def defer_unavailable_context(server, tasks, now):
 
 
 def tick(api, server):
+    voice_reports.flush_messages(api, server)
     with enter_session() as sess:
         cfg = config(sess, server)
         tasks = [e.id for e in pending(sess, server, limit=4, due_at=time.time())]
@@ -874,6 +890,7 @@ def tick(api, server):
                         "classifying",
                         "queued",
                         "waiting",
+                        "voice",
                     }:
                         publish(
                             sess,
@@ -887,11 +904,15 @@ def tick(api, server):
                     for k, v in event.payload.items()
                     if k != "context_unavailable_since"
                 }
+            voice_task = bool(event and event.payload.get("voice") and event.payload["status"] == "voice")
             if event and event.payload.get("status") == "classifying":
                 from rcon import report_reason
 
                 report_reason.finish(sess, event, context, time.time())
                 continue  # Refresh context on the next tick before any action.
+        if voice_task:
+            voice_reports.advance(api, server, event_id, context)
+            continue
         with enter_session() as sess:
             event = sess.get(AdminIncidentEvent, event_id)
             rule = event.payload.get("rule") if event else None
@@ -931,6 +952,9 @@ def tick(api, server):
             if not delivered(sess, event.incident_id):
                 continue
             p = event.payload
+            if p.get("voice") and p["voice"]["phase"] != "kick_ready":
+                publish(sess, event, "manual", "Voice confirmation missing")
+                continue
             evidence = {}
             if p["rule"] != "communication":
                 status, reason, evidence = assess(
@@ -943,7 +967,7 @@ def tick(api, server):
                         "incident_revision": event.incident.revision,
                     }
                     continue
-            if p["mode"] == "dry_run":
+            if p["mode"] == "dry_run" or (p.get("voice") and not voice_reports.live_kicks_enabled(server)):
                 publish(
                     sess,
                     event,
@@ -1019,6 +1043,9 @@ def tick(api, server):
                     continue
                 event.payload = {**p, **evidence}
                 p = event.payload
+            if p.get("voice") and (p["mode"] != "active" or not voice_reports.live_kicks_enabled(server)):
+                publish(sess, event, "dry_run", "Voice pilot simulation; no kick sent")
+                continue
             reason = kick_reason(sess, p)
             confirmed = False
             try:
@@ -1051,7 +1078,7 @@ def tick(api, server):
             )
         # This runs only AFTER the kick result transaction committed. Never
         # infer success from a disconnect or a failed/unconfirmed kick response.
-        if confirmed:
+        if confirmed and not p.get("voice"):
             try:
                 notify_reporter(api, server, event_id)
             except Exception:

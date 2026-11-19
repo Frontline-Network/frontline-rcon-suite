@@ -15,7 +15,7 @@ from urllib.parse import urlencode, urlsplit
 
 import httpx
 from cryptography.fernet import InvalidToken
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
@@ -44,6 +44,8 @@ from .contracts import (
 )
 from .db import Base, engine, session_dependency, migrate_incident_language
 from .discord_client import DiscordClient, render_message
+from .voice_translation import build_translation_router
+from . import player_panel
 from .models import (
     EventReceipt,
     IncidentMessage,
@@ -1629,6 +1631,7 @@ def _verify_discord_signature(request_body: bytes, signature: str, timestamp: st
 @app.post("/v1/discord/interactions")
 async def discord_interaction(
     request: Request,
+    background_tasks: BackgroundTasks,
     x_signature_ed25519: str = Header(default=""),
     x_signature_timestamp: str = Header(default=""),
     session: Session = Depends(session_dependency),
@@ -1645,6 +1648,9 @@ async def discord_interaction(
     rate_member = payload.get("member") or {}
     rate_user = rate_member.get("user") or {}
     _check_rate_limit(f"interaction:{payload.get('guild_id')}:{rate_user.get('id')}")
+    player_response = player_panel.handle_interaction(session, payload, background_tasks, _crcon_post)
+    if player_response is not None:
+        return player_response
     custom_id = str((payload.get("data") or {}).get("custom_id") or "")
     if payload.get("type") == 3 and custom_id.startswith("confirm:"):
         handle = custom_id.split(":", 1)[1]
@@ -2251,3 +2257,17 @@ async def discord_interaction(
                 actual_action="none",
             )
     return {"type": 4, "data": {"content": content[:1900], "flags": 64}}
+
+@app.post("/v1/player-notifications")
+def player_notification(
+    payload: player_panel.PlayerNotification,
+    authorization: str | None = Header(default=None),
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    session: Session = Depends(session_dependency),
+):
+    integration = _integration_for_capability(session, payload.installation_id, authorization)
+    _check_rate_limit(f"voice-player:{integration.installation_id}")
+    return player_panel.notify_player(session, integration, payload, idempotency_key)
+
+
+app.include_router(build_translation_router(_integration_for_capability, _check_rate_limit, session_dependency))

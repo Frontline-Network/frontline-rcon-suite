@@ -115,6 +115,7 @@ def target_for(
     *,
     allow_self_reports=False,
     communication_squad_members=False,
+    voice_contact_check=False,
 ):
     """Accept exact references or independently validated, unique name typos."""
     ids = [str(p.get("player_id") or "") for p in players]
@@ -169,6 +170,7 @@ def target_for(
                     allow_self_reports
                     and str(p["player_id"]) == incident.get("reporter_id")
                 )
+                or voice_contact_check
                 or may_report(
                     players,
                     incident.get("reporter_id"),
@@ -208,7 +210,11 @@ def target_for(
         (pid == incident.get("reporter_id") and not allow_self_reports)
         or team not in {"allies", "axis"}
         or _normalize_team(reporter.get("team")) not in {"allies", "axis"}
-        or (rule != "cheating" and team != _normalize_team(reporter.get("team")))
+        or (
+            rule != "cheating"
+            and not (rule == "communication" and voice_contact_check)
+            and team != _normalize_team(reporter.get("team"))
+        )
     ):
         return None
     return {

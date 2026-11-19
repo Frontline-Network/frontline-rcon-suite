@@ -903,7 +903,7 @@ def create_incident(
 
     now = _utcnow()
     dedupe_key = None
-    if raw_message:
+    if raw_message and actor != "discord:voice-player":
         dedupe_key = _dedupe_key(
             server_number,
             reporter_id,
@@ -1279,6 +1279,11 @@ def mutate_incident(
         event = _event(actor, operation, payload)
         event.idempotency_key = idempotency_key
         incident.events.append(event)
+        if operation in {"claim", "reassign", *FINAL_STATUSES} and any(
+            e.event_type == "report_admin" and e.payload.get("voice") for e in incident.events
+        ):
+            from rcon.voice_player_delivery import queue_admin_change
+            queue_admin_change(sess, incident, "closed" if operation in FINAL_STATUSES else "claimed")
         sess.flush()
         return incident.to_dict(include_events=True)
 

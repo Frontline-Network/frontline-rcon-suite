@@ -277,6 +277,10 @@ def get_handler():
 
 @on_chat
 def handle_on_chat(rcon, log):
+    from rcon import voice_reports
+    if str(log.get("sub_content") or "").lstrip().lower().startswith("!voice"):
+        if voice_reports.handle_chat(rcon, log, int(get_server_number())):
+            return
     from rcon.leadership_vote.service import read_context
     from rcon.leadership_vote.domain import event_time, private_chat
     from rcon.user_config.report_admin import ReportAdminUserConfig
@@ -378,11 +382,14 @@ def handle_on_chat(rcon, log):
                     if created and incident.get("reporter_id"):
                         from rcon.incident_notifications import (
                             notify_incident_reporter,
+                            player_status_text,
                             received_reporter_template,
                         )
 
                         if template := received_reporter_template():
-                            notify_incident_reporter(rcon, incident, message=template)
+                            notify_incident_reporter(rcon, incident, message=player_status_text(
+                                incident, "received", template, current_players
+                            ))
         except Exception:
             # Incident persistence must never interrupt the game log loop or
             # existing Discord notifications.

@@ -77,3 +77,27 @@ python -m pytest
 
 Set `DISCORD_SERVICE_DRY_RUN=true` only for isolated development or tests. In
 that mode Discord writes are simulated and non-HTTPS callback URLs are allowed.
+
+## Mobile player report panel
+
+Set `FRONTLINE_VOICE_REPORT_SERVERS` to the comma-separated server numbers that
+should accept voice reports. Apply it to the backend, game routines and Discord
+worker. Leave `FRONTLINE_VOICE_LIVE_KICK_SERVERS` empty during acceptance:
+players receive the private notice and follow-up while the final kick is
+simulated. A live kick requires both server flags, active report moderation,
+and a timely explicit reply from the eligible witness for that case.
+
+After enabling the voice-report pilot on the selected RCON server, publish its
+player panel from the Discord service container. Use the installation's paired
+guild ID and the player-facing text channel chosen by the community.
+
+```sh
+python -m app.publish_player_panel --installation <installation-id> --server <server-number> --guild <guild-id> --channel <player-channel-id>
+```
+
+Running the command again updates the same Discord message. Each panel routes
+new reports, language choices and private case replies to its bound RCON
+server. Players can link their game account or change DM delivery through
+**My reports**. Case updates edit the author's private interaction for up to
+14 minutes. Later updates remain available through **My reports**, with
+additional DMs for players who enabled them.

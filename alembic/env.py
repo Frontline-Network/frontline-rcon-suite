@@ -9,6 +9,7 @@ from rcon.blacklist_sync_journal import BlacklistSyncDelivery
 from rcon.barricade_scan_journal import BarricadeScanDelivery, BarricadeScanIntegration, BarricadeScanIntegrationAudit, BarricadeScanReviewAudit
 from rcon.live_map.models import TacticalBlock, TacticalReview, TacticalSettings
 from rcon.population_models import PopulationSample, SeedingSession
+from rcon import voice_language, voice_player_store  # register tables for schema comparison
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
