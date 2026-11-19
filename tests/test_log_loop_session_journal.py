@@ -7,6 +7,7 @@ import pytest
 import redis
 
 from rcon import player_history, session_event_review
+from rcon import barricade_scan_journal
 from rcon.logs import loop as log_loop
 from rcon.session_event_journal import SessionEventJournal
 
@@ -22,6 +23,7 @@ def make_loop(tmp_path, monkeypatch, logs):
     instance.record_line = Mock(return_value=None)  # duplicate or older log
     instance.process_hooks = Mock()
     monkeypatch.setattr(log_loop, "MapsHistory", lambda: SimpleNamespace(get_current_map=lambda: None))
+    monkeypatch.setattr(barricade_scan_journal, 'has_registered_integration', lambda _server: False)
     return instance
 
 
@@ -81,6 +83,7 @@ def test_anonymous_log_is_retained_for_review_without_creating_a_session(tmp_pat
 def test_optional_backlog_observation_runs_after_log_processing(tmp_path, monkeypatch):
     from rcon import session_journal_observation as observations
     instance = make_loop(tmp_path, monkeypatch, [])
+    monkeypatch.setattr(barricade_scan_journal, 'has_registered_integration', lambda _server: True)
     monkeypatch.setenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS', '1')
     monkeypatch.setenv('HLL_DB_URL', 'postgresql://synthetic@localhost/test')
     red = Mock()
@@ -96,7 +99,7 @@ def test_optional_backlog_observation_runs_after_log_processing(tmp_path, monkey
     assert publish.call_args.kwargs['poll_finished_at'] == 1001
 
 
-def test_backlog_observation_is_disabled_by_default(tmp_path, monkeypatch):
+def test_unregistered_server_does_not_publish_observations(tmp_path, monkeypatch):
     instance = make_loop(tmp_path, monkeypatch, [])
     monkeypatch.delenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS', raising=False)
     redis_client = Mock(side_effect=AssertionError('must not access Redis'))
@@ -105,9 +108,35 @@ def test_backlog_observation_is_disabled_by_default(tmp_path, monkeypatch):
     redis_client.assert_not_called()
 
 
+@pytest.mark.parametrize('flag', ['HLL_BARRICADE_DURABLE_SCANS', 'HLL_BARRICADE_JOURNAL_OBSERVATIONS'])
+def test_explicit_disable_skips_registration_and_observation(tmp_path, monkeypatch, flag):
+    instance = make_loop(tmp_path, monkeypatch, [])
+    check = Mock(side_effect=AssertionError('must not query'))
+    monkeypatch.setattr(barricade_scan_journal, 'has_registered_integration', check)
+    monkeypatch.setenv(flag, '0')
+    redis_client = Mock(side_effect=AssertionError('must not use Redis'))
+    monkeypatch.setattr(log_loop, 'get_redis_client', redis_client)
+    instance.process_logs()
+    check.assert_not_called()
+    redis_client.assert_not_called()
+
+
+def test_registration_database_failure_does_not_interrupt_log_loop(tmp_path, monkeypatch):
+    instance = make_loop(tmp_path, monkeypatch, [])
+    monkeypatch.delenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS', raising=False)
+    monkeypatch.delenv('HLL_BARRICADE_DURABLE_SCANS', raising=False)
+    monkeypatch.setattr(barricade_scan_journal, 'has_registered_integration', Mock(side_effect=RuntimeError('offline')))
+    redis_client = Mock(side_effect=AssertionError('must not use Redis'))
+    monkeypatch.setattr(log_loop, 'get_redis_client', redis_client)
+    instance.process_logs()
+    instance.rcon.get_structured_logs.assert_called_once()
+    redis_client.assert_not_called()
+
+
 def test_observation_failure_never_interrupts_log_processing(tmp_path, monkeypatch, caplog):
     from rcon import session_journal_observation as observations
     instance = make_loop(tmp_path, monkeypatch, [])
+    monkeypatch.setattr(barricade_scan_journal, 'has_registered_integration', lambda _server: True)
     monkeypatch.setenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS', '1')
     monkeypatch.setenv('HLL_DB_URL', 'postgresql://synthetic@localhost/test')
     red = Mock()
@@ -136,6 +165,7 @@ def test_log_loop_publishes_bounded_backlog_observation_to_real_redis(tmp_path, 
     from rcon.player_presence import database_scope
     from rcon import session_journal_observation as observations
     instance = make_loop(tmp_path, monkeypatch, [])
+    monkeypatch.setattr(barricade_scan_journal, 'has_registered_integration', lambda _server: True)
     url = f'postgresql://synthetic@localhost/db_{uuid4().hex}'
     scope = database_scope(url)
     client = redis.Redis.from_url(os.environ['TEST_REDIS_URL'], decode_responses=True)

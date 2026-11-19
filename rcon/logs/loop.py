@@ -402,9 +402,10 @@ class LogLoop:
         return curr_map_time_elapsed
 
     def process_logs(self):
-        self._invalidate_session_journal_observation()
+        barricade_observations = self._barricade_observations_enabled()
+        self._invalidate_session_journal_observation(barricade_observations)
         self._drain_session_events()
-        observation = self._start_session_journal_observation()
+        observation = self._start_session_journal_observation(barricade_observations)
         started = time.perf_counter()
         logs = self.rcon.get_structured_logs(since_min_ago=self.GET_LOGS_SINCE_MIN)
         observation = self._finish_session_log_poll(observation)
@@ -429,7 +430,7 @@ class LogLoop:
                                                 log.get("player_name_1") or "",
                                                 log.get("raw") or log.get("line_without_time") or ""))
         added = self.session_journal.remember_batch(session_events, self.session_cutover_us, unidentified_events)
-        if os.getenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS') == '1':
+        if barricade_observations:
             try:
                 from rcon.barricade_scan_journal import record_collector_connects
                 record_collector_connects(session_events)
@@ -449,9 +450,22 @@ class LogLoop:
         self._drain_session_events()
         self._publish_session_journal_observation(observation)
 
-    def _invalidate_session_journal_observation(self):
+    def _barricade_observations_enabled(self):
+        # Registration, not an implicit global flag, scopes evidence to this
+        # server. A missing DB/table disables only this optional integration.
+        if (os.getenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS') not in (None, '1') or
+                os.getenv('HLL_BARRICADE_DURABLE_SCANS') not in (None, '1')):
+            return False
+        try:
+            from rcon.barricade_scan_journal import has_registered_integration
+            return has_registered_integration(self.session_server_number)
+        except Exception as exc:
+            self._log_journal_observation_error(exc)
+            return False
+
+    def _invalidate_session_journal_observation(self, enabled):
         """A failed pass must not leave a previous success as fresh evidence."""
-        if os.getenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS') != '1':
+        if not enabled:
             return
         try:
             from rcon.player_presence import database_scope
@@ -490,8 +504,8 @@ class LogLoop:
             # attempt, including when PostgreSQL is temporarily unavailable.
             logger.exception("Unable to process queued session events; will retry")
 
-    def _start_session_journal_observation(self):
-        if os.getenv('HLL_BARRICADE_JOURNAL_OBSERVATIONS') != '1':
+    def _start_session_journal_observation(self, enabled):
+        if not enabled:
             return None
         try:
             from rcon.player_presence import database_scope, redis_time

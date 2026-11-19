@@ -2,15 +2,21 @@
 
 The durable scanner is opt-in for each server and integration. It needs the
 journal migration, an authenticated API key, a fresh shared roster and
-session-journal observations. Set `HLL_BARRICADE_DURABLE_SCANS` on the backend
-and `HLL_BARRICADE_JOURNAL_OBSERVATIONS` on its log collector. Both default to off.
+session-journal observations. An explicit registration enables the backend and
+collector for that server when `HLL_BARRICADE_DURABLE_SCANS` and
+`HLL_BARRICADE_JOURNAL_OBSERVATIONS` are unset. Setting either applicable flag
+to `0` explicitly disables that service. Without a registered integration, the
+collector neither publishes Barricade journal evidence nor records its CONNECT
+observations. Database or registration lookup failures skip this optional
+evidence and leave ordinary log processing running.
 
 When switching from the legacy scanner, take and verify a paired backup and
 stop the old consumer before registering the integration. Register its
 dedicated key with the Django management command `barricade_scan_integration`.
 Registration snapshots existing session IDs under a database lock. PostgreSQL
 records the cutover time and the first observations of new connections.
-Start the new consumer with the binding and both services configured.
+Start the new consumer with the binding; the default configuration needs no
+internal Compose override for these two switches.
 Check for a fresh roster snapshot for the registered namespace. A WebSocket
 connection alone does not establish which scanner handled it.
 

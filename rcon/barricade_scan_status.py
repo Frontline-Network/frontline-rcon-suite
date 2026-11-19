@@ -14,7 +14,7 @@ def scan_status(server_number: int) -> dict:
     """Report evidence availability, not a peer connection or delivery guarantee."""
     if type(server_number) is not int or not 1 <= server_number <= 32:
         raise ValueError('Invalid server number')
-    if os.getenv('HLL_BARRICADE_DURABLE_SCANS') != '1':
+    if os.getenv('HLL_BARRICADE_DURABLE_SCANS') not in (None, '1'):
         return {'state': 'disabled'}
     try:
         with get_session_maker()() as session:
