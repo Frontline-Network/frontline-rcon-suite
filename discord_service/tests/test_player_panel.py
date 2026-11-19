@@ -367,8 +367,19 @@ def test_transient_webhook_retries_even_after_dm_while_stale_and_expired_edits_s
     assert database.get(PrivateReply, (PANEL, "123", CASE)) is None
 
 
+@pytest.fixture
+def panel_dns(monkeypatch):
+    import socket
+
+    def resolve_panel_host(host, port, *, type):
+        assert host in {"rcon3.example", "rcon4.example"}
+        return [(socket.AF_INET, type, socket.IPPROTO_TCP, "", ("93.184.216.34", port))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolve_panel_host)
+
+
 def test_mixed_version_player_route_is_paired_per_panel_and_can_be_cleared(
-    database, monkeypatch
+    database, monkeypatch, panel_dns
 ):
     from discord_service.app import main, player_callback
     from discord_service.app.player_models import PlayerPanelCallback
@@ -480,7 +491,7 @@ def test_override_rejects_untrusted_origin_before_any_relay(
     assert not post.called and not discord.upsert.called
 
 
-def test_override_rejects_other_installation_before_publication(database, monkeypatch):
+def test_override_rejects_other_installation_before_publication(database, monkeypatch, panel_dns):
     from discord_service.app import main
     from discord_service.app.player_models import PlayerPanelCallback
 
