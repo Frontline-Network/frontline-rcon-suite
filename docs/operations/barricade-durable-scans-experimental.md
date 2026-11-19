@@ -78,9 +78,38 @@ directory containing the latter three as `custom.py`, `crcon.py`, and
 isolated test environment. The test checks the pinned Git blob hashes and
 substitutes the alert callback; it does not contact Barricade or Discord.
 
-The new consumer rejects an explicitly requested or registered connection
-if durable scanning is disabled or its binding cannot be used. An unregistered
-peer without the parameter uses the legacy path. On rollback, keep the
+### Updating an existing installation
+
+An upgrade from v0.9.30 uses the existing database registration, integration
+UUID, session baseline and delivery journal. Keep the same database and the
+same exclusive API key. An already registered Custom integration reconnects
+using its existing Discord configuration. Each Frontline server uses its own
+registration and configured game, including when several servers share PostgreSQL.
+Neither a Barricade integration number nor an API-key record number from
+another installation is required.
+
+An authorized, unregistered Custom connection can still submit bans, unbans
+and report notifications. It receives no automatic player scans. A successful
+report acknowledgement confirms receipt of the notification. With a configured
+binding the server also checks which reported players are online and requests
+a scan on the connection that submitted the report. Old queued report
+notifications lack a recipient binding and are skipped during an update.
+Existing ban-list deliveries are a separate queue.
+
+For a first-time registration, identify the exclusive key actually used by
+the peer. After all old scanners have stopped, run the following command in
+the target server's backend, substituting its local record ID and operator.
+
+```sh
+python /code/rconweb/manage.py barricade_scan_integration register \
+  --credential-id "$CREDENTIAL_ID" --actor "$ADMIN_USERNAME" \
+  --reason "Enable automatic player scans for this Custom integration" \
+  --legacy-scanner-stopped --dedicated-key-confirmed
+```
+
+Reconnect that Custom integration once so its socket picks up the new binding.
+Subsequent updates preserve it. A request for an invalid or mismatched
+integration UUID is rejected. On rollback, keep the
 registered peer disconnected from any older backend until pending and
 uncertain deliveries are reconciled. Older binaries do not know the binding.
 Keep shared maintenance on an image that recognizes the migrated Alembic
