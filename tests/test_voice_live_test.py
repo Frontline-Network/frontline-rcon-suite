@@ -14,6 +14,45 @@ TARGET = "000000000000000000000000000000e1"
 REPORTER = "000000000000000000000000000000e2"
 
 
+@pytest.mark.parametrize("outcome", ["no", "yes", "cancel", "expire", "other", "discord"])
+def test_real_chat_pilot(volunteers, outcome):
+    fixture, advance = volunteers
+    database, _, ctx = fixture
+    api = transport()
+    window = grant.arm_chat(1, REPORTER, ctx, 2)
+    iid = report(fixture, reporter_id="v0" if outcome == "other" else REPORTER)["id"]
+    if outcome == "other":
+        assert snapshot(database, iid)["mode"] == "dry_run"
+        return
+    assert snapshot(database, iid)["voice"]["chat_pilot"] == window
+    if outcome == "discord":
+        with database() as sess:
+            from rcon.models import AdminIncident
+            case = sess.get(AdminIncident, iid)
+            case.source = "manual"
+            event = sess.scalar(select(AdminIncidentEvent).where(
+                AdminIncidentEvent.incident_id == iid, AdminIncidentEvent.event_type == "report_admin"
+            ))
+            assert not grant.allowed(sess, event, "dispatch", database.clock.now)
+        return
+    service.tick(api, 1)
+    advance(60)
+    service.tick(api, 1)
+    api.kick.assert_not_called()
+    assert voice_reports.answer(1, iid, REPORTER, outcome == "yes", ctx)
+    if outcome == "cancel":
+        grant.cancel(1, window)
+    if outcome == "expire":
+        advance(61)
+    service.tick(api, 1)
+    service.tick(api, 1)
+    if outcome == "no":
+        api.kick.assert_called_once()
+        assert api.kick.call_args.args[0] == TARGET
+    else:
+        api.kick.assert_not_called()
+
+
 @pytest.fixture
 def volunteers(pilot, monkeypatch):
     fixture, advance = pilot

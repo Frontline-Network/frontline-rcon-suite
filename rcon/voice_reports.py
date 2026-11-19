@@ -522,7 +522,7 @@ def advance(api, server, event_id, context):
             return
         if not admin.delivered(sess, event.incident_id):
             return
-        if v.get("live_test"):
+        if v.get("live_test") or v.get("chat_pilot"):
             from rcon.voice_live_test import keep_or_simulate
 
             keep_or_simulate(sess, event, now)
@@ -739,7 +739,7 @@ def _answer(
         if reason := admin.invalid_reason(sess, event, context, now):
             _final(sess, event, "manual", "manual", reason)
             return False
-        if v.get("live_test"):
+        if v.get("live_test") or v.get("chat_pilot"):
             from rcon.voice_live_test import keep_or_simulate
 
             keep_or_simulate(sess, event, now)

@@ -1,4 +1,4 @@
-"""A single consensual pilot kick, tied to one new report and two live sessions."""
+"""Operator-scoped voice pilots bound to live game identities and new reports."""
 
 import re
 import time
@@ -19,14 +19,25 @@ def _window(sess, server):
 
 
 def arm(server, target, reporter, context):
+    return _arm(server, target, reporter, context, WINDOW_SECONDS)
+
+
+def arm_chat(server, reporter, context, minutes):
+    if not 1 <= minutes <= 60:
+        raise ValueError("Select a chat pilot duration between 1 and 60 minutes")
+    return _arm(server, None, reporter, context, minutes * 60)
+
+
+def _arm(server, target, reporter, context, duration):
     from rcon import voice_reports as voice
 
     if not voice.enabled(server) or voice.live_kicks_enabled(server):
         raise ValueError(
             "The voice pilot must be enabled and global voice kicks disabled"
         )
+    ids = (reporter,) if target is None else (target, reporter)
     if target == reporter or not all(
-        re.fullmatch(r"[0-9a-f]{32}", p) for p in (target, reporter)
+        re.fullmatch(r"[0-9a-f]{32}", p) for p in ids
     ):
         raise ValueError("Use two different canonical Vietnam EOS player IDs")
     with admin.enter_session() as sess:
@@ -40,7 +51,7 @@ def arm(server, target, reporter, context):
                 "The existing communication rule must be enabled and active"
             )
         participants = {}
-        for pid in (target, reporter):
+        for pid in ids:
             rows = [
                 p
                 for p in context["players"]
@@ -52,8 +63,8 @@ def arm(server, target, reporter, context):
                     "Both volunteers need a verified current session on this server"
                 )
             participants[pid] = (rows[0], token)
-        target_seat = voice.communication_identity(participants[target][0], True)
-        if not voice._channel(participants[reporter][0], target_seat):
+        target_seat = voice.communication_identity(participants[target][0], True) if target else None
+        if target and not voice._channel(participants[reporter][0], target_seat):
             raise ValueError(
                 "The reporter must be in the target's squad or leadership voice channel"
             )
@@ -70,13 +81,13 @@ def arm(server, target, reporter, context):
         )
         window = {
             "id": str(uuid4()),
-            "state": "armed",
+            "state": "armed" if target else "chat",
             "started_at": now,
-            "expires_at": now + WINDOW_SECONDS,
+            "expires_at": now + duration,
             "round_id": context["round_id"],
             "target_id": target,
             "reporter_id": reporter,
-            "session": participants[target][1],
+            "session": participants[target][1] if target else None,
             "reporter_session": participants[reporter][1],
             "target_seat": target_seat,
             "witness_seat": voice.communication_identity(
@@ -99,7 +110,7 @@ def inspect_window(server):
             return {"state": "absent"}
         window = row.value
         state = window["state"]
-        if state in {"armed", "bound"} and time.time() >= window["expires_at"]:
+        if state in {"armed", "bound", "chat"} and time.time() >= window["expires_at"]:
             state = "expired"
         return {
             "state": state,
@@ -160,6 +171,13 @@ def bind(sess, event, now):
     if p["config"]["mode"] != "active":
         return
     row = _window(sess, event.incident.server_number)
+    if row and row.value["state"] == "chat" and _matches_chat(sess, event, row.value, now):
+        event.payload = {
+            **p,
+            "mode": "active",
+            "voice": {**p["voice"], "chat_pilot": row.value["id"]},
+        }
+        return
     if row and row.value["state"] == "armed" and _matches(sess, event, row, now):
         row.value = {
             **row.value,
@@ -174,6 +192,21 @@ def bind(sess, event, now):
         }
 
 
+def _matches_chat(sess, event, window, now):
+    incident, p = event.incident, event.payload
+    return (
+        incident.source == "chat"
+        and incident.reporter_id == window["reporter_id"]
+        and p["rule"] == "communication"
+        and window["started_at"] <= p["report_time"] <= now < window["expires_at"]
+        and event.id > window["after_event"]
+        and p["round_id"] == window["round_id"]
+        and p["reporter_session"] == window["reporter_session"]
+        and admin.session_token(sess, incident.server_number, incident.reporter_id, now)
+        == window["reporter_session"]
+    )
+
+
 def allowed(sess, event, stage, now):
     """Caller holds the same server lock and independently validates a fresh game context."""
     from rcon import voice_reports as voice
@@ -181,6 +214,14 @@ def allowed(sess, event, stage, now):
     server = event.incident.server_number
     p = event.payload
     grant = p["voice"].get("live_test")
+    chat = p["voice"].get("chat_pilot")
+    if chat:
+        row = _window(sess, server)
+        return bool(
+            voice.enabled(server) and p["mode"] == "active" and row
+            and row.value["state"] == "chat" and row.value["id"] == chat
+            and _matches_chat(sess, event, row.value, now)
+        )
     if not grant:
         return p["mode"] == "active" and voice.live_kicks_enabled(server)
     if (
@@ -216,7 +257,7 @@ def keep_or_simulate(sess, event, now):
     """Freeze a revoked/expired grant to dry-run even if a new window is armed later."""
     p = event.payload
     if (
-        p["voice"].get("live_test")
+        (p["voice"].get("live_test") or p["voice"].get("chat_pilot"))
         and p["mode"] == "active"
         and not allowed(sess, event, "reserve", now)
     ):

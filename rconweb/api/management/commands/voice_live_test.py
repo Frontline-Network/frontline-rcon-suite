@@ -19,6 +19,9 @@ class Command(BaseCommand):
         arm = sub.add_parser("arm")
         arm.add_argument("--target-id", required=True)
         arm.add_argument("--reporter-id", required=True)
+        chat = sub.add_parser("chat")
+        chat.add_argument("--reporter-id", required=True)
+        chat.add_argument("--minutes", type=int, required=True)
         sub.add_parser("status")
         sub.add_parser("cancel").add_argument("--window", required=True)
 
@@ -29,18 +32,17 @@ class Command(BaseCommand):
         if server != int(get_server_number()):
             raise CommandError("Run in the backend for the selected server")
         try:
-            if options["operation"] == "arm":
+            if options["operation"] in {"arm", "chat"}:
                 api = get_rcon_api()
                 if api.game_profile.game != GameEnum.HLL_VIETNAM:
                     raise ValueError(
                         "This one-time pilot command requires Hell Let Loose Vietnam"
                     )
-                voice_live_test.arm(
-                    server,
-                    options["target_id"],
-                    options["reporter_id"],
-                    read_context(api),
-                )
+                context = read_context(api)
+                if options["operation"] == "chat":
+                    voice_live_test.arm_chat(server, options["reporter_id"], context, options["minutes"])
+                else:
+                    voice_live_test.arm(server, options["target_id"], options["reporter_id"], context)
             elif options["operation"] == "cancel":
                 voice_live_test.cancel(server, options["window"])
             self.stdout.write(json.dumps(voice_live_test.inspect_window(server)))
