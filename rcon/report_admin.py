@@ -36,7 +36,7 @@ from rcon.report_admin_rules import (
     QUALIFIED,
     MAX_REPORT_AGE,
 )
-from rcon import report_admin_evidence as evidence_rules, voice_reports
+from rcon import report_admin_evidence as evidence_rules, voice_reports, voice_live_test
 from rcon.admin_incidents import _normalize_team, _normalize_message
 from rcon.user_config.report_admin import ReportAdminUserConfig as Config
 from rcon.user_config.utils import _invalidate_user_config_cache
@@ -967,7 +967,7 @@ def tick(api, server):
                         "incident_revision": event.incident.revision,
                     }
                     continue
-            if p["mode"] == "dry_run" or (p.get("voice") and not voice_reports.live_kicks_enabled(server)):
+            if p["mode"] == "dry_run" or (p.get("voice") and not voice_live_test.allowed(sess, event, "reserve", time.time())):
                 publish(
                     sess,
                     event,
@@ -1000,6 +1000,9 @@ def tick(api, server):
                     "manual",
                     "Kürzlicher Eingriff; manuell prüfen / Recent action; manual review",
                 )
+                continue
+            if p.get("voice") and not voice_live_test.consume(sess, event, time.time()):
+                publish(sess, event, "dry_run", "One-time pilot window no longer available")
                 continue
             # Commit the durable no-retry marker BEFORE touching RCON.
             publish(
@@ -1043,7 +1046,7 @@ def tick(api, server):
                     continue
                 event.payload = {**p, **evidence}
                 p = event.payload
-            if p.get("voice") and (p["mode"] != "active" or not voice_reports.live_kicks_enabled(server)):
+            if p.get("voice") and not voice_live_test.allowed(sess, event, "dispatch", time.time()):
                 publish(sess, event, "dry_run", "Voice pilot simulation; no kick sent")
                 continue
             reason = kick_reason(sess, p)

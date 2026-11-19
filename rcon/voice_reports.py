@@ -427,6 +427,10 @@ def begin(sess, event, players, now):
         "ready_at": now,
         "result": "Voice contact notice pending",
     }
+    if not live_kicks_enabled(i.server_number):
+        from rcon.voice_live_test import bind
+
+        bind(sess, event, now)
 
 
 def witness_problem(sess, event, players, now):
@@ -518,6 +522,11 @@ def advance(api, server, event_id, context):
             return
         if not admin.delivered(sess, event.incident_id):
             return
+        if v.get("live_test"):
+            from rcon.voice_live_test import keep_or_simulate
+
+            keep_or_simulate(sess, event, now)
+            p = event.payload
         if v["phase"] == "awaiting_answer":
             if now >= v["deadline"]:
                 _final(
@@ -730,6 +739,10 @@ def _answer(
         if reason := admin.invalid_reason(sess, event, context, now):
             _final(sess, event, "manual", "manual", reason)
             return False
+        if v.get("live_test"):
+            from rcon.voice_live_test import keep_or_simulate
+
+            keep_or_simulate(sess, event, now)
         _replace(event, answer_at=now, answer="working" if working else "still_silent")
         if working:
             _final(
