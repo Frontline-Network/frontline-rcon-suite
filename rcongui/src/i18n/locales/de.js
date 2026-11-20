@@ -6527,7 +6527,7 @@ Object.assign(de.dashboard, {
 de.settings.campaigns.vipLifecycle = {
   title: "VIP-Lebenszyklus",
   subtitle:
-    "Vier direkte Kampagnen nach VIP-Status – genau einmal je Spielersitzung.",
+    "Der zweite Besuch beginnt nach mindestens 30 Minuten Abwesenheit. Die Zustellung gilt für die gesamte Serverfamilie.",
   testMode: "Testmodus",
   testModeHelp:
     "Im Testmodus werden Zielgruppen und Protokolle erzeugt, aber keine automatischen Spielernachrichten versendet. Eine ausdrücklich ausgelöste Testnachricht wird weiterhin an den ausgewählten Spieler gesendet.",
@@ -6535,7 +6535,8 @@ de.settings.campaigns.vipLifecycle = {
   expiryWindow: "Hinweis vor Ablauf (Stunden)",
   cacheSeconds: "Status-Cache (Sekunden)",
   message: "Persönliche Ingame-Nachricht",
-  oncePerSession: "Einmal pro Sitzung",
+  onceReturning: "Einmal ab dem zweiten Besuch",
+  oncePerTrial: "Einmal pro Probezeitraum",
   previewTitle: "Zielgruppenvorschau",
   previewHelp:
     "Prüft VIP-Status, Sitzungsdauer, Spielerzahl und Seeding-Pause aller verbundenen Spieler. Es wird nichts versendet.",

@@ -14,20 +14,23 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 import requests
-from sqlalchemy import func, or_
+from sqlalchemy import String, cast, func, or_
 
 from rcon.broadcast import campaign_is_eligible, format_message
 from rcon.models import (
     Blacklist,
     BlacklistRecord,
     CampaignDelivery,
+    LogLine,
     PlayerID,
+    PlayerSession,
     VipLifecycleDelivery,
     enter_session,
 )
 from rcon.user_config.auto_broadcast import VipLifecycleCampaign, VipLifecycleConfig
 from rcon.user_config.auto_mod_seeding import AutoModSeedingUserConfig
 from rcon.active_session_selection import latest_open_sessions
+from rcon.types import GameIntEnum
 from rcon.utils import get_server_number
 
 logger = logging.getLogger(__name__)
@@ -141,18 +144,15 @@ def classify_status(
 
 
 def _fingerprint_status(status: dict[str, Any], rule: str) -> str:
-    payload = {
-        "rule": rule,
-        "server_family": status.get("server_family"),
-        "verified": status.get("verified"),
-        "vip_active": status.get("vip_active"),
-        "grant_source": status.get("grant_source"),
-        "expires_at": status.get("expires_at"),
-        "has_purchased_vip": status.get("has_purchased_vip"),
-        "status_version": status.get("status_version"),
-    }
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(encoded).hexdigest()
+    # WordPress offers a single free trial per player and family. A provider
+    # offering repeat trials can identify each grant independently of its expiry.
+    if rule == RULE_UNVERIFIED:
+        return "invitation"
+    trial_id = status.get("trial_id")
+    if not trial_id:
+        return "single"
+    return hashlib.sha256(trial_id.encode()).hexdigest()[:48]
+
 
 
 def _local_server_family() -> str:
@@ -230,7 +230,11 @@ def _validate_status(
         return None
     if purchased and grant_source != "paid":
         return None
+    trial_id = raw.get("trial_id")
+    if trial_id is not None and (not isinstance(trial_id, str) or not trial_id.strip() or len(trial_id) > 256):
+        return None
     return {
+        "trial_id": trial_id,
         "player_id": player_id,
         "server_family": server_family,
         "status_known": True,
@@ -380,6 +384,8 @@ def _active_sessions(
                 {
                     "player_db_id": player.id,
                     "session_id": player_session.id,
+                    "start_us": player_session.start_event_us,
+                    "server_number": server_number,
                     "start": (
                         datetime.fromtimestamp(
                             player_session.start_event_us / 1_000_000, timezone.utc
@@ -391,6 +397,22 @@ def _active_sessions(
                     ),
                 },
             )
+        return result
+
+
+def _audience_sessions(statuses, server_number, config):
+    result = _active_sessions(set(statuses), server_number)
+    with enter_session() as sess:
+        ids = [row["player_db_id"] for row in result.values()]
+        attempts = _family_attempts(sess, ids, config)
+        invitation = LifecycleDecision(RULE_UNVERIFIED, "invitation")
+        candidates = {pid: row for pid, row in result.items()
+                      if statuses.get(pid, {}).get("verified") is False
+                      and not _already_attempted(attempts, row["player_db_id"], invitation, config.test_mode)}
+        returning = _returning_players(sess, candidates, config.server_family) if config.campaigns.unverified.enabled else set()
+        for row in result.values():
+            row["returning"] = row["player_db_id"] in returning
+            row["attempts"] = attempts
         return result
 
 
@@ -421,13 +443,90 @@ def _interval_is_due(
     )
 
 
-def _session_fingerprint(
-    *, server_number: int, rule: str, player_session_id: int, test_mode: bool
-) -> str:
-    namespace = "test" if test_mode else "live"
-    return hashlib.sha256(
-        f"{namespace}|{server_number}|{rule}|{player_session_id}".encode()
-    ).hexdigest()
+VISIT_BREAK_US = 30 * 60 * 1_000_000
+
+
+def _returning_players(sess, sessions, family):
+    """A new visit begins after 30 minutes off all servers in this family."""
+    if not sessions:
+        return set()
+    game = GameIntEnum.HLL_VIETNAM if family == "hll_vietnam" else GameIntEnum.HLL_WW2
+    starts = {row["player_db_id"]: row["start_us"] for row in sessions.values()
+              if row["start_us"] is not None}
+    if not starts:
+        return set()
+    # Server numbers can be reused for another game. Match the recorded
+    # connection, including its player and game, before counting past visits.
+    recorded = sess.query(LogLine.id).filter(
+        LogLine.server == cast(PlayerSession.server_number, String),
+        LogLine.event_time == PlayerSession.start,
+        LogLine.player1_player_id == PlayerSession.player_id_id,
+        LogLine.type == "CONNECTED", LogLine.game == game.value,
+    ).exists()
+    rows = (sess.query(PlayerSession.player_id_id, PlayerSession.start_event_us,
+                       PlayerSession.end_event_us, PlayerSession.server_number)
+            .filter(PlayerSession.player_id_id.in_(starts), PlayerSession.start_event_us.isnot(None),
+                    PlayerSession.start_event_us <= max(starts.values()), recorded)
+            .order_by(PlayerSession.player_id_id, PlayerSession.start_event_us, PlayerSession.id))
+    intervals = {}
+    for pid, start, end, server in rows:
+        if start <= starts[pid]:
+            intervals.setdefault(pid, []).append((start, end, server))
+    returning = set()
+    for row in sessions.values():
+        pid = row["player_db_id"]
+        if pid not in starts:
+            continue
+        history = intervals.get(pid, [])
+        # The live session can precede persistence of its CONNECTED log.
+        history.append((starts[pid], None, row["server_number"]))
+        last_end = None
+        open_servers = set()
+        for start, end, server in history:
+            if not open_servers and last_end is not None and start - last_end >= VISIT_BREAK_US:
+                returning.add(pid)
+                break
+            # A later connection on the same server supersedes an unclosed one,
+            # but cannot by itself prove that the player had been offline.
+            open_servers.discard(server)
+            if end is None or end < start:
+                open_servers.add(server)
+            else:
+                last_end = max(last_end or end, end)
+    return returning
+
+
+def _family_attempts(sess, player_ids, config):
+    if not player_ids:
+        return {}
+    rows = (sess.query(VipLifecycleDelivery.player_id_id, VipLifecycleDelivery.rule,
+                       VipLifecycleDelivery.status_fingerprint)
+            .filter(VipLifecycleDelivery.player_id_id.in_(player_ids),
+                    VipLifecycleDelivery.server_family == config.server_family,
+                    VipLifecycleDelivery.test_mode.is_(config.test_mode),
+                    VipLifecycleDelivery.status != "test"))
+    attempts = {}
+    for pid, rule, fingerprint in rows:
+        attempts.setdefault((pid, rule), set()).add(fingerprint)
+    return attempts
+
+
+def _already_attempted(attempts, pid, decision, test_mode):
+    rules = ((RULE_TRIAL_EXPIRING, RULE_TRIAL_EXPIRED)
+             if decision.rule in (RULE_TRIAL_EXPIRING, RULE_TRIAL_EXPIRED) else (decision.rule,))
+    current = _delivery_key(decision, test_mode)
+    for rule in rules:
+        for prior in attempts.get((pid, rule), ()):
+            # Old session-based entries and unidentified one-time trials have
+            # no reliable grant identity. Suppress a possible repeat.
+            if (prior == current or not prior.startswith("v2:") or prior.endswith(":single")
+                    or decision.status_fingerprint == "single"):
+                return True
+    return False
+
+
+def _delivery_key(decision, test_mode):
+    return f"v2:{'test' if test_mode else 'live'}:{decision.status_fingerprint}"
 
 
 def _prepare_delivery(
@@ -444,6 +543,10 @@ def _prepare_delivery(
     now: datetime,
 ) -> int | None:
     with enter_session() as sess:
+        # Serialize claims across servers and the two expiry notice rules.
+        sess.query(PlayerID.id).filter(PlayerID.id == player_db_id).with_for_update().one()
+        if _already_attempted(_family_attempts(sess, [player_db_id], config), player_db_id, decision, config.test_mode):
+            return None
         existing = (
             sess.query(VipLifecycleDelivery)
             .filter(
@@ -455,8 +558,7 @@ def _prepare_delivery(
             .one_or_none()
         )
         if existing is not None:
-            # The session claim is the dedupe boundary. Never retry it
-            # automatically because RCON may have accepted a timed-out send.
+            # Keep compatibility with the historical unique session constraint.
             return None
 
         if not config.test_mode:
@@ -489,18 +591,17 @@ def _prepare_delivery(
                 )
                 .scalar()
             )
-            latest_lifecycle_send = (
-                sess.query(func.max(VipLifecycleDelivery.sent_at))
+            latest_family_contact = (
+                sess.query(func.max(func.coalesce(VipLifecycleDelivery.sent_at, VipLifecycleDelivery.last_attempt_at)))
                 .filter(
-                    VipLifecycleDelivery.server_number == server_number,
-                    VipLifecycleDelivery.player_session_id == player_session_id,
-                    VipLifecycleDelivery.status == "sent",
+                    VipLifecycleDelivery.server_family == config.server_family,
+                    VipLifecycleDelivery.player_id_id == player_db_id,
                     VipLifecycleDelivery.test_mode.is_(False),
                 )
                 .scalar()
             )
             if not _interval_is_due(
-                _latest_timestamp(latest_direct_send, latest_lifecycle_send),
+                _latest_timestamp(latest_direct_send, latest_family_contact),
                 player_message_gap_sec,
                 now,
             ):
@@ -513,12 +614,7 @@ def _prepare_delivery(
             player_id_id=player_db_id,
             player_session_id=player_session_id,
             player_name=player_name,
-            status_fingerprint=_session_fingerprint(
-                server_number=server_number,
-                rule=decision.rule,
-                player_session_id=player_session_id,
-                test_mode=config.test_mode,
-            ),
+            status_fingerprint=_delivery_key(decision, config.test_mode),
             message=campaign.message.strip(),
             status="sending",
             attempt_count=1,
@@ -550,6 +646,12 @@ def _finish_delivery(
         delivery.last_error = error
 
 
+def _eligible_this_visit(player_session, decision, config):
+    return ((decision.rule != RULE_UNVERIFIED or player_session["returning"])
+            and not _already_attempted(player_session["attempts"], player_session["player_db_id"],
+                                       decision, config.test_mode))
+
+
 def process_once(
     ctl,
     config: VipLifecycleConfig,
@@ -574,12 +676,12 @@ def process_once(
     counters["online"] = len(players)
     blocked = _blocked_player_ids(set(players), server_number)
     candidate_ids = set(players) - blocked
-    active_sessions = _active_sessions(candidate_ids, server_number)
     statuses = fetch_statuses(
         candidate_ids,
         server_family=config.server_family,
         cache_seconds=config.status_cache_seconds,
     )
+    active_sessions = _audience_sessions(statuses, server_number, config)
     seeding_config = (
         AutoModSeedingUserConfig.load_from_db()
         if any(
@@ -600,7 +702,7 @@ def process_once(
             now=now,
             expiry_window_hours=config.expiry_window_hours,
         )
-        if decision is None:
+        if decision is None or not _eligible_this_visit(player_session, decision, config):
             continue
         campaign = _campaign_for_rule(config, decision.rule)
         if not campaign.message.strip():
@@ -671,7 +773,6 @@ def preview(ctl, config: VipLifecycleConfig) -> dict[str, Any]:
             "server_family": config.server_family,
         }
     blocked = _blocked_player_ids(set(players), server_number)
-    active_sessions = _active_sessions(set(players) - blocked, server_number)
     statuses = fetch_statuses(
         set(players) - blocked,
         server_family=config.server_family,
@@ -679,6 +780,7 @@ def preview(ctl, config: VipLifecycleConfig) -> dict[str, Any]:
         force=True,
     )
     now = utc_now()
+    active_sessions = _audience_sessions(statuses, server_number, config)
     seeding_config = (
         AutoModSeedingUserConfig.load_from_db()
         if any(
@@ -707,6 +809,7 @@ def preview(ctl, config: VipLifecycleConfig) -> dict[str, Any]:
             decision
             and campaign
             and player_session
+            and _eligible_this_visit(player_session, decision, config)
             and campaign.message.strip()
             and campaign_is_eligible(campaign, len(players), seeding_config)
             and _session_is_eligible(campaign, player_session["start"], now)

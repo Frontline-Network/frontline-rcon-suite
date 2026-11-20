@@ -60,10 +60,10 @@ export const campaignsFr = {
   deleteDescription: "« {{name}} » sera supprimée de la configuration. La modification prend effet uniquement après enregistrement.",
   priorityNote: "Les diffusions conservent la protection des messages des administrateurs et de la modération automatique. Les campagnes directes sont envoyées une fois par session et échelonnées via message_player.",
   vipLifecycle: {
-    title: "Cycle de vie VIP", subtitle: "Quatre campagnes directes choisies selon le statut VIP, une fois par session de joueur.", testMode: "Mode test",
+    title: "Cycle de vie VIP", subtitle: "Une nouvelle visite commence après au moins 30 minutes d’absence. L’historique des envois est partagé entre les serveurs de la même famille.", testMode: "Mode test",
     testModeHelp: "Le mode test enregistre les destinataires et les journaux d'envoi sans envoyer automatiquement de messages aux joueurs. Un test déclenché manuellement est toutefois envoyé au joueur sélectionné.",
     serverFamily: "Famille de serveurs cible", expiryWindow: "Délai d'avertissement avant expiration (heures)", cacheSeconds: "Cache de statut (secondes)",
-    message: "Message personnel en jeu", oncePerSession: "Une fois par session", previewTitle: "Aperçu des destinataires",
+    message: "Message personnel en jeu", onceReturning: "Une fois dès la deuxième visite", oncePerTrial: "Une fois par période d’essai", previewTitle: "Aperçu des destinataires",
     previewHelp: "Vérifie le statut VIP, la durée de session, le nombre de joueurs et la pause pendant le remplissage pour chaque joueur connecté. Aucun message n'est envoyé.",
     previewAction: "Vérifier les destinataires", targetCount_one: "{{count}} joueur recevrait un message.", targetCount_other: "{{count}} joueurs recevraient un message.",
     unknownStatus: "Statut impossible à déterminer avec certitude", blocked: "Bloqué – aucun envoi", notEligible: "Actuellement en pause ou délai d'attente non atteint", noMessage: "Aucun message",
