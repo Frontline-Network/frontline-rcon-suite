@@ -52,13 +52,15 @@ class TestServer:
         return pid
 
     def get_gamestate(self):
+        if not self.healthy:
+            raise RuntimeError("Team counts unavailable")
         return {
             "num_allied_players": sum(p["team"] == "allies" for p in self.players.values()),
             "num_axis_players": sum(p["team"] == "axis" for p in self.players.values()),
         }
 
     def get_detailed_players(self):
-        return {"players": deepcopy(self.players), "fail_count": 0 if self.healthy else 1}
+        return {"players": deepcopy(self.players), "fail_count": 0}
 
     def add_vip(self, **data):
         self.writes.append(deepcopy(data))
@@ -156,6 +158,55 @@ def world(request, monkeypatch, tmp_path):
             json.dumps(evidence, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
         )
         db.dispose()
+
+
+def test_partial_roster_preserves_population_timer_and_verified_progress(world, monkeypatch):
+    w = world
+    w.cfg = VipRewardsUserConfig(
+        enabled=True, dry_run=False, weekly_support={"enabled": True},
+        milestones={"enabled": True},
+    )
+    alice = w.player("Test-Alice")
+    bob = w.player("Test-Bob", "axis")
+    counts = {"num_allied_players": 48, "num_axis_players": 47}
+    monkeypatch.setattr(w, "get_gamestate", lambda: counts)
+    w.tick()
+    w.advance(150)
+    hidden = w.players.pop(bob)
+    w.tick(30)
+    assert service.status()["release_wait_seconds"] == 120
+    w.advance(120)
+    assert service.status()["status"] == "active"
+    w.players[alice]["support"] += 100
+    w.tick(30)
+    w.players[bob] = {**hidden, "support": 600}
+    w.tick(30)
+    assert w.support(alice) == 100 and w.support(bob) == 0
+    assert service.progress(alice)["total"] == 60
+    assert service.progress(bob)["total"] == 0
+    w.players[bob]["support"] += 10
+    w.tick(30)
+    assert w.support(bob) == 10 and service.progress(bob)["total"] == 30
+
+    with monkeypatch.context() as detail_error:
+        def unavailable():
+            raise RuntimeError("Roster unavailable")
+
+        detail_error.setattr(w, "get_detailed_players", unavailable)
+        w.tick(30)
+        assert service.status()["status"] == "active"
+    w.tick(30)
+    assert service.progress(bob)["total"] == 30
+    counts["num_axis_players"] = 1
+    w.tick(30)
+    assert service.status()["status"] == "seeding"
+    assert service.status()["release_wait_seconds"] is None
+    del counts["num_axis_players"]
+    w.tick(30)
+    assert service.status()["status"] == "unknown"
+    counts["num_axis_players"] = 47
+    w.tick(30)
+    assert service.status()["release_wait_seconds"] == 300
 
 
 def test_support_across_rounds_reconnect_outage_and_next_week(world):

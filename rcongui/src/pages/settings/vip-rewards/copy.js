@@ -92,6 +92,9 @@ export const vipCopy = {
   "Pausiert: kein bestätigter Serverstatus":
     "Paused: server status not confirmed",
   "Pausiert: Seeding / Freigabeprüfung": "Paused: seeding / population check",
+  "Wartet auf Mindestbesetzung": "Waiting for minimum team sizes",
+  "Freigabe in {{time}}": "Rewards unlock in {{time}}",
+  "Freigabe wird bestätigt": "Confirming eligibility",
   "Lokaler Formulartest · Nur simulierte Daten. Keine VIP-Vergaben oder Spielernachrichten.":
     "Local form preview · Simulated data only. No VIP awards or player messages.",
   "VIP-Belohnungen": "VIP rewards",

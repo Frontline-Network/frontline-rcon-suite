@@ -15,7 +15,7 @@ from rcon.service_runtime import stopping, wait
 from rcon.user_config.seed_vip import SeedVIPUserConfig
 from rcon.user_config.vip_rewards import VipRewardsUserConfig
 from rcon.utils import get_server_number
-from rcon.vip_rewards.engine import Engine, budget, gate
+from rcon.vip_rewards.engine import RELEASE_SECONDS, Engine, budget, gate
 from rcon.vip_rewards.locking import lock, switch_state_lock, vip_lock
 
 logger = logging.getLogger(__name__)
@@ -57,8 +57,13 @@ def read_gate_state(preview):
 def status():
     cfg = VipRewardsUserConfig.load_from_db()
     state = read_gate_state(cfg.dry_run)
+    now = time.time()
+    phase = gate(state, cfg, now)
+    since = state.get("above_since")
     return {
-        "status": gate(state, cfg, time.time()),
+        "status": phase,
+        "release_wait_seconds": max(0, since + RELEASE_SECONDS - now)
+        if phase == "seeding" and since is not None else None,
         "preview": cfg.dry_run,
         "counts": state.get("counts", {}),
         "thresholds": state.get("thresholds", {}),
@@ -214,28 +219,33 @@ def enqueue(payload):
 
 
 def observe(rcon, cfg):
-    """Only fully observed snapshots can credit time or release the seeding gate."""
+    """Team totals drive seeding. Individual observations drive player progress."""
     try:
         game = rcon.get_gamestate()
-        details = rcon.get_detailed_players()
         counts = {
-            "allies": int(game["num_allied_players"]),
-            "axis": int(game["num_axis_players"]),
+            "allies": game["num_allied_players"],
+            "axis": game["num_axis_players"],
         }
+        for team, value in counts.items():
+            if type(value) is str and value.isascii() and value.isdecimal():
+                counts[team] = int(value)
+            elif type(value) is not int or value < 0:
+                raise ValueError("Invalid game server team count")
+    except Exception:
+        logger.exception("VIP team counts unavailable; rewards paused")
+        return {}, {"allies": 0, "axis": 0}, False
+    try:
+        details = rcon.get_detailed_players()
         players = {
             pid: {"name": p["name"], "team": str(p.get("team", "")).lower(),
                   "support": p.get("support")}
             for pid, p in details["players"].items()
+            if pid and isinstance(p, dict) and p.get("name")
         }
-        healthy = not details.get("fail_count", 0)
-        # Missing player details must not earn attendance time.
-        healthy = healthy and sum(p["team"] in counts for p in players.values()) >= sum(
-            counts.values()
-        )
-        return players, counts, healthy
     except Exception:
-        logger.exception("VIP reward snapshot failed; rewards paused")
-        return {}, {"allies": 0, "axis": 0}, False
+        logger.exception("VIP player details unavailable for this interval")
+        players = {}
+    return players, counts, True
 
 
 def current_round():
