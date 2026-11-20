@@ -61,6 +61,20 @@ def test_legacy_campaign_config_keeps_lifecycle_disabled():
     assert config.vip_lifecycle.expiry_window_hours == 48
 
 
+def test_default_and_previous_vip_invitations_link_to_game_identities():
+    previous = (
+        "Du kannst einmalig kostenlos VIP freischalten und erhältst damit "
+        "bevorzugten Zugang bei voller Warteschlange. Weitere Informationen: fln.gg/vip"
+    )
+    current = VipLifecycleConfig().campaigns.unverified.message
+    assert "https://fln.gg/mein-konto/spielidentitaeten/" in current
+    for config in ({"messages": {"unverified": previous}},
+                   {"campaigns": {"unverified": {"message": previous, "enabled": False}}}):
+        assert VipLifecycleConfig.model_validate(config).campaigns.unverified.message == current
+    custom = {"campaigns": {"unverified": {"message": "Eigener Einladungstext"}}}
+    assert VipLifecycleConfig.model_validate(custom).campaigns.unverified.message == "Eigener Einladungstext"
+
+
 def test_private_feature_is_disabled_by_default(monkeypatch):
     monkeypatch.delenv("FRONTLINE_VIP_LIFECYCLE_ENABLED", raising=False)
 
