@@ -20,7 +20,7 @@ from rcon.vip_lifecycle import (
     RULE_UNVERIFIED,
     LifecycleDecision,
     _prepare_delivery,
-    _session_fingerprint,
+    _delivery_key,
     _session_is_eligible,
     classify_status,
     clear_status_cache,
@@ -158,28 +158,12 @@ def test_session_wait_time_is_inclusive_and_timezone_safe():
     )
 
 
-def test_session_fingerprint_changes_with_session_and_mode():
-    first = _session_fingerprint(
-        server_number=1,
-        rule=RULE_TRIAL_ACTIVE,
-        player_session_id=11,
-        test_mode=False,
-    )
-    second = _session_fingerprint(
-        server_number=1,
-        rule=RULE_TRIAL_ACTIVE,
-        player_session_id=12,
-        test_mode=False,
-    )
-    simulated = _session_fingerprint(
-        server_number=1,
-        rule=RULE_TRIAL_ACTIVE,
-        player_session_id=11,
-        test_mode=True,
-    )
-
-    assert len(first) == 64
-    assert len({first, second, simulated}) == 3
+def test_delivery_key_ignores_expiry_edits_and_separates_grants_and_modes():
+    def key(data, test_mode=False):
+        return _delivery_key(classify_status(data, now=NOW, expiry_window_hours=48), test_mode)
+    assert key(status()) == key(status(expires_at=(NOW+timedelta(hours=12)).isoformat(), status_version="2"))
+    assert key(status(trial_id="second")) != key(status(trial_id="first"))
+    assert key(status(), True) != key(status())
 
 
 def test_paid_or_ambiguous_players_never_receive_advertising():
@@ -344,11 +328,13 @@ def test_process_delivers_information_only_outside_test_mode(monkeypatch, test_m
     )
     monkeypatch.setattr("rcon.vip_lifecycle._blocked_player_ids", lambda *_: set())
     monkeypatch.setattr(
-        "rcon.vip_lifecycle._active_sessions",
+        "rcon.vip_lifecycle._audience_sessions",
         lambda *_: {
             "player-1": {
                 "player_db_id": 7,
                 "session_id": 17,
+                "attempts": {},
+                "returning": True,
                 "start": NOW - timedelta(minutes=10),
             }
         },
@@ -395,11 +381,13 @@ def test_process_skips_delivery_when_status_api_is_unavailable(monkeypatch):
     )
     monkeypatch.setattr("rcon.vip_lifecycle._blocked_player_ids", lambda *_: set())
     monkeypatch.setattr(
-        "rcon.vip_lifecycle._active_sessions",
+        "rcon.vip_lifecycle._audience_sessions",
         lambda *_: {
             "player-1": {
                 "player_db_id": 7,
                 "session_id": 17,
+                "attempts": {},
+                "returning": True,
                 "start": NOW - timedelta(minutes=10),
             }
         },
@@ -468,37 +456,10 @@ def test_process_is_inert_when_private_feature_is_not_enabled(monkeypatch):
 
 
 def test_existing_persistent_claim_is_never_retried(monkeypatch):
-    existing_delivery = Mock(status="failed", attempt_count=1)
-
-    class FakeQuery:
-        def __init__(self, value):
-            self.value = value
-
-        def filter(self, *_args):
-            return self
-
-        def one_or_none(self):
-            return self.value
-
-    class FakeSession:
-        def query(self, _model):
-            return FakeQuery(existing_delivery)
-
-        def add(self, _value):
-            raise AssertionError("An existing lifecycle claim must not be recreated")
-
-    class FakeContext:
-        def __enter__(self):
-            return FakeSession()
-
-        def __exit__(self, *_args):
-            return False
-
-    def fake_enter_session():
-        return FakeContext()
-
-    monkeypatch.setattr("rcon.vip_lifecycle.enter_session", fake_enter_session)
-
+    session = MagicMock()
+    monkeypatch.setattr("rcon.vip_lifecycle.enter_session", lambda: MagicMock(__enter__=lambda *_: session))
+    monkeypatch.setattr("rcon.vip_lifecycle._family_attempts",
+                        lambda *_: {(7, RULE_TRIAL_ACTIVE): {"old-session-key"}})
     assert (
         _prepare_delivery(
             player_db_id=7,
@@ -536,11 +497,13 @@ def test_disabled_status_campaign_is_not_prepared(monkeypatch):
     )
     monkeypatch.setattr("rcon.vip_lifecycle._blocked_player_ids", lambda *_: set())
     monkeypatch.setattr(
-        "rcon.vip_lifecycle._active_sessions",
+        "rcon.vip_lifecycle._audience_sessions",
         lambda *_: {
             "player-1": {
                 "player_db_id": 7,
                 "session_id": 17,
+                "attempts": {},
+                "returning": True,
                 "start": NOW - timedelta(minutes=10),
             }
         },

@@ -6481,7 +6481,7 @@ Object.assign(en.dashboard, {
 en.settings.campaigns.vipLifecycle = {
   title: "VIP lifecycle",
   subtitle:
-    "Four direct campaigns selected by VIP status – once per player session.",
+    "A second visit starts after at least 30 minutes away. Delivery history is shared across the server family.",
   testMode: "Test mode",
   testModeHelp:
     "Test mode records audiences and delivery logs without sending automatic player messages. A manually triggered test message is still sent to the selected player.",
@@ -6489,7 +6489,8 @@ en.settings.campaigns.vipLifecycle = {
   expiryWindow: "Expiry notice window (hours)",
   cacheSeconds: "Status cache (seconds)",
   message: "Personal in-game message",
-  oncePerSession: "Once per session",
+  onceReturning: "Once from the second visit",
+  oncePerTrial: "Once per trial",
   previewTitle: "Audience preview",
   previewHelp:
     "Checks VIP status, session time, player count, and seeding pause for every connected player. Nothing is sent.",

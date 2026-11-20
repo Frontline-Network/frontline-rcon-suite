@@ -79,7 +79,7 @@ VIP_LIFECYCLE_DEFAULT_MESSAGES = {
 
 
 class VipLifecycleCampaign(BaseModel):
-    """One status-targeted campaign delivered once per player session."""
+    """One personal campaign selected by VIP status and family delivery history."""
 
     enabled: bool = Field(default=True, strict=True)
     message: str

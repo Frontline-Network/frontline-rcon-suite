@@ -327,7 +327,9 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
                     size="small"
                     variant="outlined"
                     label={t(
-                      "settings.campaigns.vipLifecycle.oncePerSession"
+                        rule === "unverified"
+                          ? "settings.campaigns.vipLifecycle.onceReturning"
+                          : "settings.campaigns.vipLifecycle.oncePerTrial"
                     )}
                     sx={{ alignSelf: "flex-start" }}
                   />

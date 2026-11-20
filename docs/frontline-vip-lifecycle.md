@@ -75,11 +75,18 @@ feature. Normal broadcast and direct-message campaigns remain unchanged.
 
 ## Delivery guarantees
 
-- Eligible unverified, active trial, expiring trial and expired trial recipients
-  can receive one automatic message per enabled rule and player session.
-- The expiring rule applies inside its configured window (48 hours by default).
-- Paid VIP, blocked players, family mismatches, invalid timestamps, missing rows,
-  and API failures: no message.
+- Unverified players get one invitation from their second visit onwards. A
+  visit spans reconnects and server changes until a confirmed break of at least
+  30 minutes. Prior sessions are matched to their recorded CONNECTED event
+  and game family. Ambiguous history does not establish a return visit.
+- The active trial notice is sent once. Expiring and expired share one notice:
+  expiry is a fallback for players who missed the reminder. The reminder
+  window defaults to 48 hours. Paid or blocked players are excluded.
+- Claims are scoped to the player and game family in the shared installation
+  database. WordPress offers one free trial per account and family. A provider
+  supporting multiple trials may supply a stable string `trial_id` per grant.
+  Edits to expiry or status version never trigger another reminder. Without
+  an identifiable grant, the one-time trial is treated conservatively.
 - Test mode persists simulations but never sends an automatic message.
 - Manual test messages are explicit, logged separately, and do not consume a
   regular lifecycle delivery.
@@ -92,19 +99,12 @@ players are queried in one request.
 
 ## Database migration
 
-Alembic revision `9f3c2d1a6b40` creates `vip_lifecycle_deliveries`. The delivery
-claim is scoped to server, rule, player session and test mode. A worker restart
-does not create another claim for the same rule and session, but a reconnect
-that creates a new session can make the player eligible again. There is no
-cross-session seven-day unverified cooldown or once-per-trial-period guarantee.
-Upgrades migrate legacy message texts; the old `unverified_cooldown_days` setting
-is not retained. Review campaign frequency and message intervals after upgrading.
-
-The delivery claim is committed before the RCON call. A failed or interrupted
-attempt is logged but is not retried automatically for the same rule and
-session, because an RCON timeout cannot prove that the player did not see the
-message. A new session or a different applicable rule can produce another
-delivery. The shared message interval and per-player gap also limit timing.
+Alembic revision `9f3c2d1a6b40` creates `vip_lifecycle_deliveries`. Existing automatic attempts, including ambiguous sends, count
+toward the family limit. Historical rows without a grant identifier suppress a
+possible duplicate for the corresponding stage. Manual tests and simulations
+are kept separate from live claims. The player row is locked during reservation
+so workers on different servers cannot both claim the same notification.
+The shared message interval and per-player gap also limit timing.
 
 Do not enable the feature until the WordPress plugin and database migration are
 installed and the signed status endpoint has passed a read-only smoke test.
