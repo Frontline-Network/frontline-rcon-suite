@@ -61,7 +61,7 @@ const createCampaign = (index = 0) => ({
 
 const VIP_LIFECYCLE_DEFAULT_MESSAGES = {
   unverified:
-    "Du kannst einmalig kostenlos VIP freischalten und erhältst damit bevorzugten Zugang bei voller Warteschlange. Weitere Informationen: fln.gg/vip",
+    "Gratis-VIP: Öffne https://fln.gg/mein-konto/spielidentitaeten/ am Handy. Suche deinen Spielernamen und fordere den Code an. Gib den Code aus der privaten Spielnachricht auf der Webseite ein.",
   trial_active:
     "Dein kostenloser VIP-Zugang ist aktiv. Die verbleibende Laufzeit findest du in deinem Konto unter fln.gg/mein-konto",
   trial_expiring:

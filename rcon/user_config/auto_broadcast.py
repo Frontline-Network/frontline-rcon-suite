@@ -57,11 +57,16 @@ class AutoBroadcastType(AutoBroadcastRequiredType, total=False):
     vip_lifecycle: VipLifecycleConfigType
 
 
+_PREVIOUS_VIP_INVITATION = (
+    "Du kannst einmalig kostenlos VIP freischalten und erhältst damit "
+    "bevorzugten Zugang bei voller Warteschlange. Weitere Informationen: fln.gg/vip"
+)
+
+
 VIP_LIFECYCLE_DEFAULT_MESSAGES = {
     "unverified": (
-        "Du kannst einmalig kostenlos VIP freischalten und erhältst damit "
-        "bevorzugten Zugang bei voller Warteschlange. Weitere Informationen: "
-        "fln.gg/vip"
+        "Gratis-VIP: Öffne https://fln.gg/mein-konto/spielidentitaeten/ am Handy. "
+        "Suche deinen Spielernamen und fordere den Code an. Gib den Code aus der privaten Spielnachricht auf der Webseite ein."
     ),
     "trial_active": (
         "Dein kostenloser VIP-Zugang ist aktiv. Die verbleibende Laufzeit "
@@ -116,6 +121,13 @@ class VipLifecycleCampaigns(BaseModel):
             message=VIP_LIFECYCLE_DEFAULT_MESSAGES["trial_expired"]
         )
     )
+
+    @field_validator("unverified")
+    @classmethod
+    def refresh_previous_invitation(cls, campaign: VipLifecycleCampaign):
+        if campaign.message == _PREVIOUS_VIP_INVITATION:
+            return campaign.model_copy(update={"message": VIP_LIFECYCLE_DEFAULT_MESSAGES["unverified"]})
+        return campaign
 
 
 class VipLifecycleConfig(BaseModel):
