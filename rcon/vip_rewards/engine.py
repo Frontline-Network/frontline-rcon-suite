@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from hllrcon import HLLVWeapon, WeaponType as ReferenceWeaponType
 
 MELEE = {"m3 knife", "feldspaten", "fairbairn-sykes", "mpl-50 spade", "mpl-50 spaten"}
+RELEASE_SECONDS = 300
 
 
 def weapon(value):
@@ -164,7 +165,7 @@ class Engine:
             healthy=healthy,
             counts=counts,
             thresholds=thresholds,
-            released=bool(above and now - s["above_since"] >= 300),
+            released=bool(above and now - s["above_since"] >= RELEASE_SECONDS),
         )
         online = {
             pid: p for pid, p in players.items() if p.get("team") in ("allies", "axis")
@@ -187,7 +188,7 @@ class Engine:
                 or k.startswith(("milestones:", "event:"))
                 or k.endswith(":fixed")
             }
-            if not active or pid not in online or not self.eligible(pid):
+            if not active or not self.eligible(pid):
                 p.pop("balance", None)
         self.support_snapshot(now, online, previous_players, previous_time, valid_interval)
         if not active:

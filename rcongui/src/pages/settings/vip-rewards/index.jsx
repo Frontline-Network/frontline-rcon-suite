@@ -403,6 +403,33 @@ function localTime(value) {
     .slice(0, 16);
 }
 
+function RewardStatus({ status }) {
+  const [now, setNow] = useState(Date.now);
+  const deadline = status?.releaseDeadline;
+  useEffect(() => {
+    if (deadline == null) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [deadline]);
+
+  let label = tr("Status wird geladen");
+  if (status?.status === "seeding") {
+    const { counts = {}, thresholds = {} } = status;
+    const teams = `Allies ${counts.allies ?? "?"}/${thresholds.allies ?? "?"} · Axis ${counts.axis ?? "?"}/${thresholds.axis ?? "?"}`;
+    const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
+    let phase = tr("Wartet auf Mindestbesetzung");
+    if (deadline != null) {
+      const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+      phase = seconds ? tr("Freigabe in {{time}}", { time }) : tr("Freigabe wird bestätigt");
+    }
+    label = `${phase} · ${teams}`;
+  } else if (status) {
+    label = tr({ active: "Aktiv", disabled: "Deaktiviert" }[status.status] ?? "Pausiert: kein bestätigter Serverstatus");
+  }
+  return <Chip size="small" label={label} />;
+}
+
 export default function VipRewards() {
   useTranslation("vipRewards");
   const { labels, notes, results, noticeResults, reasons, ruleLabels } = getCopy();
@@ -477,7 +504,8 @@ export default function VipRewards() {
       ])
         .then(([s, j]) => {
           if (mounted) {
-            setStatus(s);
+            setStatus({ ...s, releaseDeadline: s.release_wait_seconds == null
+              ? null : Date.now() + s.release_wait_seconds * 1000 });
             setJournal(j);
           }
         })
@@ -590,21 +618,6 @@ export default function VipRewards() {
       }
     />
   );
-  const counts = status?.counts || {},
-    targets = status?.thresholds || {};
-  const statusText = !status
-    ? tr("Status wird geladen")
-    : status.status === "active"
-    ? tr("Aktiv")
-    : status.status === "disabled"
-    ? tr("Deaktiviert")
-    : status.status === "seeding"
-    ? `${tr("Pausiert: Seeding / Freigabeprüfung")} - Allies ${
-        counts.allies ?? "?"
-      }/${targets.allies ?? "?"}, Axis ${counts.axis ?? "?"}/${
-        targets.axis ?? "?"
-      }`
-    : tr("Pausiert: kein bestätigter Serverstatus");
   return (
     <Stack
       spacing={2}
@@ -646,7 +659,7 @@ export default function VipRewards() {
           >
             {tr("VIP-Belohnungen")}
           </Typography>
-          <Chip size="small" label={statusText} />
+          <RewardStatus status={status} />
           <Chip
             size="small"
             color="primary"
