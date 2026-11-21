@@ -11,7 +11,7 @@ import zlib
 
 from sqlalchemy import delete, exists, func, select
 
-from rcon.live_map.domain import CASE_SECONDS, HISTORY_SECONDS
+from rcon.live_map.domain import CASE_SECONDS, HISTORY_SECONDS, normalize_stored_frame
 from rcon.live_map.models import (
     TacticalArchive,
     TacticalBlock,
@@ -169,7 +169,7 @@ def history(server, start, end, round_id=None, now=None, archive_id=None):
             query.order_by(TacticalBlock.start_at).limit(128)
         ).all()
         return [
-            frame
+            normalize_stored_frame(frame)
             for row in rows
             for frame in unpack(row.data)
             if start <= frame["captured_at"] <= end
@@ -632,7 +632,10 @@ def get_evidence(server, signal_id):
         row = session.get(TacticalReview, (server, signal_id))
         if row is None or row.expires_at <= time.time() or row.evidence is None:
             raise LookupError("Gesicherter Ausschnitt nicht verfügbar")
-        return unpack(row.evidence)
+        evidence = unpack(row.evidence)
+        for frame in evidence.get("frames", []):
+            normalize_stored_frame(frame)
+        return evidence
 
 
 def cleanup(server, now=None):

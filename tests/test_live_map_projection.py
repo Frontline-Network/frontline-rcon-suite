@@ -100,8 +100,10 @@ def test_preview_traces_cut_missing_positions_deaths_jumps_and_time_gaps():
 def test_bulk_capture_maps_100_players_without_metric_monitor_positions(monkeypatch, profile, map_id):
     monkeypatch.setattr("rcon.utils.MapsHistory", lambda: SimpleNamespace(get_current_map=lambda: {"name": "layer", "start": 900, "end": None}))
     monkeypatch.setattr(service, "session_ids", lambda server, ids: {p: "s" for p in ids})
-    raw = [{"iD": str(76561198000000000 + i), "Name": f"fixture-{i}", "Team": i % 2 + 1,
-            "Role": 1, "Stats": {"Deaths": 0}, "WorldPosition": {"X": i * 100, "Y": -20000, "Z": 0}} for i in range(100)]
+    factions = (1, 6) if profile is HLLV_PROFILE else (1, 0)
+    raw = [{"iD": str(76561198000000000 + i), "Name": f"fixture-{i}", "Team": factions[i % 2],
+            "Platoon": "Alfa", "Role": 0, "Stats": {"Deaths": 0},
+            "WorldPosition": {"X": i * 100, "Y": -20000, "Z": 0}} for i in range(100)]
     calls = []
     def sample():
         calls.append(True)

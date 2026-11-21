@@ -8,11 +8,12 @@ from rcon.live_map import service, storage
 
 
 @pytest.mark.parametrize("profile", [HLL_PROFILE, HLLV_PROFILE])
-def test_real_game_adapters_preserve_valid_origin_and_missing_positions(profile, monkeypatch):
+def test_real_game_adapters_distinguish_origin_and_missing_positions(profile, monkeypatch):
     history = {"name": "layer", "start": 900, "end": None}
     monkeypatch.setattr("rcon.utils.MapsHistory", lambda: SimpleNamespace(get_current_map=lambda: history))
     monkeypatch.setattr(service, "session_ids", lambda server, ids: {p: "s" for p in ids})
-    raw = {"iD": "76561198000000001", "Name": "fixture", "Team": 1, "Role": 1, "Stats": {"Deaths": 0}, "WorldPosition": {"X": 0, "Y": 0, "Z": 0}}
+    raw = {"iD": "76561198000000001", "Name": "fixture", "Team": 1, "Role": 0, "Platoon": "Alfa",
+           "Stats": {"Deaths": 0}, "WorldPosition": {"X": 0, "Y": 0, "Z": 0}}
     api = SimpleNamespace(config=SimpleNamespace(game=profile.game), game_profile=profile,
                           get_gamestate=lambda: {"current_map": {"id": "layer", "map": {"id": "map"}}},
                           get_raw_player_snapshot=lambda: {"captured_at": 1000, "players": [raw]})
@@ -20,13 +21,44 @@ def test_real_game_adapters_preserve_valid_origin_and_missing_positions(profile,
     frame = service.capture(api, 1, None, settings)
     assert frame["quality"]["round_confirmed"]
     player = frame["players"][0]
-    assert player["position"] == {"x": 0, "y": 0, "z": 0}
-    assert player["position_valid"] and player["deaths_valid"]
+    assert player["position"] is None
+    assert not player["position_valid"]
+    assert player["deaths_valid"]
     assert player["map_position"] is None
+    raw["WorldPosition"]["Z"] = 1
+    assert service.capture(api, 1, frame, settings)["players"][0]["position_valid"]
+    raw.pop("Platoon")
+    unassigned = service.capture(api, 1, frame, settings)["players"][0]
+    assert unassigned["unit_name"] == "unassigned"
+    assert not unassigned["position_valid"]
     raw.pop("WorldPosition")
     assert not service.capture(api, 1, None, settings)["players"][0]["position_valid"]
     history["name"] = "previous-map"
     assert not service.capture(api, 1, None, settings)["quality"]["round_confirmed"]
+
+
+@pytest.mark.parametrize("game", ["hllv", "hll"])
+def test_stored_frames_keep_the_roster_and_split_placeholder_positions(game):
+    from rcon.live_map.domain import normalize_stored_frame, segment_break
+
+    center = {"x": 0, "y": 0, "z": 1}
+    point = {"team": "axis", "unit_name": "command", "player_id": "p", "session_id": "s",
+             "position_valid": True, "position": center, "position_m": center,
+             "map_position": {"x": .5, "y": .5}}
+    players = [point, {**point, "position": {**center, "z": 0}},
+               {**point, "unit_name": "unassigned"}, {**point, "unit_name": ""},
+               {**point, "team": None}, {**point, "team": "unknown"},
+               {**point, "unit_name": "alfa", "position": {**center, "x": .001, "z": 0}}]
+    frame = normalize_stored_frame({"game": game, "players": players, "quality": {
+        "total_players": 7, "valid_positions": 7, "mapped_positions": 7}})
+    assert len(frame["players"]) == 7
+    assert frame["quality"] == {"total_players": 7, "valid_positions": 2, "mapped_positions": 2}
+    assert frame["players"][0]["map_position"] and frame["players"][-1]["map_position"]
+    for hidden in frame["players"][1:-1]:
+        assert not hidden["position_valid"]
+        assert hidden["position"] is hidden["position_m"] is hidden["map_position"] is None
+        assert segment_break(point, hidden, 1, 2, display_only=True)
+        assert segment_break(hidden, point, 2, 3, display_only=True)
 
 
 def test_redis_outage_in_lease_check_fails_closed():
