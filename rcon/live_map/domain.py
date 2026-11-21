@@ -28,6 +28,29 @@ def position(value):
         return None
 
 
+def vietnam_list_only(player, point):
+    return (player.get("team") not in ("allies", "axis")
+            or not player.get("unit_name")
+            or player["unit_name"] == "unassigned"
+            or point == {"x": 0, "y": 0, "z": 0})
+
+
+def normalize_stored_frame(frame):
+    """Apply current marker rules to a newly decoded snapshot or archive frame."""
+    if frame.get("game") != "hllv":
+        return frame
+    players = frame.get("players", [])
+    changed = False
+    for player in players:
+        if player.get("position") is not None and vietnam_list_only(player, player["position"]):
+            player.update(position=None, position_valid=False, map_position=None, position_m=None)
+            changed = True
+    if changed and "quality" in frame:
+        frame["quality"].update(valid_positions=sum(bool(p.get("position_valid")) for p in players),
+                                mapped_positions=sum(p.get("map_position") is not None for p in players))
+    return frame
+
+
 def distance(a, b):
     return math.hypot(a["x"] - b["x"], a["y"] - b["y"])
 
