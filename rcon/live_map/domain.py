@@ -28,7 +28,7 @@ def position(value):
         return None
 
 
-def vietnam_list_only(player, point):
+def list_only_position(player, point):
     return (player.get("team") not in ("allies", "axis")
             or not player.get("unit_name")
             or player["unit_name"] == "unassigned"
@@ -37,12 +37,10 @@ def vietnam_list_only(player, point):
 
 def normalize_stored_frame(frame):
     """Apply current marker rules to a newly decoded snapshot or archive frame."""
-    if frame.get("game") != "hllv":
-        return frame
     players = frame.get("players", [])
     changed = False
     for player in players:
-        if player.get("position") is not None and vietnam_list_only(player, player["position"]):
+        if player.get("position") is not None and list_only_position(player, player["position"]):
             player.update(position=None, position_valid=False, map_position=None, position_m=None)
             changed = True
     if changed and "quality" in frame:

@@ -9,13 +9,13 @@ from rcon.live_map import storage
 from rcon.live_map.domain import (
     evaluate_encounters,
     evaluate_gameplay_patterns,
+    list_only_position,
     normalize_event,
     normalize_stored_frame,
     observed_death_totals,
     position,
     project,
     segment_break,
-    vietnam_list_only,
 )
 from rcon.live_map.projections import display_projection, projection_ready
 
@@ -75,7 +75,7 @@ def capture(api, server, previous, settings):
             detailed = parse_raw_player_info(p, api.config.game)
             lowered = {k.lower(): v for k, v in raw.items()}
             vector = position(lowered.get("worldposition"))
-            if game == "hllv" and vietnam_list_only(detailed, vector):
+            if list_only_position(detailed, vector):
                 vector = None
             raw_stats = lowered.get("stats") or {}
             raw_deaths = {k.lower(): v for k, v in raw_stats.items()}.get("deaths")

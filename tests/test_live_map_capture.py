@@ -21,8 +21,8 @@ def test_real_game_adapters_distinguish_origin_and_missing_positions(profile, mo
     frame = service.capture(api, 1, None, settings)
     assert frame["quality"]["round_confirmed"]
     player = frame["players"][0]
-    assert player["position"] == (None if profile is HLLV_PROFILE else {"x": 0, "y": 0, "z": 0})
-    assert player["position_valid"] is (profile is HLL_PROFILE)
+    assert player["position"] is None
+    assert not player["position_valid"]
     assert player["deaths_valid"]
     assert player["map_position"] is None
     raw["WorldPosition"]["Z"] = 1
@@ -30,7 +30,7 @@ def test_real_game_adapters_distinguish_origin_and_missing_positions(profile, mo
     raw.pop("Platoon")
     unassigned = service.capture(api, 1, frame, settings)["players"][0]
     assert unassigned["unit_name"] == "unassigned"
-    assert unassigned["position_valid"] is (profile is HLL_PROFILE)
+    assert not unassigned["position_valid"]
     raw.pop("WorldPosition")
     assert not service.capture(api, 1, None, settings)["players"][0]["position_valid"]
     history["name"] = "previous-map"
@@ -52,17 +52,13 @@ def test_stored_frames_keep_the_roster_and_split_placeholder_positions(game):
     frame = normalize_stored_frame({"game": game, "players": players, "quality": {
         "total_players": 7, "valid_positions": 7, "mapped_positions": 7}})
     assert len(frame["players"]) == 7
-    expected = 2 if game == "hllv" else 7
-    assert frame["quality"] == {"total_players": 7, "valid_positions": expected, "mapped_positions": expected}
+    assert frame["quality"] == {"total_players": 7, "valid_positions": 2, "mapped_positions": 2}
     assert frame["players"][0]["map_position"] and frame["players"][-1]["map_position"]
     for hidden in frame["players"][1:-1]:
-        if game == "hllv":
-            assert not hidden["position_valid"]
-            assert hidden["position"] is hidden["position_m"] is hidden["map_position"] is None
-            assert segment_break(point, hidden, 1, 2, display_only=True)
-            assert segment_break(hidden, point, 2, 3, display_only=True)
-        else:
-            assert hidden["map_position"] == point["map_position"]
+        assert not hidden["position_valid"]
+        assert hidden["position"] is hidden["position_m"] is hidden["map_position"] is None
+        assert segment_break(point, hidden, 1, 2, display_only=True)
+        assert segment_break(hidden, point, 2, 3, display_only=True)
 
 
 def test_redis_outage_in_lease_check_fails_closed():
