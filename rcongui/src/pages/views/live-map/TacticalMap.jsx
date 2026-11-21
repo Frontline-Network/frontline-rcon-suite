@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 import { getThemeTeamColor } from "@/themes/teamColors";
 import { getLiveMapArtwork } from "@/utils/map-images.mjs";
-import { projectionReady } from "./geometry.mjs";
+import { mapArtworkBounds, projectionReady } from "./geometry.mjs";
 import { pointerOnMap, wheelZoomFactor, zoomCamera } from "./interaction.mjs";
 
 export default function TacticalMap({
@@ -82,6 +82,7 @@ export default function TacticalMap({
       ? encounter.map_position
       : null;
   const { image, headquarters, grid } = getLiveMapArtwork(frame?.map);
+  const artworkBounds = mapArtworkBounds(headquarters, frame?.calibration);
   useLayoutEffect(() => {
     let active = true;
     const measure = () => {
@@ -227,8 +228,7 @@ export default function TacticalMap({
           {image && (
             <image
               href={image}
-              width="1000"
-              height="1000"
+              {...artworkBounds}
               preserveAspectRatio="none"
             />
           )}
@@ -249,7 +249,7 @@ export default function TacticalMap({
             </g>
           )}
           {headquarters && (
-            <image href={headquarters} width="1000" height="1000"
+            <image href={headquarters} {...artworkBounds}
               preserveAspectRatio="none" pointerEvents="none" aria-hidden="true" />
           )}
           {calibrated &&
