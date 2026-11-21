@@ -20,6 +20,7 @@ import {
 } from '../styled';
 import dayjs from 'dayjs';
 import PlayerLogs from './logs';
+import { isModerationAction, isPlayerMessage } from "@/utils/player-warnings.mjs";
 import ProfileDetails from './profile-details';
 import { useTranslation } from "react-i18next";
 
@@ -37,6 +38,7 @@ export default function PlayerDetailView() {
       endDate: null 
     },
     actions: { search: '', type: '' },
+    messages: { search: '' },
     names: { search: '' },
     comments: { 
       search: '', 
@@ -97,10 +99,13 @@ export default function PlayerDetailView() {
             (sessionStart.format('lll').toLowerCase().includes(searchLower) || 
              (sessionEnd && sessionEnd.format('lll').toLowerCase().includes(searchLower)))
           );
-        case 'received-actions':
+        case 'actions':
+        case 'messages':
           return (
-            item.action_type.includes(filters.actions.type) &&
-            (item.reason.toLowerCase().includes(searchLower) || item.by.toLowerCase().includes(searchLower))
+            (tab === 'messages'
+              ? isPlayerMessage(item)
+              : isModerationAction(item) && (!filters.actions.type || item.action_type === filters.actions.type)) &&
+            [item.reason, item.by].some((value) => (value ?? '').toLowerCase().includes(searchLower))
           );
         case 'names':
           return item.name.toLowerCase().includes(searchLower);
@@ -183,16 +188,19 @@ export default function PlayerDetailView() {
         );
 
       case 'actions':
+      case 'messages': {
+        const messagesOnly = detail === 'messages';
+        const entries = filterData(profile.received_actions ?? [], detail);
         return (
           <div>
             <FilterSection className="wardogs-profile-filters">
               <TextField
-                label={t("records.playerDetails.searchActions")}
-                value={filters.actions.search}
-                onChange={(e) => handleFilterChange('actions', 'search', e.target.value)}
+                label={t(messagesOnly ? "common.search" : "records.playerDetails.searchActions")}
+                value={filters[detail].search}
+                onChange={(e) => handleFilterChange(detail, 'search', e.target.value)}
                 size="small"
               />
-              <TextField
+              {!messagesOnly && <TextField
                 select
                 label={t("records.playerDetails.actionType")}
                 value={filters.actions.type}
@@ -205,15 +213,19 @@ export default function PlayerDetailView() {
                 <MenuItem value="PUNISH">{t("actions.types.PUNISH")}</MenuItem>
                 <MenuItem value="KICK">{t("actions.types.KICK")}</MenuItem>
                 <MenuItem value="MESSAGE">{t("actions.types.MESSAGE")}</MenuItem>
-              </TextField>
+              </TextField>}
             </FilterSection>
             <ScrollableContent className="wardogs-profile-scroll">
-              {filterData(profile.received_actions, 'actions').map((action, index) => (
+              {entries.length === 0 && (
+                <Typography>{t(filters[detail].search || (!messagesOnly && filters.actions.type)
+                  ? "common.noResults" : messagesOnly ? "playerDrawer.noMessages" : "sharedOperations.cleanRecord")}</Typography>
+              )}
+              {entries.map((action, index) => (
                 <ListItem key={index}>
                   <Typography variant="subtitle1">
                     {t(`actions.types.${action.action_type}`, { defaultValue: action.action_type })}
                   </Typography>
-                  <Typography>{t("records.playerDetails.reason")}: {action.reason}</Typography>
+                  <Typography>{!messagesOnly && `${t("records.playerDetails.reason")}: `}{action.reason}</Typography>
                   <Typography>{t("records.playerDetails.by")}: {action.by}</Typography>
                   <Typography>{t("records.playerDetails.time")}: {formatDate(action.time)}</Typography>
                 </ListItem>
@@ -221,6 +233,8 @@ export default function PlayerDetailView() {
             </ScrollableContent>
           </div>
         );
+
+      }
 
       case 'names':
         return (

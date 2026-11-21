@@ -24,7 +24,6 @@ import PlayerProfileSummary from "@/components/player/profile/Summary";
 import PlayerProfileHeader from "@/components/player/profile/Header";
 import { generatePlayerActions } from "@/features/player-action/actions";
 import PlayerProfileStatusTags from "@/components/player/profile/StatusTags";
-import ReceivedActions from "./[detail]/received-actions";
 import { useGlobalStore } from "@/stores/global-state";
 import ProfileActions from "@/components/player/profile/Actions";
 import { useTranslation } from "react-i18next";
@@ -33,6 +32,7 @@ import LinkedAccounts from "@/components/player/profile/LinkedAccounts";
 const DETAIL_LINKS = [
   { path: "", label: "records.playerDetails.profile" },
   { path: "actions", label: "records.playerDetails.actions" },
+  { path: "messages", label: "playerDrawer.tabs.messages" },
   { path: "sessions", label: "records.playerDetails.sessions" },
   { path: "names", label: "records.playerDetails.names" },
   { path: "comments", label: "records.playerDetails.comments" },

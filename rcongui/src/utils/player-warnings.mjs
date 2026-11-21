@@ -10,17 +10,25 @@ const INFORMATIONAL_SENDERS = [
 
 export function isInformationalPlayerMessage(action) {
   return (
-    action?.action_type === "MESSAGE" &&
+    isPlayerMessage(action) &&
     typeof action.by === "string" &&
     INFORMATIONAL_SENDERS.some((prefix) => action.by.startsWith(prefix))
   );
+}
+
+export function isPlayerMessage(action) {
+  return action?.action_type === "MESSAGE";
+}
+
+export function isModerationAction(action) {
+  return Boolean(action?.action_type) && !isInformationalPlayerMessage(action);
 }
 
 export function countRecentWarnings(receivedActions, now = Date.now()) {
   if (!Array.isArray(receivedActions)) return 0;
   const earliest = now - RECENT_WARNING_WINDOW_MS;
   return receivedActions.filter((action) => {
-    if (isInformationalPlayerMessage(action)) return false;
+    if (!isModerationAction(action)) return false;
     const timestamp = Date.parse(action?.time);
     return Number.isFinite(timestamp) && timestamp > earliest;
   }).length;
