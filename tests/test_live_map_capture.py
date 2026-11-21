@@ -27,6 +27,10 @@ def test_real_game_adapters_distinguish_origin_and_missing_positions(profile, mo
     assert player["map_position"] is None
     raw["WorldPosition"]["Z"] = 1
     assert service.capture(api, 1, frame, settings)["players"][0]["position_valid"]
+    raw.pop("Platoon")
+    unassigned = service.capture(api, 1, frame, settings)["players"][0]
+    assert unassigned["unit_name"] == "unassigned"
+    assert unassigned["position_valid"] is (profile is HLL_PROFILE)
     raw.pop("WorldPosition")
     assert not service.capture(api, 1, None, settings)["players"][0]["position_valid"]
     history["name"] = "previous-map"
