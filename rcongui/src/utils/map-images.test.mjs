@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { readdirSync } from "node:fs";
 import test from "node:test";
 
 import {
+  getLiveMapArtwork,
   getMapIconSrc,
   getMapImageSrc,
   getTacticalMapImageSrc,
@@ -27,6 +29,28 @@ test("resolves every HLLV map from current and legacy map identifiers", () => {
       `wdev_${suffix}-day.webp`
     );
   }
+});
+
+test("each shipped map resolves to the matching live-map artwork", () => {
+  const names = readdirSync(new URL("../../../assets/images/tac-maps/", import.meta.url));
+  const files = new Set(readdirSync(new URL("../../../assets/rcongui/live-maps/", import.meta.url)));
+  for (const name of names.filter((file) => file.endsWith(".webp"))) {
+    const id = name.slice(0, -5);
+    const { image, headquarters, grid } = getLiveMapArtwork({ map: { id } });
+    if (id.startsWith("wdev_")) {
+      assert.equal(image, `/tac-maps/${name}`);
+      assert.equal(headquarters, `/live-maps/${id}-hq.svg`);
+      assert.ok(files.has(`${id}-hq.svg`));
+      assert.equal(grid, false);
+    } else {
+      assert.equal(image, `/live-maps/${name}`);
+      assert.ok(files.has(name));
+      assert.equal(headquarters, null);
+      assert.equal(grid, true);
+    }
+  }
+  assert.deepEqual(getLiveMapArtwork({ map: { id: "future" } }),
+    { image: "/tac-maps/future.webp", headquarters: null, grid: false });
 });
 
 test("replaces an unknown API image with the matching HLLV artwork", () => {

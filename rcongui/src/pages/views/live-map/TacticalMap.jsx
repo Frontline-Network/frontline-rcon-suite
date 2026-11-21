@@ -8,7 +8,7 @@ import {
   useTheme,
 } from "@mui/material";
 import { getThemeTeamColor } from "@/themes/teamColors";
-import { getTacticalMapImageSrc } from "@/utils/map-images.mjs";
+import { getLiveMapArtwork } from "@/utils/map-images.mjs";
 import { projectionReady } from "./geometry.mjs";
 import { pointerOnMap, wheelZoomFactor, zoomCamera } from "./interaction.mjs";
 
@@ -81,7 +81,7 @@ export default function TacticalMap({
     calibrated && encounter?.round_id === frame?.round_id
       ? encounter.map_position
       : null;
-  const image = getTacticalMapImageSrc(frame?.map);
+  const { image, headquarters, grid } = getLiveMapArtwork(frame?.map);
   useLayoutEffect(() => {
     let active = true;
     const measure = () => {
@@ -231,6 +231,26 @@ export default function TacticalMap({
               height="1000"
               preserveAspectRatio="none"
             />
+          )}
+          {grid && (
+            <g pointerEvents="none" aria-hidden="true" data-testid="live-map-grid">
+              {Array.from({ length: 10 }, (_, i) => (
+                <g key={i}>
+                  {i > 0 && (
+                    <path d={`M ${i * 100} 0 v 1000 M 0 ${i * 100} h 1000`}
+                      stroke="white" strokeOpacity="0.55" strokeWidth="1" />
+                  )}
+                  <g fill="white" stroke="#222" strokeWidth="2" paintOrder="stroke" fontSize="15" fontWeight="bold">
+                    <text x={i * 100 + 9} y="23">{String.fromCharCode(65 + i)}</text>
+                    <text x="9" y={i * 100 + 45}>{i + 1}</text>
+                  </g>
+                </g>
+              ))}
+            </g>
+          )}
+          {headquarters && (
+            <image href={headquarters} width="1000" height="1000"
+              preserveAspectRatio="none" pointerEvents="none" aria-hidden="true" />
           )}
           {calibrated &&
             trails.map((line, i) => (

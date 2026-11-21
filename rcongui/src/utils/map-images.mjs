@@ -67,6 +67,29 @@ export const resolveTacticalMapImageName = (layer, fallback = null) => {
   return mapIdentifier ? `${mapIdentifier}.webp` : fallback;
 };
 
+const HLL_LIVE_MAP_IDS = new Set([
+  "carentan", "driel", "elalamein", "elsenbornridge", "foy", "hill400",
+  "hurtgenforest", "junobeach", "kharkov", "kursk", "mortain", "omahabeach",
+  "purpleheartlane", "remagen", "smolensk", "stalingrad", "stmariedumont",
+  "stmereeglise", "tobruk", "utahbeach",
+]);
+
+export function getLiveMapArtwork(layer) {
+  const vietnam = getHllvImageSuffix(layer);
+  if (vietnam) {
+    return {
+      image: getTacticalMapImageSrc(layer),
+      headquarters: `/live-maps/wdev_${vietnam}-hq.svg`,
+      grid: false,
+    };
+  }
+  const id = normalizeMapIdentifier(layer?.map?.id ?? layer?.map?.name);
+  if (HLL_LIVE_MAP_IDS.has(id)) {
+    return { image: `/live-maps/${id}.webp`, headquarters: null, grid: true };
+  }
+  return { image: getTacticalMapImageSrc(layer), headquarters: null, grid: false };
+}
+
 export const getTacticalMapImageSrc = (layer, fallback = null) => {
   const imageName = resolveTacticalMapImageName(layer, fallback);
   return imageName ? `/tac-maps/${imageName}` : null;
