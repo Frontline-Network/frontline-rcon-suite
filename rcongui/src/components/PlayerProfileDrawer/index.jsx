@@ -26,6 +26,7 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import CloseIcon from "@mui/icons-material/Close";
 import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
+import { isModerationAction, isPlayerMessage } from "@/utils/player-warnings.mjs";
 import { generatePlayerActions } from "@/features/player-action/actions";
 import { ClientError } from "../shared/ClientError";
 import { useState } from "react";
@@ -202,6 +203,9 @@ const PlayerDetails = ({ player, onClose }) => {
   };
 
   const profile = player.profile;
+  const history = profile.received_actions ?? [];
+  const moderationActions = history.filter(isModerationAction);
+  const messages = history.filter(isPlayerMessage);
   const isOnline = player?.is_online;
   const isVip = player?.is_vip;
   const playerVip = player?.vip;
@@ -281,11 +285,7 @@ const PlayerDetails = ({ player, onClose }) => {
             <Tab
               label={t("playerDrawer.tabs.messages")}
               value="messages"
-              disabled={
-                profile.received_actions.filter(
-                  (action) => action.action_type === "MESSAGE"
-                ).length === 0
-              }
+              disabled={messages.length === 0}
             />
             <Tab
               label={t("playerDrawer.tabs.comments")}
@@ -346,7 +346,11 @@ const PlayerDetails = ({ player, onClose }) => {
             <Typography variant="h6" component={"h2"}>
               {t("playerDrawer.receivedActions")}
             </Typography>
-            <ReceivedActions actions={profile.received_actions} />
+            {moderationActions.length ? (
+              <ReceivedActions actions={moderationActions} />
+            ) : (
+              <Typography>{t("sharedOperations.cleanRecord")}</Typography>
+            )}
           </Box>
         </TabPanel>
         <TabPanel value="messages">
@@ -354,11 +358,7 @@ const PlayerDetails = ({ player, onClose }) => {
             <Typography variant="h6" component={"h2"}>
               {t("playerDrawer.tabs.messages")}
             </Typography>
-            <Messages
-              messages={profile.received_actions.filter(
-                (action) => action.action_type === "MESSAGE"
-              )}
-            />
+            <Messages messages={messages} />
           </Box>
         </TabPanel>
         <TabPanel value="comments">

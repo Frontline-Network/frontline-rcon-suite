@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import { isModerationAction } from "@/utils/player-warnings.mjs";
 import ListItem from "@mui/material/ListItem";
 import ListItemSecondaryAction from "@mui/material/ListItemSecondaryAction";
 import ListItemText from "@mui/material/ListItemText";
@@ -142,6 +143,7 @@ const formatPunitions = (profile, t, language) => {
     moment.utc(item.get("time")).local().locale(language).format(t("common.logDateTimeFormat"));
   return profile
     .get("received_actions", [])
+    .filter((item) => isModerationAction(item.toJS()))
     .map((item) => (
       <Typography display="block" variant="caption" key={item}>{`${formatTime(
         item

@@ -4,6 +4,8 @@ import {
   countRecentWarnings,
   hasRecentWarnings,
   isInformationalPlayerMessage,
+  isModerationAction,
+  isPlayerMessage,
 } from "./player-warnings.mjs";
 
 const now = Date.parse("2026-09-13T12:00:00Z");
@@ -13,6 +15,17 @@ const action = (overrides = {}) => ({
   reason: "Bitte beachte die Serverregeln.",
   time: "2026-09-13T11:00:00Z",
   ...overrides,
+});
+
+test("profile history separates campaign mail from moderation and keeps manual warnings accessible", () => {
+  const vip = action({ by: "VIP lifecycle: trial_expiring" });
+  const campaign = action({ by: "Campaign: Welcome" });
+  const warning = action();
+  const automaticWarning = action({ by: "AUTOMOD_NO_LEADER" });
+  const kick = action({ action_type: "KICK" });
+  const history = [vip, kick, campaign, automaticWarning, warning];
+  assert.deepEqual(history.filter(isModerationAction), [kick, automaticWarning, warning]);
+  assert.deepEqual(history.filter(isPlayerMessage), [vip, campaign, automaticWarning, warning]);
 });
 
 test("campaign and VIP messages do not mark their recipients as warned", () => {
