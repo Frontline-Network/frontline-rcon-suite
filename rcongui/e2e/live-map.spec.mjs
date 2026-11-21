@@ -344,13 +344,24 @@ test("unknown projections keep the map unobstructed and explain missing markers 
 test("Vietnam displays the map-specific HQ overlay inside the zoom camera", async ({ page }) => {
   await openDemoPage(page, "/views/live-map");
   const camera = page.getByTestId("map-camera");
-  await expect(camera.locator('image[href="/tac-maps/wdev_e.webp"]')).toHaveCount(1);
+  await expect(camera.locator('image[href="/tac-maps/wdev_e.webp"]')).toHaveAttribute("width", "1000");
   const overlay = camera.locator('image[href="/live-maps/wdev_e-hq.svg"]');
   await expect(overlay).toHaveAttribute("pointer-events", "none");
   await expect(page.getByTestId("live-map-grid")).toHaveCount(0);
   const response = await page.request.get("/live-maps/wdev_e-hq.svg");
   expect(response.ok()).toBeTruthy();
   expect((await response.text()).match(/data-hq=/g)).toHaveLength(6);
+});
+
+test("Vietnam preview fits terrain and HQs to the same centred extent", async ({ page }) => {
+  await openDemoPage(page, "/views/live-map", { query: { tacticalScenario: "estimated" } });
+  const layers = page.getByTestId("map-camera").locator("image");
+  await expect(layers).toHaveCount(2);
+  for (const layer of await layers.all()) {
+    for (const attr of ["x", "y"]) await expect(layer).toHaveAttribute(attr, "3.75");
+    for (const attr of ["width", "height"]) await expect(layer).toHaveAttribute(attr, "992.5");
+  }
+  await expect(page.getByTestId("player-map-marker")).toHaveCount(100);
 });
 
 for (const mapId of ["junobeach", "foy", "carentan"]) {

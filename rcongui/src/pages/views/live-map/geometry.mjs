@@ -1,3 +1,22 @@
+const vietnamPreviewRevisions = new Set([
+  "hllv-field-grid-20260905-v1",
+  "hllv-display-preview-20260905-v2",
+]);
+const previewWorldWidth = 200000;
+const previewMatrix = [1 / previewWorldWidth, 0, 0.5, 0, 1 / previewWorldWidth, 0.5];
+
+export function mapArtworkBounds(headquarters, calibration) {
+  // Stored marker positions use the preview frame. Fit both artwork layers to
+  // the game's narrower, centred BP_TacticalMapTool orthographic capture.
+  const useCaptureWidth = headquarters && !calibration?.verified &&
+    vietnamPreviewRevisions.has(calibration?.revision) &&
+    calibration.matrix?.length === previewMatrix.length &&
+    previewMatrix.every((value, i) => calibration.matrix[i] === value);
+  const width = useCaptureWidth ? 1000 * 198500 / previewWorldWidth : 1000;
+  const offset = (1000 - width) / 2;
+  return { x: offset, y: offset, width, height: width };
+}
+
 export function projectionReady(calibration) {
   return Boolean(
     calibration &&

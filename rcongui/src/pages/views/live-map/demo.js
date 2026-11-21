@@ -83,6 +83,8 @@ function frame(time) {
           verified: false,
           display_ready: true,
           quality: "estimated",
+          revision: hllMap ? "hll-display-20260905-v1" : "hllv-display-preview-20260905-v2",
+          matrix: [1 / 200000, 0, 0.5, 0, 1 / 200000, 0.5],
           units_per_meter: null,
         }
       : { verified: true, units_per_meter: 100 },

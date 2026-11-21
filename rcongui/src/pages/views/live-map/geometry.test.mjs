@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  mapArtworkBounds,
   filterPlayers,
   frameAt,
   trailSegments,
@@ -20,6 +21,24 @@ test("provisional rendering is explicit and distinct from verified calibration",
     }),
     true
   );
+});
+
+test("Vietnam artwork places Cam Ranh US HQ 1 at its recorded world position", () => {
+  const matrix = [0.000005, 0, 0.5, 0, 0.000005, 0.5];
+  for (const revision of ["hllv-field-grid-20260905-v1", "hllv-display-preview-20260905-v2"]) {
+    const calibration = { verified: false, revision, matrix };
+    const b = mapArtworkBounds("hq.svg", calibration);
+    const x = b.x + b.width * 96.33091187259843 / 2280;
+    const y = b.y + b.height * 643.2531686445668 / 2280;
+    assert.ok(Math.abs(x - 1000 * (0.5 - 90863.29561109176 * matrix[0])) < 1e-9);
+    assert.ok(Math.abs(y - 1000 * (0.5 - 43247.476326339245 * matrix[4])) < 1e-9);
+    const full = { x: 0, y: 0, width: 1000, height: 1000 };
+    assert.deepEqual(mapArtworkBounds(null, calibration), full);
+    assert.deepEqual(mapArtworkBounds("hq.svg", null), full);
+    assert.deepEqual(mapArtworkBounds("hq.svg", { ...calibration, verified: true }), full);
+    assert.deepEqual(mapArtworkBounds("hq.svg", { ...calibration, revision: "custom" }), full);
+    assert.deepEqual(mapArtworkBounds("hq.svg", { ...calibration, matrix: [1,0,0,0,1,0] }), full);
+  }
 });
 
 const f = (time, segment, point = { x: 0.1, y: 0.2 }, round = "r") => ({
