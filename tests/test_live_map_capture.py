@@ -12,8 +12,8 @@ def test_real_game_adapters_distinguish_origin_and_missing_positions(profile, mo
     history = {"name": "layer", "start": 900, "end": None}
     monkeypatch.setattr("rcon.utils.MapsHistory", lambda: SimpleNamespace(get_current_map=lambda: history))
     monkeypatch.setattr(service, "session_ids", lambda server, ids: {p: "s" for p in ids})
-    raw = {"iD": "76561198000000001", "Name": "fixture", "Team": 1, "Role": 1, "Stats": {"Deaths": 0}, "WorldPosition": {"X": 0, "Y": 0, "Z": 0}}
-    raw["Platoon"] = "Alfa"
+    raw = {"iD": "76561198000000001", "Name": "fixture", "Team": 1, "Role": 0, "Platoon": "Alfa",
+           "Stats": {"Deaths": 0}, "WorldPosition": {"X": 0, "Y": 0, "Z": 0}}
     api = SimpleNamespace(config=SimpleNamespace(game=profile.game), game_profile=profile,
                           get_gamestate=lambda: {"current_map": {"id": "layer", "map": {"id": "map"}}},
                           get_raw_player_snapshot=lambda: {"captured_at": 1000, "players": [raw]})
