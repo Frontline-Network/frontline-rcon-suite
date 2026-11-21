@@ -341,6 +341,18 @@ test("unknown projections keep the map unobstructed and explain missing markers 
   await expect(page.locator('svg g[role="button"]')).toHaveCount(0);
 });
 
+test("Vietnam displays the map-specific HQ overlay inside the zoom camera", async ({ page }) => {
+  await openDemoPage(page, "/views/live-map");
+  const camera = page.getByTestId("map-camera");
+  await expect(camera.locator('image[href="/tac-maps/wdev_e.webp"]')).toHaveCount(1);
+  const overlay = camera.locator('image[href="/live-maps/wdev_e-hq.svg"]');
+  await expect(overlay).toHaveAttribute("pointer-events", "none");
+  await expect(page.getByTestId("live-map-grid")).toHaveCount(0);
+  const response = await page.request.get("/live-maps/wdev_e-hq.svg");
+  expect(response.ok()).toBeTruthy();
+  expect((await response.text()).match(/data-hq=/g)).toHaveLength(6);
+});
+
 for (const mapId of ["junobeach", "foy", "carentan"]) {
   test(`HLL ${mapId} shows its image and 100 players without a blocking calibration notice`, async ({
     page,
@@ -349,9 +361,10 @@ for (const mapId of ["junobeach", "foy", "carentan"]) {
       query: { tacticalHllMap: mapId },
     });
     await expect(page.getByTestId("player-map-marker")).toHaveCount(100);
-    const mapImage = page.locator(`svg image[href="/tac-maps/${mapId}.webp"]`);
+    const mapImage = page.locator(`svg image[href="/live-maps/${mapId}.webp"]`);
     await expect(mapImage).toHaveCount(1);
-    const response = await page.request.get(`/tac-maps/${mapId}.webp`);
+    await expect(page.getByTestId("live-map-grid").locator("text")).toHaveCount(20);
+    const response = await page.request.get(`/live-maps/${mapId}.webp`);
     expect(response.ok()).toBeTruthy();
     expect(response.headers()["content-type"]).toContain("image/webp");
     await expect(
