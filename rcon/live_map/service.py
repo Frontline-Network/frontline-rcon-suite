@@ -9,7 +9,9 @@ from rcon.live_map import storage
 from rcon.live_map.domain import (
     evaluate_encounters,
     evaluate_gameplay_patterns,
+    list_only_position,
     normalize_event,
+    normalize_stored_frame,
     observed_death_totals,
     position,
     project,
@@ -26,12 +28,12 @@ def key(server, suffix):
 
 def read_snapshot(red, server):
     raw = red.get(key(server, "snapshot"))
-    return json.loads(raw) if raw else None
+    return normalize_stored_frame(json.loads(raw)) if raw else None
 
 
 def read_pending(red, server):
     raw = red.get(key(server, "pending"))
-    return json.loads(raw) if raw else []
+    return [normalize_stored_frame(frame) for frame in json.loads(raw)] if raw else []
 
 
 def session_ids(server, player_ids):
@@ -73,6 +75,8 @@ def capture(api, server, previous, settings):
             detailed = parse_raw_player_info(p, api.config.game)
             lowered = {k.lower(): v for k, v in raw.items()}
             vector = position(lowered.get("worldposition"))
+            if list_only_position(detailed, vector):
+                vector = None
             raw_stats = lowered.get("stats") or {}
             raw_deaths = {k.lower(): v for k, v in raw_stats.items()}.get("deaths")
             deaths_valid = isinstance(raw_deaths, (int, float)) and not isinstance(raw_deaths, bool) and raw_deaths >= 0
