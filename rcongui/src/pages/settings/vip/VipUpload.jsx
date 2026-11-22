@@ -28,19 +28,19 @@ const VipUpload = () => {
       const formData = new FormData();
       formData.append("File", file);
 
-      queryClient.invalidateQueries({
-        queryKey: [{ queryIdentifier: "vip_upload_status" }],
-      });
+      formData.append("track_job", "1");
 
       return cmd.UPLOAD_VIP_FILE({ payload: formData, headers: {} });
     },
     onSuccess: (data) => {
       if (data?.failed || data?.result?.failed) {
         setUploadId(null);
+        setResult(data?.error?.split("\n"));
         setStatus("error");
         return;
       }
-      setUploadId(true);
+      setUploadId(data?.result?.upload_id || true);
+      setStatus("started");
     },
     onError: () => {
       setUploadId(null);
@@ -50,32 +50,37 @@ const VipUpload = () => {
 
   // Poll for upload status
   const { data: uploadStatus } = useQuery({
-    queryKey: [{ queryIdentifier: "vip_upload_status" }],
-    queryFn: () => cmd.GET_UPLOAD_VIP_FILE_RESPONSE(),
+    queryKey: [{ queryIdentifier: "vip_upload_status", uploadId }],
+    queryFn: () => cmd.GET_UPLOAD_VIP_FILE_RESPONSE({ params: typeof uploadId === "string" ? { upload_id: uploadId } : {} }),
     enabled: !!uploadId,
     refetchInterval: POLL_INTERVAL,
   });
 
   // Handle status changes with an effect
   useEffect(() => {
-    if (!uploadStatus) return;
+    if (!uploadId || !uploadStatus) return;
 
     switch (uploadStatus.status) {
       case "started":
         setStatus("started");
         break;
       case "finished":
-        setTimeout(() => {
-          setStatus("finished");
-          setResult(uploadStatus.result);
-          setUploadId(null);
-          queryClient.invalidateQueries({ queryKey: vipQueryKeys.list });
-        }, 2000);
+        setResult(uploadStatus.result);
+        setStatus(uploadStatus.result?.length === 1 && uploadStatus.result[0] === "ALL OK"
+          ? "finished" : "error");
+        setUploadId(null);
+        queryClient.invalidateQueries({ queryKey: vipQueryKeys.list });
+        break;
+      case "failed":
+      case "stopped":
+      case "canceled":
+        setStatus("error");
+        setUploadId(null);
         break;
       default:
         break;
     }
-  }, [uploadStatus?.status, queryClient]);
+  }, [uploadId, uploadStatus, queryClient]);
 
   const handleInitialUpload = () => {
     setShowWarning(true);
@@ -122,6 +127,7 @@ const VipUpload = () => {
     return (
       <Stack spacing={2}>
         <Alert severity="error">{t("records.vips.uploadError")}</Alert>
+        {result?.map((message) => <Typography key={message}>{message}</Typography>)}
         <Button variant="outlined" onClick={reset}>
           {t("common.retry")}
         </Button>
