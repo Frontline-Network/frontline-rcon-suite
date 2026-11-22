@@ -9,7 +9,6 @@ from functools import cached_property
 from itertools import chain
 from typing import Iterable, List, Literal, Optional, Sequence, overload
 
-from dateutil import parser
 
 import rcon.settings
 import rcon.steam_utils
@@ -59,6 +58,7 @@ from rcon.types import (
 from rcon.user_config.rcon_connection_settings import RconConnectionSettingsUserConfig
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
 from rcon.user_config.utils import BaseUserConfig
+from rcon.vip_dates import parse_vip_expiration
 from rcon.utils import (
     ALL_ROLES,
     ALL_ROLES_KEY_INDEX_MAP,
@@ -836,30 +836,17 @@ class Rcon(ServerCtl):
         self, player_id: str, description: str, expiration: str | None = None
     ) -> bool:
         """Adds VIP status on the game server and adds or updates their PlayerVIP record."""
+        expiration_date = (
+            INDEFINITE_VIP_DATE if expiration is None or expiration == ""
+            else parse_vip_expiration(expiration)
+        )
         with invalidates(Rcon.get_vip_ids):
-            # Add VIP before anything else in case we have errors
             result = super().add_vip(player_id, description)
 
         if result is not True:
             return result
 
-        expiration = expiration or ""
-        # postgres and Python have different max date limits
-        # https://docs.python.org/3.8/library/datetime.html#datetime.MAXYEAR
-        # https://www.postgresql.org/docs/12/datatype-datetime.html
-
         server_number = get_server_number()
-        # If we're unable to parse the date, treat them as indefinite VIPs
-        expiration_date: str | datetime
-        try:
-            expiration_date = parser.parse(expiration)
-        except (parser.ParserError, OverflowError):
-            logger.warning(
-                f"Unable to parse {expiration=} for {description=} {player_id=}"
-            )
-            # For our purposes (human lifespans) we can use 200 years in the future as
-            # the equivalent of indefinite VIP access
-            expiration_date = INDEFINITE_VIP_DATE
 
         # Find a player and update their expiration date if it exists or create a new record if not
         with enter_session() as session:

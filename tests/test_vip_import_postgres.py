@@ -13,11 +13,12 @@ from sqlalchemy import select
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "rconweb.rconweb.test_settings")
 django.setup()
-from api import audit_log, auth, vips
+from api import audit_log, auth, decorators, views, vips
 from rcon import api_commands, models, vip_import, workers
-from rcon.expiring_vips.service import restore_missing_vips
+from rcon.expiring_vips.service import remove_expired_vips, restore_missing_vips
 from rcon.rcon import ServerCtl
 from rcon.types import GameEnum
+from rcon.utils import INDEFINITE_VIP_DATE
 from tests.test_vip_restore_race_postgres import database, vip_admin
 
 ALPHA = "0002000000000000000000000000000a"
@@ -75,6 +76,68 @@ def scenario(database, vip_admin, monkeypatch):
 
 def line(pid, name, expiry=END):
     return f"{pid} {name} {expiry.isoformat()}\n".encode()
+
+
+@pytest.mark.parametrize("bad", ["2030-02-30", "2030-02", "Monday", "09:30", "bad-date", "   "])
+def test_bad_single_grant_never_sends_or_overwrites(scenario, monkeypatch, bad):
+    send = Mock(return_value=True)
+    monkeypatch.setattr(ServerCtl, "add_vip", send)
+    with pytest.raises(ValueError, match="Invalid VIP expiration"):
+        scenario.api.add_vip(ALPHA, "Changed", bad)
+    send.assert_not_called()
+    assert scenario.stored() == {ALPHA: END, BRAVO: END}
+    assert scenario.members[ALPHA] == "Alpha"
+
+
+def test_invalid_single_grant_returns_client_error_before_forwarding(scenario, monkeypatch):
+    grant = scenario.api.add_vip
+    monkeypatch.setattr(decorators, "ENDPOINT_HTTP_METHODS", {})
+    monkeypatch.setattr(decorators, "ENDPOINT_PERMISSIONS_LOOKUP", {})
+    forward = Mock()
+    monkeypatch.setattr(views, "forward_command", forward)
+    endpoint = views.expose_api_endpoint(grant, "add_vip", "api.can_add_vip", {grant: ["POST"]})
+    request = RequestFactory().post("/api/add_vip", {
+        "player_id": ALPHA, "description": "Changed", "expiration": "2030-02-30", "forward": True,
+    }, content_type="application/json")
+    request.user = scenario.request().user
+    response = endpoint(request)
+    assert response.status_code == 400
+    result = json.loads(response.content)
+    assert result["failed"] and "Invalid VIP expiration" in result["error"]
+    assert scenario.members[ALPHA] == "Alpha" and scenario.stored()[ALPHA] == END
+    forward.assert_not_called()
+
+
+@pytest.mark.parametrize("expiry,expected", [
+    (None, INDEFINITE_VIP_DATE), ("", INDEFINITE_VIP_DATE),
+    ("2050-10-03 10:30:00+02:00", END), ("2050-10-03T08:30:00Z", END),
+    ("Oct 3, 2050 08:30", END), ("2052-02-29", datetime(2052, 2, 29, tzinfo=timezone.utc)),
+])
+def test_valid_single_grant(scenario, expiry, expected):
+    assert scenario.api.add_vip(ALPHA, "Alpha", expiry) is True
+    assert scenario.stored() == {ALPHA: expected, BRAVO: END}
+
+
+@pytest.mark.parametrize("name", ["Captain May", "Captain Monday", "May", "Alpha 240101"])
+def test_undated_names_survive_import_export_and_expiry_cleanup(scenario, name):
+    assert not scenario.submit(f"{ALPHA} {name}\n".encode() + line(BRAVO, "Bravo"))["failed"]
+    assert scenario.run() == ["ALL OK"]
+    exported = scenario.export()
+    assert line(ALPHA, name, INDEFINITE_VIP_DATE).rstrip() in exported.splitlines()
+    assert not scenario.submit(exported)["failed"]
+    assert scenario.run() == ["ALL OK"]
+    remove_expired_vips(scenario.api)
+    assert scenario.members == {ALPHA: name, BRAVO: "Bravo"}
+    assert scenario.stored() == {ALPHA: INDEFINITE_VIP_DATE, BRAVO: END}
+    scenario.remove.assert_not_called()
+
+
+@pytest.mark.parametrize("stamp", ["2050-10-03T10:30:00+02:00", "2050-10-03 08:30:00Z"])
+def test_dated_name_ending_in_month(scenario, stamp):
+    assert not scenario.submit(f"{ALPHA} Captain May {stamp}".encode() + b"\n" + line(BRAVO, "Bravo"))["failed"]
+    assert scenario.run() == ["ALL OK"]
+    assert scenario.members[ALPHA] == "Captain May"
+    assert scenario.stored()[ALPHA] == END
 
 
 @pytest.mark.parametrize("bad", [b"truncated", b"bad-id Bravo", b"\xff", b"", b"duplicate",

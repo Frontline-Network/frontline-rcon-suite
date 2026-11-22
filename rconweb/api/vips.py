@@ -4,7 +4,6 @@ import os
 import re
 from uuid import uuid4
 
-from dateutil import parser
 from django import forms
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -12,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rcon.discord import send_to_discord_audit
 from rcon.types import GameEnum
 from rcon.utils import INDEFINITE_VIP_DATE
+from rcon.vip_dates import parse_vip_expiration
 from rcon.vip_import import inventory
 from rcon.workers import get_job_results, worker_bulk_vip
 
@@ -25,6 +25,27 @@ logger = logging.getLogger("rconweb")
 
 class DocumentForm(forms.Form):
     docfile = forms.FileField(label="Select a file")
+
+
+def _split_vip_description(text, pid):
+    # Only the trailing field can be a deadline. Keep the description verbatim.
+    fields = text.rsplit(maxsplit=1)
+    suffix = fields[-1]
+    if len(fields) == 2 and re.match(r"^[0-9]{1,2}:[0-9]{2}", suffix):
+        # Also accept the space-separated timestamp emitted by the admin UI.
+        fields = fields[0].rsplit(maxsplit=1)
+        suffix = fields[-1] + " " + suffix
+    if not any(char.isdigit() for char in suffix) or (suffix.isdigit() and len(suffix) != 8):
+        return text, None
+    try:
+        expires = parse_vip_expiration(suffix)
+    except ValueError:
+        # A malformed explicit date invalidates the whole replacement file.
+        if re.match(r"^(?:[0-9]{4}[-/.][0-9]{1,2}[-/.]|[0-9]{1,2}[-/.][0-9]{1,2}[-/.][0-9])", suffix):
+            raise
+        return text, None
+    # Older exports may have no description before the timestamp.
+    return (fields[0] if len(fields) == 2 else pid), expires
 
 
 @csrf_exempt
@@ -53,20 +74,7 @@ def upload_vips(request):
                     raise ValueError("Invalid game player ID")
                 if pid.casefold() in seen:
                     raise ValueError("Duplicate player ID")
-                expires = None
-                parts = name.rsplit(maxsplit=1)
-                # Older exports could contain an empty description before the ISO timestamp.
-                if len(parts) == 1 and re.match(r"^\d{4}-\d{1,2}-\d{1,2}", name):
-                    expires = parser.isoparse(name)
-                    name = pid
-                elif len(parts) == 2 and (not parts[1].isdigit() or len(parts[1]) == 8):
-                    try:
-                        expires = parser.parse(parts[1])
-                    except (ValueError, OverflowError):
-                        if re.match(r"^\d{4}-\d{1,2}-", parts[1]):
-                            raise ValueError("Invalid expiration date")
-                    else:
-                        name = parts[0]
+                name, expires = _split_vip_description(name, pid)
                 seen.add(pid.casefold())
                 vips.append((name, pid, expires))
             except (ValueError, OverflowError) as exc:

@@ -34,6 +34,7 @@ from rcon.types import (
 from rcon.user_config.rcon_server_settings import RconServerSettingsUserConfig
 from rcon.user_config.utils import InvalidKeysConfigurationError
 from rcon.utils import MapsHistory, get_server_number
+from rcon.vip_dates import InvalidVipExpiration
 from rconweb.settings import TAG_VERSION
 
 from .audit_log import auto_record_audit, record_audit
@@ -359,6 +360,9 @@ def expose_api_endpoint(
                 error = e.asdict()
             else:
                 error = str(e)
+        except InvalidVipExpiration as exc:
+            return api_response(command=command_name, arguments=arguments, failed=True,
+                                error=str(exc), status_code=400)
         except HLLCommandFailedError as e:
             failure = True
             error = e.args[0] if e.args else None
