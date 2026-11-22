@@ -19,7 +19,7 @@ from rcon.vip_rewards.locking import vip_lock
 
 @pytest.fixture
 def database(monkeypatch):
-    dsn = os.getenv('TEST_POSTGRES_DSN')
+    dsn = os.getenv('TEST_POSTGRES_DSN') or os.getenv('VIP_REWARDS_TEST_DB_URL')
     if not dsn:
         pytest.skip('requires a disposable PostgreSQL database')
     root = create_engine(dsn)
@@ -152,3 +152,117 @@ def test_transition_hold_blocks_restore_until_audited_release(database):
     api.add_vip.assert_not_called()
     assert action_guard.review(3, '*', token, 'operator', 'Prior operation checked') == 1
     assert service.restore_missing_vips(api) == 1
+
+
+@pytest.fixture
+def vip_admin(database, monkeypatch):
+    from rcon import rcon as rcon_module
+    from rcon.rcon import Rcon, ServerCtl
+
+    monkeypatch.setenv("SERVER_NUMBER", "3")
+    monkeypatch.setattr(rcon_module, "enter_session", service.enter_session)
+    members = {"fictional-player": "Example"}
+    read = Mock(side_effect=lambda: [{"player_id": k, "name": v} for k, v in members.items()])
+
+    def add(_api, player_id, description):
+        members[player_id] = description
+        return True
+
+    def remove(player_id):
+        return members.pop(player_id, None) is not None
+
+    removal = Mock(side_effect=remove)
+    monkeypatch.setattr(ServerCtl, "get_vip_ids", lambda self: read())
+    monkeypatch.setattr(ServerCtl, "add_vip", add)
+    monkeypatch.setattr(ServerCtl, "remove_vip", lambda self, player_id: removal(player_id))
+    api = object.__new__(Rcon)
+    snapshot = Mock(side_effect=api.get_live_vip_ids)
+    monkeypatch.setattr(Rcon, "get_vip_ids", snapshot)
+    return api, members, read, removal, snapshot
+
+
+@pytest.mark.parametrize("original", ["missing", "legacy"])
+@pytest.mark.parametrize("action", ["limit", "revoke", "unchanged"])
+def test_backfill_respects_current_entitlement(database, vip_admin, original, action):
+    api, members, _, _, snapshot = vip_admin
+    pid = "fictional-player"
+    limited = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=7)
+    with database.begin() as db:
+        row = db.scalar(select(models.PlayerVIP))
+        if original == "legacy":
+            row.expiration = limited + timedelta(days=365 * 150)
+        else:
+            db.delete(row)
+
+    def scan_then_change():
+        rows = api.get_live_vip_ids()
+        snapshot.side_effect = api.get_live_vip_ids
+        if action == "limit":
+            assert api.add_vip(pid, "Example", limited.isoformat()) is True
+        elif action == "revoke":
+            assert api.remove_vip(pid) is True
+        return rows
+
+    snapshot.side_effect = scan_then_change
+    service.remove_expired_vips(api)
+    assert service.restore_missing_vips(api) == 0
+    with database() as db:
+        row = db.scalar(select(models.PlayerVIP))
+        if action == "revoke":
+            assert row is None and pid not in members
+        else:
+            expected = limited if action == "limit" else utils.INDEFINITE_VIP_DATE
+            assert row.expiration == expected and pid in members
+
+
+@pytest.mark.parametrize("state", ["listed", "missing", "restored", "rejected", "unknown"])
+def test_bulk_revoke_includes_stored_entitlements(database, vip_admin, state):
+    from rcon.commands import HLLCommandFailedError
+
+    api, members, read, removal, _ = vip_admin
+    pid = "fictional-player"
+    with database.begin() as db:
+        primary = db.scalar(select(models.PlayerVIP))
+        db.add(models.PlayerVIP(player_id_id=primary.player_id_id, server_number=4, expiration=primary.expiration))
+    if state == "missing":
+        members.clear()
+    elif state == "restored":
+        # Game membership reappears between the first scan and the player lock.
+        read.side_effect = [[], [{"player_id": pid, "name": "Example"}], []]
+    elif state == "rejected":
+        removal.side_effect = None
+        removal.return_value = False
+    elif state == "unknown":
+        read.side_effect = [[], TimeoutError("game unreachable")]
+
+    if state in ("rejected", "unknown"):
+        error = TimeoutError if state == "unknown" else HLLCommandFailedError
+        with pytest.raises(error):
+            api.remove_all_vips()
+    else:
+        assert api.remove_all_vips() is True
+        assert pid not in members
+        read.side_effect = lambda: []
+        assert service.restore_missing_vips(api) == 0
+
+    with database() as db:
+        servers = set(db.scalars(select(models.PlayerVIP.server_number)))
+    assert servers == ({3, 4} if state in ("rejected", "unknown") else {4})
+
+
+def test_bulk_revoke_reports_partial_failure_and_keeps_rejected_right(database, vip_admin):
+    from rcon.commands import HLLCommandFailedError
+
+    api, members, _, removal, _ = vip_admin
+    blocked = "fictional-player"
+    accepted = "second-player"
+    with database.begin() as db:
+        db.add(models.PlayerID(player_id=accepted))
+    assert api.add_vip(accepted, "Second", utils.INDEFINITE_VIP_DATE.isoformat())
+    removal.side_effect = lambda player_id: player_id != blocked and members.pop(player_id, None) is not None
+    with pytest.raises(HLLCommandFailedError, match="1 player"):
+        api.remove_all_vips()
+    assert set(members) == {blocked}
+    with database() as db:
+        assert db.scalar(select(models.PlayerVIP)).player.player_id == blocked
+        assert db.query(models.PlayerVIP).count() == 1
