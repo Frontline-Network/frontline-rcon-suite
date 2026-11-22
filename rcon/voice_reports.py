@@ -86,7 +86,7 @@ def max_age(payload):
         voice.get("deadline", 0),
         (
             payload.get("ready_at", 0) + 15
-            if voice["phase"] == "notice_sent"
+            if voice["phase"] in {"notice_sent", "question_sending"}
             else 0
         ),
     )
@@ -579,6 +579,8 @@ def advance(api, server, event_id, context):
             sess,
             event,
             sending,
+            # Keep the scheduled time through the final check before sending.
+            due=p.get("ready_at", 0) if sending == "question_sending" else 0,
             **({"question_reserved_at": now} if sending == "question_sending" else {}),
         )
     try:
