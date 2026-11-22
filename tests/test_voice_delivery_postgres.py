@@ -20,6 +20,64 @@ def db(postgres):
 
 
 @pytest.mark.parametrize(
+    ("worker_delay", "context_delay", "should_send"),
+    [(0, 0, True), (4, 0, True), (15, 0, True), (16, 0, False), (4, 12, False)],
+)
+def test_second_witness_question_uses_scheduled_time(pilot, monkeypatch, worker_delay, context_delay, should_send):
+    scenario, advance = pilot
+    database, _, context = scenario
+    api = transport()
+    first = report(scenario, reporter_id="v0")["id"]
+    service.tick(api, 1)
+    advance(1)
+    context["event_time"] = database.clock.now
+    second = report(scenario, "!admin Squad-1 redet nicht", reporter_id="v0")["id"]
+    service.tick(api, 1)
+    advance(59)
+    service.tick(api, 1)
+    first_prompt = snapshot(database, first)["voice"]
+    assert first_prompt["witness_id"] == "v0"
+    assert voice_reports.answer(1, first, "v0", True, context)
+    advance(1)
+    service.tick(api, 1)
+    deferred = snapshot(database, second)
+    assert deferred["voice"]["witness_id"] == "v0"
+    assert deferred["ready_at"] == first_prompt["deadline"] + 1
+    advance(deferred["ready_at"] - database.clock.now - 1)
+    service.tick(api, 1)
+    assert snapshot(database, second)["voice"]["phase"] == "notice_sent"
+    advance(1 + worker_delay)
+    api.message_player.reset_mock()
+
+    def read_context(_api):
+        # Only the second live-context read happens after the send reservation.
+        if snapshot(database, second)["voice"]["phase"] == "question_sending":
+            advance(context_delay)
+        return context
+
+    with monkeypatch.context() as patch:
+        patch.setattr(service, "read_context", read_context)
+        service.tick(api, 1)
+    state = snapshot(database, second)["voice"]
+    if not should_send:
+        assert state["phase"] == "manual"
+        api.message_player.assert_not_called()
+        return
+    assert state["phase"] == "awaiting_answer"
+    assert state["deadline"] == state["question_at"] + 120
+    api.message_player.assert_called_once()
+    assert api.message_player.call_args.args[0] == "v0"
+    service.tick(api, 1)
+    api.message_player.assert_called_once()
+    reply = {"player_id_1": "v0", "sub_content": "Ja"}
+    assert not voice_reports.handle_chat(api, {**reply, "timestamp_ms": first_prompt["question_at"] * 1000}, 1)
+    assert voice_reports.handle_chat(api, {**reply, "timestamp_ms": database.clock.now * 1000}, 1)
+    assert snapshot(database, second)["voice"]["phase"] == "resolved"
+    assert snapshot(database, first)["voice"]["answer_at"] == first_prompt["question_at"]
+    api.kick.assert_not_called()
+
+
+@pytest.mark.parametrize(
     ("reply_delay", "worker_delay", "accepted", "kicked"),
     [
         (119, 0, True, True),
