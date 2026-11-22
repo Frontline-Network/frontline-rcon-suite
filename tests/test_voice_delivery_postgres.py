@@ -19,6 +19,53 @@ def db(postgres):
     return postgres
 
 
+@pytest.mark.parametrize(
+    ("reply_delay", "worker_delay", "accepted", "kicked"),
+    [
+        (119, 0, True, True),
+        (119, 5, True, True),
+        (119, 30, True, True),
+        (119, 31, True, False),
+        (1, 31, True, False),
+        (120, 0, False, False),
+        (121, 0, False, False),
+    ],
+)
+def test_voice_answer_and_dispatch_deadlines(pilot, reply_delay, worker_delay, accepted, kicked):
+    scenario, advance = pilot
+    database, _, context = scenario
+    api = transport()
+    case = report(scenario, reporter_id="member")["id"]
+    service.tick(api, 1)
+    advance(60)
+    service.tick(api, 1)
+    assert snapshot(database, case)["voice"]["phase"] == "awaiting_answer"
+    advance(reply_delay)
+    assert voice_reports.answer(1, case, "member", False, context) is accepted
+    advance(worker_delay)
+    service.tick(api, 1)
+    service.tick(api, 1)
+    assert snapshot(database, case)["status"] == ("kicked" if kicked else "manual")
+    assert api.kick.call_count == int(kicked)
+
+
+def test_role_change_after_timely_voice_answer_prevents_delayed_kick(pilot):
+    scenario, advance = pilot
+    database, players, context = scenario
+    api = transport()
+    case = report(scenario, reporter_id="member")["id"]
+    service.tick(api, 1)
+    advance(60)
+    service.tick(api, 1)
+    advance(119)
+    assert voice_reports.answer(1, case, "member", False, context)
+    next(p for p in players if p["player_id"] == "target")["role"] = "Rifleman"
+    advance(5)
+    service.tick(api, 1)
+    assert snapshot(database, case)["status"] == "manual"
+    api.kick.assert_not_called()
+
+
 def test_missing_round_before_kick_preserves_other_voice_dialog(pilot, monkeypatch):
     scenario, advance = pilot
     database, players, context = scenario

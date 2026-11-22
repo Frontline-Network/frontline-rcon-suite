@@ -21,6 +21,7 @@ _REPLIES = {
     )
 }
 _BARE = frozenset(word for pair in _REPLIES.values() for word in pair)
+KICK_PROCESSING_SECONDS = 30
 
 
 def chat_candidate(message):
@@ -66,19 +67,26 @@ def named_target(player, players):
 
 
 def max_age(payload):
+    voice = payload["voice"]
     # No extension to the original 60-second validity window before dispatch.
-    if payload["voice"]["phase"] == "clarify":
+    if voice["phase"] == "clarify":
         return 120
-    sent_at = payload["voice"].get("notice_sent_at")
+    sent_at = voice.get("notice_sent_at")
     if sent_at is None:
         return 60
+    if voice["phase"] == "kick_ready":
+        # Anchor dispatch to the accepted reply, including across worker ticks.
+        answered_at = voice.get("answer_at")
+        if answered_at is None:
+            return -1
+        return answered_at + KICK_PROCESSING_SECONDS - payload["report_time"]
     # A witness with an existing prompt can receive the next one after its window.
     horizon = max(
         sent_at + 180,
-        payload["voice"].get("deadline", 0),
+        voice.get("deadline", 0),
         (
             payload.get("ready_at", 0) + 15
-            if payload["voice"]["phase"] == "notice_sent"
+            if voice["phase"] == "notice_sent"
             else 0
         ),
     )
