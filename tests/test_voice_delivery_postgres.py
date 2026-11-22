@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import select
 
 from rcon import admin_incidents, voice_reports
-from rcon.models import AdminIncident, AdminIncidentEvent
+from rcon.models import AdminIncident, AdminIncidentEvent, PlayerSession
 from tests.test_leadership_vote_postgres import postgres
 from tests.test_report_admin import report, service, setup, transport
 from tests.test_voice_reports import pilot, snapshot
@@ -103,14 +103,25 @@ def test_uncertain_receipt_is_never_replayed(pilot, outcome):
             AdminIncidentEvent.incident_id == incident_id,
         ))
 
-    def interrupted(*args, **kwargs):
-        if outcome == "restart":
-            service.recover(1)
-            return True  # Late confirmation from the previous owner.
-        raise TimeoutError("no game-server acknowledgement")
+    if outcome == "restart":
+        entered, release = Event(), Event()
 
-    api.message_player.side_effect = interrupted
-    voice_reports.flush_messages(api, 1)
+        def late_confirmation(*args, **kwargs):
+            entered.set()
+            return release.wait(20)
+
+        api.message_player.side_effect = late_confirmation
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            delivery = pool.submit(voice_reports.flush_messages, api, 1)
+            try:
+                assert entered.wait(10)
+                pool.submit(service.recover, 1).result(timeout=5)
+            finally:
+                release.set()
+            delivery.result(timeout=5)
+    else:
+        api.message_player.side_effect = TimeoutError("no game-server acknowledgement")
+        voice_reports.flush_messages(api, 1)
     original_receipt = api.message_player.call_args
     with database() as sess:
         assert sess.get(AdminIncidentEvent, receipt_id).payload["status"] == "unknown"
@@ -121,3 +132,29 @@ def test_uncertain_receipt_is_never_replayed(pilot, outcome):
     assert original_receipt not in api.message_player.call_args_list
     with database() as sess:
         assert sess.get(AdminIncidentEvent, receipt_id).payload["status"] == "unknown"
+
+
+@pytest.mark.parametrize("invalid", ["expired", "disconnected"])
+def test_stale_receipt_expires_without_sending(pilot, invalid):
+    scenario, advance_time = pilot
+    database, _, _ = scenario
+    api = transport()
+    incident_id = report(scenario, reporter_id="member")["id"]
+    service.tick(api, 1)
+    with database() as sess:
+        receipt = sess.scalar(select(AdminIncidentEvent).where(
+            AdminIncidentEvent.incident_id == incident_id,
+            AdminIncidentEvent.event_type == "voice_game_message",
+        ))
+        receipt_id = receipt.id
+        if invalid == "disconnected":
+            sess.get(PlayerSession, receipt.payload["session"]).end_event_us = int(
+                database.clock.now * 1_000_000
+            )
+    if invalid == "expired":
+        advance_time(120)
+    api.message_player.reset_mock()
+    voice_reports.flush_messages(api, 1)
+    api.message_player.assert_not_called()
+    with database() as sess:
+        assert sess.get(AdminIncidentEvent, receipt_id).payload["status"] == "expired"
