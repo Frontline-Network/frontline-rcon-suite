@@ -4,13 +4,14 @@ import copy
 import hashlib
 import logging
 import time
+from contextlib import nullcontext
 from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 
-from rcon.models import SeedVipGrant, VipRewardEvent, VipRewardGrant, VipRewardNotice, VipRewardState, enter_session, get_session_maker
+from rcon.models import PlayerID, PlayerVIP, SeedVipGrant, VipRewardEvent, VipRewardGrant, VipRewardNotice, VipRewardState, enter_session, get_session_maker
 from rcon.service_runtime import stopping, wait
 from rcon.user_config.seed_vip import SeedVIPUserConfig
 from rcon.user_config.vip_rewards import VipRewardsUserConfig
@@ -387,6 +388,22 @@ def current_vip(rcon, player_id):
     return rows[0] if rows else None
 
 
+def vip_for_reward(rcon, player_id, default_name, *, session=None):
+    """Read the entitlement under vip_lock. Only a live read can confirm a write."""
+    live = current_vip(rcon, player_id)
+    if live is not None:
+        return live
+    with (nullcontext(session) if session is not None else get_session_maker()()) as db:
+        stored = db.execute(
+            select(PlayerVIP.expiration)
+            .join(PlayerID, PlayerID.id == PlayerVIP.player_id_id)
+            .where(PlayerVIP.server_number == server(), PlayerID.player_id == player_id)
+        ).one_or_none()
+        if stored is not None:
+            return {"player_id": player_id, "name": default_name, "vip_expiration": stored.expiration}
+    return None
+
+
 def expiration(value):
     if isinstance(value, str):
         value = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -543,7 +560,7 @@ def deliver(rcon, grant_id):
                 if not allowed:
                     row.status, row.reason = "skipped", row.reason or "daily_budget"
                     return
-                vip = current_vip(rcon, pid)
+                vip = vip_for_reward(rcon, pid, "VIP-Belohnung", session=session)
                 if permanent(vip):
                     row.status, row.reason = "skipped", "permanent_vip"
                     return

@@ -71,6 +71,8 @@ class PostgreSQLSeedingTests(unittest.TestCase):
         os.environ["HLL_DB_URL"] = str(url.render_as_string(hide_password=False))
         os.environ["SERVER_NUMBER"] = "3"
         UserConfig.__table__.create(cls.db)
+        models.PlayerID.__table__.create(cls.db)
+        models.PlayerVIP.__table__.create(cls.db)
         SeedVipGrant.__table__.create(cls.db)
         path = Path(__file__).parents[1] / "alembic/versions/c8e2a4f61009_vip_rewards.py"
         spec = importlib.util.spec_from_file_location("staging_migration", path)

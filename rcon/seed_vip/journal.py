@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from rcon.models import SeedVipCycle, SeedVipGrant, VipRewardGrant, get_session_maker
 from rcon.vip_rewards.locking import vip_lock
-from rcon.vip_rewards.service import current_vip, expiration, permanent
+from rcon.vip_rewards.service import current_vip, expiration, permanent, vip_for_reward
 
 
 @dataclass(frozen=True)
@@ -230,7 +230,7 @@ def deliver(rcon, *, server_number: int, grant_id: int) -> str:
         if not prepared:
             # RCON reads may themselves query PostgreSQL. Do not hold a second
             # journal transaction while making those calls under the VIP lock.
-            vip = current_vip(rcon, player_id)
+            vip = vip_for_reward(rcon, player_id, player_name)
             if permanent(vip):
                 with maker() as session, session.begin():
                     grant = session.get(SeedVipGrant, grant_id, with_for_update=True)

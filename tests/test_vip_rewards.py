@@ -330,7 +330,7 @@ def delivery(monkeypatch):
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.ext.compiler import compiles
     from sqlalchemy.dialects.postgresql import JSONB
-    from rcon.models import SeedVipGrant, VipRewardGrant, VipRewardNotice, VipRewardState, VipRewardEvent
+    from rcon.models import PlayerID, PlayerVIP, SeedVipGrant, VipRewardGrant, VipRewardNotice, VipRewardState, VipRewardEvent
     from rcon.vip_rewards import service
 
     @compiles(JSONB, "sqlite")
@@ -339,6 +339,8 @@ def delivery(monkeypatch):
 
     db = create_engine("sqlite://")
     for table in (
+        PlayerID.__table__,
+        PlayerVIP.__table__,
         VipRewardGrant.__table__,
         VipRewardNotice.__table__,
         SeedVipGrant.__table__,
@@ -414,6 +416,34 @@ def delivery(monkeypatch):
 
     yield service, cfg, rcon, remote, add, read_row
     db.dispose()
+
+
+@pytest.mark.parametrize(
+    ("stored_hours", "stored_server", "expected_hours"),
+    [(720, 1, 721), (-1, 1, 1), (720, 2, 1), (None, 1, None)],
+)
+def test_reward_preserves_vip_missing_from_game(delivery, stored_hours, stored_server, expected_hours):
+    from datetime import timedelta
+    from rcon.models import PlayerID, PlayerVIP
+    from rcon.utils import INDEFINITE_VIP_DATE
+
+    service, _, api, _, add, read = delivery
+    now = datetime.fromtimestamp(NOW, timezone.utc)
+    with service.enter_session() as session:
+        player = PlayerID(player_id="a")
+        session.add(player)
+        session.flush()
+        session.add(PlayerVIP(player_id_id=player.id, server_number=stored_server,
+                              expiration=INDEFINITE_VIP_DATE if stored_hours is None
+                              else now + timedelta(hours=stored_hours)))
+    grant = add(hours=1)
+    service.deliver(api, grant)
+    if expected_hours is None:
+        assert read(grant)["reason"] == "permanent_vip"
+        api.add_vip.assert_not_called()
+    else:
+        assert read(grant)["status"] == "awarded"
+        assert datetime.fromisoformat(read(grant)["target"]) == now + timedelta(hours=expected_hours)
 
 
 def test_unresolved_seed_grant_blocks_other_vip_write(delivery):
