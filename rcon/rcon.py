@@ -782,54 +782,37 @@ class Rcon(ServerCtl):
 
         return sorted(player_dicts, key=lambda d: d[NAME])
 
-    @serialized_vip
     def remove_vip(self, player_id, expected_expiration=None) -> bool:
-        """Removes VIP status on the game server and removes their PlayerVIP record."""
+        """Revoke this server's entitlement even if Vietnam has lost its VIP list."""
+        # Expiry cleanup verifies its own live observation under the same lock.
+        listed = expected_expiration is not None or self.config.game != GameEnum.HLL_VIETNAM
+        return self._revoke_stored_or_live_vip(player_id, listed, expected_expiration)
 
+    @serialized_vip
+    def _revoke_stored_or_live_vip(self, player_id, listed, expected_expiration=None):
         if expected_expiration is not None:
-            # Expiry cleanup must not remove a VIP extended after its initial query.
             from rcon.vip_rewards.service import current_vip, expiration
             current = current_vip(self, player_id)
             if current is None or current["vip_expiration"] is None or expiration(current["vip_expiration"]) != expiration(expected_expiration):
                 return False
 
-        # Remove VIP before anything else in case we have errors
         with invalidates(Rcon.get_vip_ids):
-            result = super().remove_vip(player_id)
-        if not result:
-            logger.warning("Game server rejected VIP removal for %s", player_id)
-            return False
-
-        server_number = get_server_number()
-        with enter_session() as session:
-            player: PlayerID | None = (
-                session.query(PlayerID)
-                .filter(PlayerID.player_id == player_id)
-                .one_or_none()
-            )
-            if player and player.vip:
-                logger.info(
-                    f"Removed VIP from {player_id} expired: {player.vip.expiration}"
-                )
-                # TODO: This is an incredibly dumb fix because I can't get
-                # the changes to persist otherwise
-                vip_record: PlayerVIP | None = (
+            # The restore worker holds this player lock through its own DB and RCON writes.
+            if listed or self.has_live_vip(player_id):
+                if super().remove_vip(player_id) is not True:
+                    logger.warning("Game server did not confirm VIP removal for %s", player_id)
+                    return False
+            with enter_session() as session:
+                record = (
                     session.query(PlayerVIP)
-                    .filter(
-                        PlayerVIP.player_id_id == player.id,
-                        PlayerVIP.server_number == server_number,
-                    )
+                    .join(PlayerID, PlayerVIP.player_id_id == PlayerID.id)
+                    .filter(PlayerVIP.server_number == get_server_number(), PlayerID.player_id == player_id)
+                    .with_for_update(of=PlayerVIP)
                     .one_or_none()
                 )
-                session.delete(vip_record)
-            elif player and not player.vip:
-                logger.warning(f"{player_id} has no PlayerVIP record")
-            else:
-                # This is okay since you can give VIP to someone who has never been on a game server
-                # or that your instance of CRCON hasn't seen before, but you might want to prune these
-                logger.warning(f"{player_id} has no PlayerSteamID record")
-
-        return result
+                if record is not None:
+                    session.delete(record)
+        return True
 
     @serialized_vip
     def add_vip(
@@ -896,24 +879,6 @@ class Rcon(ServerCtl):
                 )
 
         return result
-
-    @serialized_vip
-    def _revoke_stored_or_live_vip(self, player_id, listed):
-        # Reconciliation may restore a missing player between the scan and this lock.
-        if listed or self.has_live_vip(player_id):
-            return self.remove_vip(player_id) is True
-        with enter_session() as session:
-            record = (
-                session.query(PlayerVIP)
-                .join(PlayerID, PlayerVIP.player_id_id == PlayerID.id)
-                .filter(PlayerVIP.server_number == get_server_number(), PlayerID.player_id == player_id)
-                .with_for_update()
-                .one_or_none()
-            )
-            if record is not None:
-                session.delete(record)
-        return True
-
 
     def remove_all_vips(self) -> bool:
         server_number = get_server_number()

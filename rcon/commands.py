@@ -604,12 +604,17 @@ class ServerCtl:
         )
 
     def get_vip_ids(self) -> list[VipId]:
-        return [
-            VipId(player_id=vip["iD"], name=vip["comment"])
-            for vip in self.exchange(
-                "GetServerInformation", 2, {"Name": "vipplayers", "Value": ""}
-            ).content_dict["vipPlayers"]
-        ]
+        rows = self.exchange(
+            "GetServerInformation", 2, {"Name": "vipplayers", "Value": ""}
+        ).content_dict.get("vipPlayers")
+        if not isinstance(rows, list):
+            raise HLLCommandFailedError("Game server did not return a VIP list")
+        result = []
+        for row in rows:
+            if not isinstance(row, dict) or not isinstance(row.get("iD"), str) or not row["iD"].strip():
+                raise HLLCommandFailedError("Game server returned an unidentified VIP")
+            result.append(VipId(player_id=row["iD"], name=row["comment"]))
+        return result
 
     def get_admin_groups(self) -> list[str]:
         return self.exchange("GetAdminGroups", 2).content_dict["groupNames"]

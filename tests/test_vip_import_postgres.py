@@ -202,6 +202,37 @@ def test_valid_roundtrip_and_in_place_update(scenario):
     scenario.remove.assert_not_called()
 
 
+@pytest.mark.parametrize("state,code", [("stored_only", 200), ("rejected", 400), ("read_timeout", 504)])
+def test_single_revoke_endpoint_distinguishes_absence_from_failure(scenario, monkeypatch, state, code):
+    revoke = scenario.api.remove_vip
+    monkeypatch.setattr(decorators, "ENDPOINT_HTTP_METHODS", {})
+    monkeypatch.setattr(decorators, "ENDPOINT_PERMISSIONS_LOOKUP", {})
+    monkeypatch.setattr(views.RconServerSettingsUserConfig, "load_from_db", lambda: SimpleNamespace(broadcast_unbans=False))
+    monkeypatch.setattr(views, "audit", Mock())
+    endpoint = views.expose_api_endpoint(revoke, "remove_vip", "api.can_remove_vip", {revoke: ["POST"]})
+    if state == "stored_only":
+        del scenario.members[BRAVO]
+    elif state == "rejected":
+        scenario.remove.side_effect = None
+        scenario.remove.return_value = False
+    else:
+        monkeypatch.setattr(ServerCtl, "get_vip_ids", Mock(side_effect=TimeoutError()))
+    req = RequestFactory().post("/api/remove_vip", {"player_id": BRAVO}, content_type="application/json")
+    req.user = scenario.request().user
+    response = endpoint(req)
+    result = json.loads(response.content)
+    assert response.status_code == code
+    assert result["failed"] == (code != 200)
+    assert scenario.stored(4) == {BRAVO: END}
+    if state == "stored_only":
+        assert result["result"] is True
+        assert restore_missing_vips(scenario.api) == 0
+        assert scenario.members == {ALPHA: "Alpha"} and scenario.stored() == {ALPHA: END}
+    else:
+        assert result["error"]
+        assert scenario.stored() == {ALPHA: END, BRAVO: END}
+
+
 def test_retry_after_lost_removal_reply_checks_both_sources(scenario):
     def applied_with_lost_reply(pid):
         scenario.members.pop(pid)

@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, nullcontext
 from datetime import datetime, timedelta, timezone
 from threading import Event
+from types import SimpleNamespace
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -14,6 +15,7 @@ from sqlalchemy.orm import sessionmaker
 from rcon import models, utils
 from rcon.automods import action_guard
 from rcon.expiring_vips import service
+from rcon.types import GameEnum
 from rcon.vip_rewards.locking import vip_lock
 
 
@@ -176,6 +178,7 @@ def vip_admin(database, monkeypatch):
     monkeypatch.setattr(ServerCtl, "add_vip", add)
     monkeypatch.setattr(ServerCtl, "remove_vip", lambda self, player_id: removal(player_id))
     api = object.__new__(Rcon)
+    api.config = SimpleNamespace(game=GameEnum.HLL_VIETNAM)
     snapshot = Mock(side_effect=api.get_live_vip_ids)
     monkeypatch.setattr(Rcon, "get_vip_ids", snapshot)
     return api, members, read, removal, snapshot
@@ -266,3 +269,87 @@ def test_bulk_revoke_reports_partial_failure_and_keeps_rejected_right(database, 
     with database() as db:
         assert db.scalar(select(models.PlayerVIP)).player.player_id == blocked
         assert db.query(models.PlayerVIP).count() == 1
+
+
+@pytest.mark.parametrize("listed", [False, True])
+def test_vietnam_single_revoke_survives_restore_and_preserves_other_server(database, vip_admin, listed):
+    api, members, _, removal, _ = vip_admin
+    pid = "fictional-player"
+    with database.begin() as db:
+        current = db.scalar(select(models.PlayerVIP))
+        db.add(models.PlayerVIP(player_id_id=current.player_id_id, server_number=4,
+                                expiration=current.expiration))
+    if not listed:
+        members.clear()
+    assert api.remove_vip(pid) is True
+    assert removal.call_count == int(listed)
+    assert service.restore_missing_vips(api) == 0
+    assert pid not in members
+    with database() as db:
+        assert list(db.scalars(select(models.PlayerVIP.server_number))) == [4]
+
+
+@pytest.mark.parametrize("failure", ["read_timeout", "rejected", "lost_reply"])
+def test_vietnam_single_revoke_keeps_record_until_confirmed(database, vip_admin, failure):
+    api, members, read, removal, _ = vip_admin
+    pid = "fictional-player"
+    if failure == "rejected":
+        removal.side_effect = None
+        removal.return_value = False
+        assert api.remove_vip(pid) is False
+        assert pid in members
+    else:
+        if failure == "read_timeout":
+            read.side_effect = TimeoutError("unconfirmed list")
+        else:
+            def lose_reply(player_id):
+                members.pop(player_id)
+                raise TimeoutError("unconfirmed removal")
+            removal.side_effect = lose_reply
+        with pytest.raises(TimeoutError):
+            api.remove_vip(pid)
+    assert removal.call_count == int(failure != "read_timeout")
+    with database() as db:
+        assert db.scalar(select(models.PlayerVIP)).expiration > datetime.now(timezone.utc)
+    if failure == "lost_reply":
+        assert api.remove_vip(pid) is True
+        removal.assert_called_once()
+        assert service.restore_missing_vips(api) == 0
+
+
+def test_vietnam_single_revoke_waits_for_concurrent_restore(database, vip_admin, monkeypatch):
+    from rcon.rcon import ServerCtl
+
+    api, members, _, removal, _ = vip_admin
+    pid = "fictional-player"
+    members.clear()
+    restoring, release, revoking = Event(), Event(), Event()
+
+    def add(_api, player_id, description):
+        restoring.set()
+        assert release.wait(10)
+        members[player_id] = description
+        return True
+
+    def revoke():
+        revoking.set()
+        return api.remove_vip(pid)
+
+    monkeypatch.setattr(ServerCtl, "add_vip", add)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        restore = pool.submit(service.restore_missing_vips, api)
+        try:
+            assert restoring.wait(5)
+            removal_result = pool.submit(revoke)
+            assert revoking.wait(5)
+            with pytest.raises(TimeoutError):
+                removal_result.result(timeout=0.25)
+        finally:
+            release.set()
+        assert restore.result(timeout=10) == 1
+        assert removal_result.result(timeout=10) is True
+    removal.assert_called_once_with(pid)
+    assert service.restore_missing_vips(api) == 0
+    assert pid not in members
+    with database() as db:
+        assert db.scalar(select(models.PlayerVIP)) is None
