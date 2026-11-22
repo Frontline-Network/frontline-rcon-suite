@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from contextvars import ContextVar
 import hashlib
+import re
 from time import monotonic, sleep
 from functools import wraps
 
@@ -39,10 +40,16 @@ def lock(key):
             connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": number})
 
 
+def eos_vip_key(player_id):
+    if isinstance(player_id, str) and re.fullmatch(r"[0-9a-fA-F]{32}", player_id):
+        return player_id.lower()
+    return None
+
+
 def vip_lock(player_id):
     from rcon.utils import get_server_number
 
-    return lock(f"vip:{get_server_number()}:{player_id}")
+    return lock(f"vip:{get_server_number()}:{eos_vip_key(player_id) or player_id}")
 
 
 def switch_state_lock():

@@ -202,8 +202,9 @@ def test_valid_roundtrip_and_in_place_update(scenario):
     scenario.remove.assert_not_called()
 
 
-@pytest.mark.parametrize("state,code", [("stored_only", 200), ("rejected", 400), ("read_timeout", 504)])
-def test_single_revoke_endpoint_distinguishes_absence_from_failure(scenario, monkeypatch, state, code):
+@pytest.mark.parametrize("requested_id", [BRAVO.lower(), BRAVO.upper()])
+@pytest.mark.parametrize("state,code", [("listed", 200), ("stored_only", 200), ("rejected", 400), ("read_timeout", 504)])
+def test_single_revoke_endpoint_distinguishes_absence_from_failure(scenario, monkeypatch, state, code, requested_id):
     revoke = scenario.api.remove_vip
     monkeypatch.setattr(decorators, "ENDPOINT_HTTP_METHODS", {})
     monkeypatch.setattr(decorators, "ENDPOINT_PERMISSIONS_LOOKUP", {})
@@ -215,22 +216,50 @@ def test_single_revoke_endpoint_distinguishes_absence_from_failure(scenario, mon
     elif state == "rejected":
         scenario.remove.side_effect = None
         scenario.remove.return_value = False
-    else:
+    elif state == "read_timeout":
         monkeypatch.setattr(ServerCtl, "get_vip_ids", Mock(side_effect=TimeoutError()))
-    req = RequestFactory().post("/api/remove_vip", {"player_id": BRAVO}, content_type="application/json")
+    req = RequestFactory().post("/api/remove_vip", {"player_id": requested_id}, content_type="application/json")
     req.user = scenario.request().user
     response = endpoint(req)
     result = json.loads(response.content)
     assert response.status_code == code
     assert result["failed"] == (code != 200)
     assert scenario.stored(4) == {BRAVO: END}
-    if state == "stored_only":
+    if code == 200:
         assert result["result"] is True
+        assert scenario.remove.call_count == int(state == "listed")
         assert restore_missing_vips(scenario.api) == 0
         assert scenario.members == {ALPHA: "Alpha"} and scenario.stored() == {ALPHA: END}
     else:
         assert result["error"]
         assert scenario.stored() == {ALPHA: END, BRAVO: END}
+
+
+def test_vietnam_revoke_uses_each_sources_original_spelling(scenario, database):
+    with database.begin() as db:
+        db.scalar(select(models.PlayerID).where(models.PlayerID.player_id == BRAVO)).player_id = BRAVO.upper()
+    assert scenario.api.remove_vip(BRAVO.lower()) is True
+    scenario.remove.assert_called_once_with(BRAVO.lower())
+    assert restore_missing_vips(scenario.api) == 0
+    assert scenario.members == {ALPHA: "Alpha"} and scenario.stored() == {ALPHA: END}
+    assert scenario.stored(4) == {BRAVO.upper(): END}
+
+
+@pytest.mark.parametrize("duplicates", ["game", "database"])
+def test_vietnam_ambiguous_vip_spelling_stops_before_removal(scenario, database, duplicates):
+    from rcon.commands import HLLCommandFailedError
+
+    if duplicates == "game":
+        scenario.members[BRAVO.upper()] = "Other entry"
+    else:
+        with database.begin() as db:
+            player = models.PlayerID(player_id=BRAVO.upper())
+            db.add(models.PlayerVIP(player=player, server_number=3, expiration=END))
+    before = scenario.stored()
+    with pytest.raises(HLLCommandFailedError, match="Multiple VIP entries"):
+        scenario.api.remove_vip(BRAVO.upper())
+    scenario.remove.assert_not_called()
+    assert scenario.stored() == before
 
 
 def test_retry_after_lost_removal_reply_checks_both_sources(scenario):

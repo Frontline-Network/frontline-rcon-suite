@@ -9,6 +9,7 @@ from functools import cached_property
 from itertools import chain
 from typing import Iterable, List, Literal, Optional, Sequence, overload
 
+from sqlalchemy import func
 
 import rcon.settings
 import rcon.steam_utils
@@ -26,7 +27,7 @@ from rcon.game.player_adapter import PlayerResponseAdapterError
 from rcon.maps import UNKNOWN_MAP_NAME, Layer, is_server_loading_map
 from rcon.models import GameLayout, PlayerID, PlayerVIP, enter_session
 from rcon.perf_statistics import PerformanceStatistics
-from rcon.vip_rewards.locking import serialized_vip
+from rcon.vip_rewards.locking import eos_vip_key, serialized_vip
 from rcon.player_history import (
     get_live_profiles,
     get_player_profile,
@@ -788,6 +789,22 @@ class Rcon(ServerCtl):
         listed = expected_expiration is not None or self.config.game != GameEnum.HLL_VIETNAM
         return self._revoke_stored_or_live_vip(player_id, listed, expected_expiration)
 
+    def _vietnam_vip_ids_for_revoke(self, eos_key):
+        # Each source may retain a different spelling of the same EOS ID.
+        live = [row[PLAYER_ID] for row in super().get_vip_ids()
+                if eos_vip_key(row[PLAYER_ID]) == eos_key]
+        with enter_session() as session:
+            stored = (
+                session.query(PlayerID.player_id)
+                .join(PlayerVIP, PlayerVIP.player_id_id == PlayerID.id)
+                .filter(PlayerVIP.server_number == get_server_number(),
+                        func.lower(PlayerID.player_id) == eos_key)
+                .limit(2).all()
+            )
+        if len(live) > 1 or len(stored) > 1:
+            raise HLLCommandFailedError("Multiple VIP entries match this EOS ID")
+        return (stored[0].player_id if stored else eos_key, live[0] if live else None)
+
     @serialized_vip
     def _revoke_stored_or_live_vip(self, player_id, listed, expected_expiration=None):
         if expected_expiration is not None:
@@ -798,8 +815,14 @@ class Rcon(ServerCtl):
 
         with invalidates(Rcon.get_vip_ids):
             # The restore worker holds this player lock through its own DB and RCON writes.
-            if listed or self.has_live_vip(player_id):
-                if super().remove_vip(player_id) is not True:
+            live_id = player_id
+            if not listed:
+                if self.config.game == GameEnum.HLL_VIETNAM and (key := eos_vip_key(player_id)):
+                    player_id, live_id = self._vietnam_vip_ids_for_revoke(key)
+                elif not self.has_live_vip(player_id):
+                    live_id = None
+            if live_id is not None:
+                if super().remove_vip(live_id) is not True:
                     logger.warning("Game server did not confirm VIP removal for %s", player_id)
                     return False
             with enter_session() as session:
