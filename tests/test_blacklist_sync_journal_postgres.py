@@ -230,23 +230,92 @@ def test_unconfirmed_action_requires_review_and_blocks_later_work(database, fail
 
 def test_unconfirmed_unban_is_reviewed_without_replay(database, monkeypatch):
     from contextlib import nullcontext
-    from types import SimpleNamespace
 
     monkeypatch.setattr(blacklist, 'SERVER_NUMBER', 1)
     monkeypatch.setattr(blacklist, 'lock', lambda _key: nullcontext())
     server = mock.Mock()
-    server.get_temp_bans.return_value = [{'player_id': 'synthetic'}]
-    server.get_perma_bans.return_value = [{'player_id': 'synthetic'}]
+    server.get_temp_bans.return_value = [{'player_id': 'synthetic', 'ban_time': '2025-01-01T00:00:00Z'}]
+    server.get_perma_bans.return_value = [{'player_id': 'synthetic', 'ban_time': '2025-01-01T00:00:00Z'}]
     server.remove_temp_ban.return_value = None
     receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
     receiver.rcon = server
     queue(database, b'first', 1)
-    dispatch = lambda _command: receiver.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+    dispatch = lambda _command: receiver.handle_expire_all(blacklist.BlacklistExpireAllCommand(player_id='synthetic', requested_at=datetime.now(timezone.utc)))
     assert journal.process_one(1, dispatch) == 'review'
     assert journal.process_one(1, dispatch) == 'review'
     server.remove_temp_ban.assert_called_once_with('synthetic')
     server.get_perma_bans.assert_not_called()
     server.remove_perma_ban.assert_not_called()
+
+
+@pytest.mark.parametrize("temporary", [True, False], ids=["temporary", "permanent"])
+@pytest.mark.parametrize("scenario,expected", [
+    ("older", "done"), ("newer", "done"), ("absent", "done"),
+    ("same_second", "review"), ("naive", "review"), ("legacy", "review"),
+    ("read_failure", "review"),
+])
+def test_expiry_uses_fresh_bans_and_original_request_time(
+        database, existing_blacklist, monkeypatch, temporary, scenario, expected):
+    from functools import wraps
+    from types import SimpleNamespace
+    from rcon.rcon import Rcon
+    from rcon.types import GameEnum
+
+    player = "abcdef0123456789abcdef0123456789"
+    monkeypatch.setattr(blacklist, "SERVER_NUMBER", 3)
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    ctl = receiver.rcon = Rcon.__new__(Rcon)
+    ctl.game_profile = SimpleNamespace(game=GameEnum.HLL_VIETNAM)
+    if scenario == "legacy":
+        command = blacklist.BlacklistCommand(blacklist.BlacklistCommandType.EXPIRE_ALL, 4, {"player_id": player})
+        queue(database, command.encode(), 4)
+        requested = datetime.now(timezone.utc)
+    else:
+        before = datetime.now(timezone.utc)
+        blacklist.expire_all_player_blacklists(player)
+        with database() as session:
+            delivery = session.scalar(select(journal.BlacklistSyncDelivery).where(
+                journal.BlacklistSyncDelivery.server_number == 3))
+            requested = datetime.fromisoformat(blacklist.BlacklistCommand.decode(delivery.command).payload["requested_at"])
+            assert before <= requested <= delivery.created_at
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: False) == "deferred"
+
+    stamp = {
+        "newer": (requested + timedelta(seconds=1)).isoformat(),
+        "same_second": requested.isoformat(timespec="seconds"),
+        "naive": requested.replace(tzinfo=None).isoformat(),
+    }.get(scenario, (requested - timedelta(days=1)).isoformat())
+    ban = {"userId": player.upper(), "userName": "fixture", "timeOfBanning": stamp,
+           "durationHours": 1, "banReason": "test", "adminName": "fixture"}
+    kind = "Temporary" if temporary else "Permanent"
+    def exchange(command, version):
+        if command == f"Get{kind}Bans" and scenario == "read_failure":
+            raise OSError("test read failure")
+        rows = [ban] if command == f"Get{kind}Bans" and scenario != "absent" else []
+        return SimpleNamespace(content_dict={"banList": rows})
+
+    ctl.exchange = mock.Mock(side_effect=exchange)
+    ctl.exchange_success = mock.Mock(return_value=True)
+    # Emulate a populated GUI cache while preserving the real uncached reader.
+    for name in ("get_temp_bans", "get_perma_bans"):
+        @wraps(getattr(Rcon, name).__wrapped__)
+        def cached(self):
+            return [{"player_id": player, "ban_time": stamp}] if scenario == "absent" else []
+        cached.cache_clear = mock.Mock()
+        monkeypatch.setattr(Rcon, name, cached)
+
+    assert journal.process_one(3, receiver.dispatch, is_ready=lambda: True) == expected
+    assert ctl.exchange.called
+    if scenario == "older":
+        ctl.exchange_success.assert_called_once_with(f"Remove{kind}Ban", 2, {"PlayerId": player.upper()})
+    else:
+        ctl.exchange_success.assert_not_called()
+    with database() as session:
+        row = session.scalar(select(journal.BlacklistSyncDelivery).where(journal.BlacklistSyncDelivery.server_number == 3))
+        assert row.status == expected
+        if scenario == "newer":
+            assert row.reason == "Newer game ban preserved"
+    assert journal.process_one(3, receiver.dispatch) == ("review" if expected == "review" else "empty")
 
 
 def test_interrupted_action_is_not_replayed(database):

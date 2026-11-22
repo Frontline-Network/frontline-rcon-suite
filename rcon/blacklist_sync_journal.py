@@ -250,7 +250,7 @@ def process_one(server_number: int, handler, *, is_ready=None, prepare=None, gam
             # The handlers read the current source state. Consecutive changes
             # to the same record therefore need one reconciliation, not one
             # RCON action per historical version.
-            from rcon.blacklist import BlacklistCommand, BlacklistCommandType
+            from rcon.blacklist import BlacklistCommand, BlacklistCommandType, NEWER_GAME_BAN_PRESERVED
             following = session.scalars(
                 select(BlacklistSyncDelivery)
                 .where(BlacklistSyncDelivery.server_number == server_number,
@@ -365,7 +365,8 @@ def process_one(server_number: int, handler, *, is_ready=None, prepare=None, gam
             delivery_ids, command = [item.id for item in group], row.command
 
         try:
-            if (handler(command, prepared) if prepare is not None else handler(command)) is False:
+            outcome = handler(command, prepared) if prepare is not None else handler(command)
+            if outcome is False:
                 raise RuntimeError("game server rejected blacklist synchronization")
         except Exception as exc:
             with maker() as session, session.begin():
@@ -379,6 +380,8 @@ def process_one(server_number: int, handler, *, is_ready=None, prepare=None, gam
             rows = session.scalars(select(BlacklistSyncDelivery).where(BlacklistSyncDelivery.id.in_(delivery_ids)).with_for_update()).all()
             for item in rows:
                 item.status = "done"
+                if outcome is NEWER_GAME_BAN_PRESERVED:
+                    item.reason = "Newer game ban preserved"
                 item.updated_at = datetime.now(timezone.utc)
         return "done"
 

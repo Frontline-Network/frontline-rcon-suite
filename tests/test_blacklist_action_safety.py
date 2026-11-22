@@ -318,27 +318,60 @@ def test_expire_all_fails_closed_if_guard_database_is_unavailable(monkeypatch):
 def test_expire_all_proceeds_for_an_unrelated_player(fake_blacklist_guard):
     fake_blacklist_guard['other-player'] = 'synthetic-token'
     server = Mock()
-    server.get_temp_bans.return_value = [{'player_id': 'synthetic'}]
-    server.get_perma_bans.return_value = [{'player_id': 'synthetic'}]
+    server.get_temp_bans.return_value = [{'player_id': 'synthetic', 'ban_time': '2025-01-01T00:00:00Z'}]
+    server.get_perma_bans.return_value = [{'player_id': 'synthetic', 'ban_time': '2025-01-01T00:00:00Z'}]
     server.remove_temp_ban.return_value = True
     server.remove_perma_ban.return_value = True
     handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
     handler.rcon = server
-    handler.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+    handler.handle_expire_all(blacklist.BlacklistExpireAllCommand(player_id='synthetic', requested_at=datetime.now(timezone.utc)))
     server.remove_temp_ban.assert_called_once_with('synthetic')
     server.remove_perma_ban.assert_called_once_with('synthetic')
+
+
+@pytest.mark.parametrize("temp_is_newer", [True, False])
+def test_expire_all_preserves_only_the_newer_ban_type(temp_is_newer):
+    old = {"player_id": "test", "ban_time": "2026-01-01T10:00:00.0000000+01:00"}
+    new = {"player_id": "test", "ban_time": "2026-01-01T11:00:00.001Z"}
+    payload = blacklist.BlacklistExpireAllCommand(player_id="test", requested_at="2026-01-01T11:00:00Z")
+    server = Mock()
+    server.get_temp_bans.return_value = [new if temp_is_newer else old]
+    server.get_perma_bans.return_value = [old if temp_is_newer else new]
+    server.remove_temp_ban.return_value = server.remove_perma_ban.return_value = True
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = server
+    assert receiver.handle_expire_all(payload) is blacklist.NEWER_GAME_BAN_PRESERVED
+    assert server.remove_temp_ban.call_count == int(not temp_is_newer)
+    assert server.remove_perma_ban.call_count == int(temp_is_newer)
+
+
+@pytest.mark.parametrize("snapshot", [
+    None, [{}], [{"player_id": ""}], [{"player_id": "test"}],
+    [{"player_id": "test", "ban_time": "2026-02-30T00:00:00Z"}],
+    [{"player_id": "test", "ban_time": "2026-01-01T00:00:00.123Z"}],
+    [{"player_id": "test", "ban_time": "2025-01-01T00:00:00Z"}] * 2,
+])
+def test_expire_all_refuses_ambiguous_snapshot(snapshot):
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    receiver.rcon = Mock()
+    receiver.rcon.get_temp_bans.return_value = snapshot
+    request = blacklist.BlacklistExpireAllCommand(player_id="test", requested_at="2026-01-01T00:00:00.123999Z")
+    with pytest.raises((blacklist.BlacklistExpiryTimeUnverified, blacklist.BlacklistBanOwnershipUnverified)):
+        receiver.handle_expire_all(request)
+    receiver.rcon.remove_temp_ban.assert_not_called()
+    receiver.rcon.remove_perma_ban.assert_not_called()
 
 
 @pytest.mark.parametrize('result', [None, '', 1, False])
 def test_expire_all_stops_after_unconfirmed_temporary_unban(result):
     server = Mock()
-    server.get_temp_bans.return_value = [{'player_id': 'synthetic'}]
-    server.get_perma_bans.return_value = [{'player_id': 'synthetic'}]
+    server.get_temp_bans.return_value = [{'player_id': 'synthetic', 'ban_time': '2025-01-01T00:00:00Z'}]
+    server.get_perma_bans.return_value = [{'player_id': 'synthetic', 'ban_time': '2025-01-01T00:00:00Z'}]
     server.remove_temp_ban.return_value = result
     handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
     handler.rcon = server
     with pytest.raises(RuntimeError):
-        handler.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+        handler.handle_expire_all(blacklist.BlacklistExpireAllCommand(player_id='synthetic', requested_at=datetime.now(timezone.utc)))
     server.remove_temp_ban.assert_called_once_with('synthetic')
     server.get_perma_bans.assert_not_called()
     server.remove_perma_ban.assert_not_called()
@@ -348,12 +381,12 @@ def test_expire_all_stops_after_unconfirmed_temporary_unban(result):
 def test_expire_all_does_not_confirm_unconfirmed_permanent_unban(result):
     server = Mock()
     server.get_temp_bans.return_value = []
-    server.get_perma_bans.return_value = [{'player_id': 'synthetic'}]
+    server.get_perma_bans.return_value = [{'player_id': 'synthetic', 'ban_time': '2025-01-01T00:00:00Z'}]
     server.remove_perma_ban.return_value = result
     handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
     handler.rcon = server
     with pytest.raises(RuntimeError):
-        handler.handle_expire_all(SimpleNamespace(player_id='synthetic'))
+        handler.handle_expire_all(blacklist.BlacklistExpireAllCommand(player_id='synthetic', requested_at=datetime.now(timezone.utc)))
     server.remove_perma_ban.assert_called_once_with('synthetic')
 
 

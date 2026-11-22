@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import struct
 import threading
 from contextlib import contextmanager
@@ -9,7 +10,7 @@ from typing import Literal, Sequence, overload
 
 import orjson
 import redis
-from pydantic import BaseModel, field_validator
+from pydantic import AwareDatetime, BaseModel, field_validator
 from pydantic.dataclasses import dataclass
 from sqlalchemy import and_, func, literal, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -63,6 +64,54 @@ class HLLVBanOwnershipUnverified(RuntimeError):
 
 class BlacklistBanOwnershipUnverified(RuntimeError):
     """An existing game ban cannot safely be attributed to this list."""
+
+
+class BlacklistExpiryTimeUnverified(RuntimeError):
+    """The original unban request and the current game ban cannot be ordered."""
+
+
+NEWER_GAME_BAN_PRESERVED = object()
+
+
+def _ban_identity(value: str) -> str:
+    return value.lower() if re.fullmatch(r'[0-9a-fA-F]{32}', value) else value
+
+
+def _fresh_game_bans(rcon, method):
+    # Read the game server directly even when an empty list is already cached.
+    if isinstance(rcon, Rcon):
+        bans = getattr(Rcon, method).__wrapped__(rcon)
+    else:
+        bans = getattr(rcon, method)()
+    if not isinstance(bans, list) or any(
+        not isinstance(ban, dict) or not isinstance(ban.get('player_id'), str)
+        or not ban['player_id'].strip() for ban in bans
+    ):
+        raise BlacklistBanOwnershipUnverified("Cannot verify current game bans")
+    return bans
+
+
+def _ban_predates_request(ban_time, requested_at):
+    if requested_at is None or not isinstance(ban_time, str):
+        raise BlacklistExpiryTimeUnverified("Missing unban request time or game ban time")
+    # Treat the displayed instant as a bucket at the precision sent by RCON.
+    match = re.fullmatch(
+        r'\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:\.(\d+))?(?:Z|[+-]\d\d:\d\d)',
+        ban_time,
+    )
+    if not match:
+        raise BlacklistExpiryTimeUnverified("Game ban has no comparable timestamp")
+    try:
+        start = datetime.fromisoformat(ban_time)
+    except ValueError as exc:
+        raise BlacklistExpiryTimeUnverified("Invalid game ban timestamp") from exc
+    if start > requested_at:
+        return False
+    precision = min(6, len(match[1] or ""))
+    resolution = timedelta(microseconds=10 ** (6 - precision))
+    if requested_at - start < resolution:
+        raise BlacklistExpiryTimeUnverified("Ban and request fall within the same timestamp interval")
+    return True
 
 
 class HLLVSteamIdentityUnverified(RuntimeError):
@@ -468,24 +517,14 @@ def _synchronize_ban(
         # fresh, well-formed absence permits a new temporary sanction.
         for method in ('get_temp_bans', 'get_perma_bans'):
             try:
-                reader = getattr(rcon, method)
-                if isinstance(rcon, Rcon):
-                    bans = getattr(Rcon, method).__wrapped__(rcon)
-                else:
-                    bans = reader()
+                bans = _fresh_game_bans(rcon, method)
             except Exception as exc:
                 if _blacklist_record_has_expired(new_record):
                     return
                 raise BlacklistBanOwnershipUnverified('Cannot read current game bans') from exc
             if _blacklist_record_has_expired(new_record):
                 return
-            if not isinstance(bans, list) or any(
-                    not isinstance(ban, dict) or not isinstance(ban.get('player_id'), str)
-                    for ban in bans):
-                raise BlacklistBanOwnershipUnverified('Cannot verify existing game bans')
-            def identity(value):
-                return value.lower() if len(value) == 32 and all(c in '0123456789abcdefABCDEF' for c in value) else value
-            if any(identity(ban['player_id']) == identity(player_id) for ban in bans):
+            if any(_ban_identity(ban['player_id']) == _ban_identity(player_id) for ban in bans):
                 raise BlacklistBanOwnershipUnverified('Existing game ban ownership is unknown')
 
     # Remove the existing ban if it will not be overwritten later. Also remove if the
@@ -1047,6 +1086,7 @@ def blacklist_or_ban(
 
 
 def expire_all_player_blacklists(player_id: str):
+    requested_at = datetime.now(timezone.utc)
     with blacklist_change_session() as sess:
         records = get_player_blacklist_records(
             sess,
@@ -1057,15 +1097,11 @@ def expire_all_player_blacklists(player_id: str):
         kick_only_mask = 0
         ban_mask = 0
         if records:
-            expire_time = datetime.now(tz=timezone.utc)
-            server_mask = 0
-
             for record in records:
-                record.expires_at = expire_time
+                record.expires_at = requested_at
                 servers = record.blacklist.servers
                 if servers is None:
                     servers = 2**32 - 1
-                server_mask |= servers
                 if record.blacklist.sync == BlacklistSyncMethod.KICK_ONLY:
                     kick_only_mask |= servers
                 else:
@@ -1073,11 +1109,10 @@ def expire_all_player_blacklists(player_id: str):
         commit_blacklist_change(sess,
             BlacklistCommand(
                 command=BlacklistCommandType.EXPIRE_ALL,
-                # server_mask=server_mask,
                 server_mask=2**32 - 1,
                 payload=BlacklistExpireAllCommand(
-                    player_id=player_id, kick_only_server_mask=kick_only_mask & ~ban_mask
-                ).model_dump(),
+                    player_id=player_id, requested_at=requested_at, kick_only_server_mask=kick_only_mask & ~ban_mask
+                ).model_dump(mode='json'),
             )
         )
 
@@ -1118,6 +1153,7 @@ class BlacklistDeleteListCommand(BaseModel):
 
 class BlacklistExpireAllCommand(BaseModel):
     player_id: str
+    requested_at: AwareDatetime | None = None  # Absent on orders from earlier releases.
     # None identifies a historical command that did not capture the prior
     # synchronization modes. Never infer ownership from that old payload.
     kick_only_server_mask: int | None = None
@@ -1279,7 +1315,7 @@ class BlacklistCommandHandler:
                            BlacklistCommandType.DELETE_RECORD, BlacklistCommandType.EDIT_LIST):
             handler(payload, prepared=prepared)
         else:
-            handler(payload)
+            return handler(payload)
 
     @staticmethod
     def send(cmd: BlacklistCommand):
@@ -1659,40 +1695,27 @@ class BlacklistCommandHandler:
             raise HLLVSteamBanOwnershipUnverified('Steam expiry needs EOS ownership review')
         with lock(f"blacklist-sync:{SERVER_NUMBER}"):
             _require_blacklist_action_review_clear(payload.player_id)
-            self._handle_expire_all(payload)
+            return self._handle_expire_all(payload)
 
     def _handle_expire_all(self, payload: BlacklistExpireAllCommand):
-        """Handle all of a player's active blacklist records being expired,
-        effectively granting them access to the server whilst keeping all
-        previous blacklists logged.
-
-        Note that if a player was only temporarily blacklisted but also had
-        a permanent ban, that permanent ban will also be removed."""
-        # Check if the player is temp-banned
-        if next(
-            (
-                True
-                for ban in self.rcon.get_temp_bans()
-                if ban["player_id"] == payload.player_id
-            ),
-            False,
-        ):
-            # Remove their temp-ban
-            if self.rcon.remove_temp_ban(payload.player_id) is not True:
-                raise RuntimeError("Game server did not confirm temporary ban removal")
-
-        # Check if the player is perma-banned
-        if next(
-            (
-                True
-                for ban in self.rcon.get_perma_bans()
-                if ban["player_id"] == payload.player_id
-            ),
-            False,
-        ):
-            # Remove their perma-ban
-            if self.rcon.remove_perma_ban(payload.player_id) is not True:
-                raise RuntimeError("Game server did not confirm permanent ban removal")
+        """Remove only bans that demonstrably predate the original request."""
+        player = _ban_identity(payload.player_id)
+        outcome = None
+        for reader, remove in (('get_temp_bans', self.rcon.remove_temp_ban),
+                               ('get_perma_bans', self.rcon.remove_perma_ban)):
+            matches = [ban for ban in _fresh_game_bans(self.rcon, reader)
+                       if _ban_identity(ban['player_id']) == player]
+            if not matches:
+                continue
+            # A remove command cannot select an individual row within one type.
+            if len(matches) > 1:
+                raise BlacklistBanOwnershipUnverified("Multiple game bans match this player and type")
+            if not _ban_predates_request(matches[0].get('ban_time'), payload.requested_at):
+                outcome = NEWER_GAME_BAN_PRESERVED
+                continue
+            if remove(matches[0]['player_id']) is not True:
+                raise RuntimeError("Game server did not confirm ban removal")
+        return outcome
 
     def handle_barricade_warn_online(
         self, payload: BlacklistBarricadeWarnOnlineCommand
