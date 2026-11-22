@@ -16,6 +16,7 @@ django.setup()
 from api import audit_log, auth, decorators, views, vips
 from rcon import api_commands, models, vip_import, workers
 from rcon.expiring_vips.service import remove_expired_vips, restore_missing_vips
+from rcon.expiring_vips import service as expiry_service
 from rcon.rcon import ServerCtl
 from rcon.types import GameEnum
 from rcon.utils import INDEFINITE_VIP_DATE
@@ -281,6 +282,104 @@ def test_vietnam_revoke_uses_each_sources_original_spelling(scenario, database):
     assert restore_missing_vips(scenario.api) == 0
     assert scenario.members == {ALPHA: "Alpha"} and scenario.stored() == {ALPHA: END}
     assert scenario.stored(4) == {BRAVO.upper(): END}
+
+
+@pytest.mark.parametrize("second_profile", [False, True])
+@pytest.mark.parametrize("uppercase_live", [False, True])
+def test_expiry_removes_mixed_case_once_and_never_restores(scenario, database, monkeypatch, second_profile, uppercase_live):
+    audit = Mock()
+    monkeypatch.setattr(expiry_service, "send_to_discord_audit", audit)
+    stored_id, live_id = (BRAVO, BRAVO.upper()) if uppercase_live else (BRAVO.upper(), BRAVO)
+    scenario.members[live_id] = scenario.members.pop(BRAVO)
+    expired = datetime.now(timezone.utc) - timedelta(hours=1)
+    with database.begin() as db:
+        player = db.scalar(select(models.PlayerID).where(models.PlayerID.player_id == BRAVO))
+        player.player_id = stored_id
+        db.flush()
+        db.scalar(select(models.PlayerVIP).where(models.PlayerVIP.player_id_id == player.id,
+                                                models.PlayerVIP.server_number == 3)).expiration = expired
+        if second_profile:
+            db.add(models.PlayerID(player_id=live_id))
+
+    assert next(row for row in scenario.api.get_live_vip_ids() if row["player_id"] == live_id)["vip_expiration"] == expired
+    for _ in range(2):
+        remove_expired_vips(scenario.api)
+        assert restore_missing_vips(scenario.api) == 0
+    scenario.remove.assert_called_once_with(live_id)
+    audit.assert_called_once()
+    assert scenario.stored() == {ALPHA: END} and scenario.members == {ALPHA: "Alpha"}
+    scenario.members.clear()
+    assert restore_missing_vips(scenario.api) == 1
+    assert set(scenario.members) == {ALPHA}
+    assert scenario.stored(4) == {stored_id: END}
+
+
+def test_stale_expiry_and_backfill_preserve_mixed_case_extension(scenario, database):
+    with database.begin() as db:
+        player = db.scalar(select(models.PlayerID).where(models.PlayerID.player_id == BRAVO))
+        player.player_id = BRAVO.upper()
+        db.flush()
+        db.add(models.PlayerID(player_id=BRAVO))
+    past = datetime.now(timezone.utc) - timedelta(hours=1)
+    assert expiry_service._resolve_expired_vip(scenario.api, BRAVO.upper(), past) == "changed"
+    expiry_service._backfill_vip_expiration(scenario.api, BRAVO, None)
+    assert restore_missing_vips(scenario.api) == 0
+    assert set(scenario.members) == {ALPHA, BRAVO}
+    assert scenario.stored() == {ALPHA: END, BRAVO.upper(): END}
+    scenario.remove.assert_not_called()
+
+
+@pytest.mark.parametrize("outcome", ["rejected", "lost_reply"])
+def test_mixed_case_expiry_reconciles_unconfirmed_removal(scenario, database, monkeypatch, outcome):
+    audit = Mock()
+    monkeypatch.setattr(expiry_service, "send_to_discord_audit", audit)
+    expired = datetime.now(timezone.utc) - timedelta(hours=1)
+    scenario.members[BRAVO.upper()] = scenario.members.pop(BRAVO)
+    with database.begin() as db:
+        player = db.scalar(select(models.PlayerID).where(models.PlayerID.player_id == BRAVO))
+        db.scalar(select(models.PlayerVIP).where(models.PlayerVIP.player_id_id == player.id,
+                                                models.PlayerVIP.server_number == 3)).expiration = expired
+
+    def unconfirmed(live_id):
+        if outcome == "rejected":
+            return False
+        del scenario.members[live_id]
+        raise TimeoutError("simulated lost reply")
+
+    scenario.remove.side_effect = unconfirmed
+    remove_expired_vips(scenario.api)
+    audit.assert_not_called()
+    assert scenario.stored()[BRAVO] == expired
+    assert restore_missing_vips(scenario.api) == 0
+    if outcome == "lost_reply":
+        remove_expired_vips(scenario.api)
+        assert BRAVO not in scenario.stored()
+        assert BRAVO.upper() not in scenario.members
+    else:
+        assert BRAVO.upper() in scenario.members
+    scenario.remove.assert_called_once_with(BRAVO.upper())
+
+
+@pytest.mark.parametrize("conflict", ["live", "stored", "stored_after_restart"])
+def test_expiry_leaves_ambiguous_rights_for_review(scenario, database, monkeypatch, conflict):
+    audit = Mock()
+    monkeypatch.setattr(expiry_service, "send_to_discord_audit", audit)
+    with database.begin() as db:
+        player = db.scalar(select(models.PlayerID).where(models.PlayerID.player_id == BRAVO))
+        db.scalar(select(models.PlayerVIP).where(models.PlayerVIP.player_id_id == player.id,
+                                                models.PlayerVIP.server_number == 3)).expiration = datetime.now(timezone.utc) - timedelta(days=1)
+        if conflict != "live":
+            db.add(models.PlayerVIP(player=models.PlayerID(player_id=BRAVO.upper()), server_number=3, expiration=END))
+    if conflict == "live":
+        scenario.members[BRAVO.upper()] = "Alternate"
+    elif conflict == "stored_after_restart":
+        del scenario.members[BRAVO]
+    stored, members = scenario.stored(), dict(scenario.members)
+    remove_expired_vips(scenario.api)
+    assert restore_missing_vips(scenario.api) == 0
+    assert scenario.stored() == stored and scenario.members == members
+    scenario.remove.assert_not_called()
+    audit.assert_not_called()
 
 
 @pytest.mark.parametrize("duplicates", ["game", "database"])

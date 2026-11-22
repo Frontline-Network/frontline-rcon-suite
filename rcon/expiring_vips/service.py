@@ -12,6 +12,7 @@ from rcon.rcon import Rcon, get_rcon
 from rcon.types import GameEnum
 from rcon.user_config.expired_vips import ExpiredVipsUserConfig
 from rcon.utils import INDEFINITE_VIP_DATE, get_server_number
+from rcon.vip_rewards.locking import vietnam_eos_key
 
 SERVICE_NAME = "ExpiringVIPs"
 VIP_RECONCILE_INTERVAL_SECONDS = 60
@@ -24,8 +25,15 @@ def _resolve_expired_vip(rcon_hook: Rcon, player_id: str, expected_expiration: d
     from rcon.vip_rewards.service import current_vip, expiration
 
     with vip_lock(player_id):
-        current = current_vip(rcon_hook, player_id)
-        if current is not None:
+        key = vietnam_eos_key(rcon_hook.config.game, player_id)
+        if key:
+            stored_id, live_id = rcon_hook._vietnam_vip_ids(key)
+            if stored_id != player_id:
+                return "changed"
+            listed = live_id is not None
+        else:
+            listed = current_vip(rcon_hook, player_id) is not None
+        if listed:
             return "removed" if rcon_hook.remove_vip(player_id, expected_expiration=expected_expiration) is True else "changed"
         with enter_session() as session:
             record = (session.query(PlayerVIP).join(PlayerID, PlayerVIP.player_id_id == PlayerID.id)
@@ -61,7 +69,11 @@ def restore_missing_vips(rcon_hook: Rcon) -> int:
     # VIP cache may still contain the pre-restart list.  Force a live read for
     # reconciliation instead of waiting for that stale cache to expire.
     rcon_hook.get_vip_ids.cache_clear()
-    live_vip_ids = {vip["player_id"] for vip in rcon_hook.get_vip_ids()}
+    game = rcon_hook.config.game
+    live_vip_ids = {
+        vietnam_eos_key(game, row["player_id"]) or row["player_id"]
+        for row in rcon_hook.get_vip_ids()
+    }
 
     with enter_session() as session:
         active_vips = (
@@ -75,7 +87,7 @@ def restore_missing_vips(rcon_hook: Rcon) -> int:
         missing_vips = []
         for vip in active_vips:
             player_id = vip.player.player_id
-            if player_id in live_vip_ids:
+            if (vietnam_eos_key(game, player_id) or player_id) in live_vip_ids:
                 continue
             missing_vips.append(player_id)
 
@@ -97,9 +109,14 @@ def restore_missing_vips(rcon_hook: Rcon) -> int:
                         description = vip.player.names[0].name
                     except IndexError:
                         description = "Restored CRCON VIP"
-                rcon_hook.get_vip_ids.cache_clear()
-                if player_id in {vip["player_id"] for vip in rcon_hook.get_vip_ids()}:
-                    continue
+                if key := vietnam_eos_key(game, player_id):
+                    stored_id, live_id = rcon_hook._vietnam_vip_ids(key)
+                    if stored_id != player_id or live_id is not None:
+                        continue
+                else:
+                    rcon_hook.get_vip_ids.cache_clear()
+                    if player_id in {vip["player_id"] for vip in rcon_hook.get_vip_ids()}:
+                        continue
                 token = action_guard.reserve(int(server_number), player_id, ["VietnamVipRestore"], "vip")
                 if token is None:
                     logger.warning("VIP restore awaits review for %s", player_id)
@@ -133,7 +150,13 @@ def _backfill_vip_expiration(rcon_hook: Rcon, player_id: str, observed: datetime
     # The scan can be stale. Hold the same lock as grants and revocations
     # from the fresh server read through the local commit.
     with vip_lock(player_id):
-        if not rcon_hook.has_live_vip(player_id):
+        key = vietnam_eos_key(rcon_hook.config.game, player_id)
+        if key:
+            stored_id, live_id = rcon_hook._vietnam_vip_ids(key)
+            if live_id is None:
+                return
+            player_id = stored_id or live_id
+        elif not rcon_hook.has_live_vip(player_id):
             return
         with enter_session() as session:
             player = session.query(PlayerID).filter_by(player_id=player_id).one_or_none()

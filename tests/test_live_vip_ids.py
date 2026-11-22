@@ -21,12 +21,14 @@ from rcon.api_commands import RconAPI
 from rcon.commands import ServerCtl
 from rcon.models import PlayerVIP
 from rcon.rcon import Rcon
+from rcon.types import GameEnum
 
 
 @pytest.fixture
 def vip_reader():
     # Skip connection setup; both external read boundaries are replaced below.
     reader = object.__new__(RconAPI)
+    reader.config = SimpleNamespace(game=GameEnum.HLL_WW2)
     with (
         mock.patch.object(ServerCtl, "get_vip_ids") as read,
         mock.patch("rcon.rcon.enter_session") as enter_session,
