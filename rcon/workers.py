@@ -2,7 +2,6 @@ import datetime
 import hashlib
 import logging
 import os
-from concurrent.futures import as_completed
 from datetime import UTC, timedelta
 from typing import Any, Optional, Set
 from typing_extensions import TypeIs
@@ -21,7 +20,7 @@ from rcon.player_history import get_player
 from rcon.player_stats import TimeWindowStats
 from rcon.rcon import get_rcon
 from rcon.types import MapInfo, MapScore, MapsType, PlayerStat, GameLayout
-from rcon.utils import GAME_LOG_STAT_FIELDS, INDEFINITE_VIP_DATE, TEMP_FIELDS, LogsHistory, MapsHistory, get_server_number, get_temp_default_stats
+from rcon.utils import GAME_LOG_STAT_FIELDS, TEMP_FIELDS, LogsHistory, MapsHistory, get_server_number, get_temp_default_stats
 
 logger = logging.getLogger("rcon")
 
@@ -465,52 +464,8 @@ def worker_bulk_vip(name_ids, job_key, mode="override"):
 
 def bulk_vip(name_ids, mode="override"):
     from rcon.api_commands import get_rcon_api
+    from rcon.vip_import import replace_vips
 
-    ctl = get_rcon_api()
-    errors = []
-    logger.info(f"bulk_vip name_ids {name_ids[0]} type {type(name_ids)}")
-    vips = ctl.get_vip_ids()
-
-    removal_futures = {
-        ctl.run_in_pool("remove_vip", vip["player_id"]): vip
-        for idx, vip in enumerate(vips)
-    }
-    for future in as_completed(removal_futures):
-        try:
-            result = future.result()
-            if not result:
-                errors.append(f"Failed to add {removal_futures[future]}")
-        except Exception:
-            logger.exception(f"Failed to remove vip from {removal_futures[future]}")
-
-    processed_additions = []
-    for description, player_id, expiration_timestamp in name_ids:
-        if not expiration_timestamp:
-            expiration_timestamp = INDEFINITE_VIP_DATE.isoformat()
-        else:
-            expiration_timestamp = expiration_timestamp.isoformat()
-
-        processed_additions.append((description, player_id, expiration_timestamp))
-
-    add_futures = {
-        ctl.run_in_pool(
-            "add_vip",
-            player_id=player_id,
-            description=description,
-            expiration=expiration_timestamp,
-        ): player_id
-        for idx, (description, player_id, expiration_timestamp) in enumerate(
-            processed_additions
-        )
-    }
-    for future in as_completed(add_futures):
-        try:
-            result = future.result()
-            if not result:
-                errors.append(f"Failed to add {add_futures[future]}")
-        except Exception:
-            logger.exception(f"Failed to add vip to {add_futures[future]}")
-
-    if not errors:
-        errors.append("ALL OK")
-    return errors
+    if mode != "override":
+        raise ValueError(f"Unsupported VIP import mode: {mode}")
+    return replace_vips(get_rcon_api(), name_ids)

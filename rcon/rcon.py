@@ -27,7 +27,7 @@ from rcon.game.player_adapter import PlayerResponseAdapterError
 from rcon.maps import UNKNOWN_MAP_NAME, Layer, is_server_loading_map
 from rcon.models import GameLayout, PlayerID, PlayerVIP, enter_session
 from rcon.perf_statistics import PerformanceStatistics
-from rcon.vip_rewards.locking import serialized_vip, vip_lock
+from rcon.vip_rewards.locking import serialized_vip
 from rcon.player_history import (
     get_live_profiles,
     get_player_profile,
@@ -910,6 +910,24 @@ class Rcon(ServerCtl):
 
         return result
 
+    @serialized_vip
+    def _revoke_stored_or_live_vip(self, player_id, listed):
+        # Reconciliation may restore a missing player between the scan and this lock.
+        if listed or self.has_live_vip(player_id):
+            return self.remove_vip(player_id) is True
+        with enter_session() as session:
+            record = (
+                session.query(PlayerVIP)
+                .join(PlayerID, PlayerVIP.player_id_id == PlayerID.id)
+                .filter(PlayerVIP.server_number == get_server_number(), PlayerID.player_id == player_id)
+                .with_for_update()
+                .one_or_none()
+            )
+            if record is not None:
+                session.delete(record)
+        return True
+
+
     def remove_all_vips(self) -> bool:
         server_number = get_server_number()
         with enter_session() as session:
@@ -922,22 +940,8 @@ class Rcon(ServerCtl):
         listed = {vip[PLAYER_ID] for vip in super().get_vip_ids()}
         rejected = 0
         for player_id in sorted(stored | listed):
-            with vip_lock(player_id):
-                # Restoration may have put a missing player back since the scan.
-                if player_id in listed or self.has_live_vip(player_id):
-                    if self.remove_vip(player_id) is not True:
-                        rejected += 1
-                    continue
-                with enter_session() as session:
-                    record = (
-                        session.query(PlayerVIP)
-                        .join(PlayerID, PlayerVIP.player_id_id == PlayerID.id)
-                        .filter(PlayerVIP.server_number == server_number, PlayerID.player_id == player_id)
-                        .with_for_update()
-                        .one_or_none()
-                    )
-                    if record is not None:
-                        session.delete(record)
+            if not self._revoke_stored_or_live_vip(player_id, player_id in listed):
+                rejected += 1
 
         self.get_vip_ids.cache_clear()
         if rejected:

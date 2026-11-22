@@ -866,7 +866,7 @@ export function makeServer({ environment = "development" } = {}) {
       this.get("/upload_vips_result", () =>
         ok({
           status: "finished",
-          result: ["4 VIP-Einträge wurden im Demo-Modus verarbeitet."],
+          result: ["ALL OK"],
         })
       );
       const demoBlacklists = [
