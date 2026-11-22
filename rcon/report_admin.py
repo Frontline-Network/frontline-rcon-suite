@@ -1025,8 +1025,14 @@ def tick(api, server):
                 "incident_revision": event.incident.revision,
             }
         # Re-read config, identity, round, and ownership after the durable commit.
-        fresh = read_context(api)
-        if rule == "teamkills":
+        try:
+            fresh = read_context(api)
+        except Exception:
+            # No kick has been attempted. Let the final guard send only this
+            # case for manual review while the worker keeps its other cases.
+            logger.warning("Final report context unavailable for event %s", event_id, exc_info=True)
+            fresh = None
+        if fresh is not None and rule == "teamkills":
             # Catch a last-moment apology, new TK or reporter retaliation before
             # the one allowed action. Read errors leave the reserved case manual.
             try:

@@ -770,7 +770,7 @@ def test_nonleader_communication_stays_manual(setup):
     assert i["report_admin"]["status"] == "manual"
 
 
-def test_final_refresh_disconnect_and_crash_marker(setup, monkeypatch):
+def test_worker_exit_after_reservation_preserves_crash_marker(setup, monkeypatch):
     db, _, ctx = setup
     i = report(setup)
     api = transport()
@@ -779,9 +779,9 @@ def test_final_refresh_disconnect_and_crash_marker(setup, monkeypatch):
     monkeypatch.setattr(
         service,
         "read_context",
-        Mock(side_effect=[deepcopy(ctx), RuntimeError("snapshot unavailable")]),
+        Mock(side_effect=[deepcopy(ctx), SystemExit("worker stopped")]),
     )
-    with pytest.raises(RuntimeError):
+    with pytest.raises(SystemExit):
         service.tick(api, 1)
     api.kick.assert_not_called()
     assert current(db, i["id"])["report_admin"]["status"] == "sending"

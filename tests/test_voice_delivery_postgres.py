@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
+from unittest.mock import Mock
 
 import pytest
 from sqlalchemy import select
@@ -16,6 +17,49 @@ from tests.test_voice_reports import pilot, snapshot
 @pytest.fixture
 def db(postgres):
     return postgres
+
+
+def test_missing_round_before_kick_preserves_other_voice_dialog(pilot, monkeypatch):
+    scenario, advance = pilot
+    database, players, context = scenario
+    api = transport()
+    runtime = service.Runtime()
+    runtime.server = 1
+    try:
+        runtime.step(api)
+        owner = runtime.owner
+        assert owner is not None
+        first = report(scenario, reporter_id="member")["id"]
+        runtime.step(api)
+        advance(60)
+        runtime.step(api)
+        assert voice_reports.answer(1, first, "member", False, context)
+
+        context["event_time"] = database.clock.now
+        second = report(scenario, "!admin MissingPerson no comms", reporter_id="v0")["id"]
+        assert snapshot(database, second)["voice"]["phase"] == "clarify"
+        with monkeypatch.context() as patch:
+            reads = Mock(side_effect=[context, ValueError("No recorder-confirmed current round")])
+            patch.setattr(service, "read_context", reads)
+            runtime.step(api)
+            assert reads.call_count == 2
+        assert runtime.owner is owner
+        assert snapshot(database, first)["status"] == "manual"
+        assert snapshot(database, second)["voice"]["phase"] == "clarify"
+
+        advance(5)
+        with database() as sess:
+            event_id = sess.scalar(select(AdminIncidentEvent.id).where(
+                AdminIncidentEvent.incident_id == second,
+                AdminIncidentEvent.event_type == "report_admin",
+            ))
+        name = next(p["name"] for p in players if p["player_id"] == "v1")
+        assert voice_reports.clarify_target(1, event_id, "v0", name, context, database.clock.now)
+        runtime.step(api)
+        assert snapshot(database, second)["voice"]["phase"] == "notice_sent"
+        api.kick.assert_not_called()
+    finally:
+        runtime.close()
 
 
 @pytest.mark.parametrize("message", ["notice", "question", "receipt"])
