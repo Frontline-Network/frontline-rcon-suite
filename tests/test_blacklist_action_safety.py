@@ -594,5 +594,5 @@ def test_blacklist_receiver_passes_readiness_probe_to_durable_journal(monkeypatc
     receiver.run(stop)
     process.assert_called_once_with(blacklist.SERVER_NUMBER, receiver.dispatch,
                                     is_ready=receiver._game_server_ready,
-                                    prepare=receiver._prepare_delivery)
+                                    prepare=receiver._prepare_delivery, game=receiver.rcon.game_profile.game)
     receiver.pubsub.close.assert_called_once()
