@@ -624,7 +624,17 @@ def advance(api, server, event_id, context):
                     )
                 )
                 _replace(event, reply_language=reply_language)
-            sent = _send(api, recipient, body)
+    # The committed phase owns this send. Keep the game-server round trip
+    # outside the transaction so an admin can take over while it is pending.
+    sent = discord_question or _send(api, recipient, body)
+    with admin.enter_session() as sess:
+        admin.votes.lock(sess, server)
+        event = sess.get(AdminIncidentEvent, event_id)
+        if not event or event.payload["status"] != "voice":
+            return
+        v = event.payload["voice"]
+        if v["phase"] != sending:
+            return
         now = time.time()
         if sending == "notice_sending":
             if not sent:
@@ -910,12 +920,6 @@ def flush_messages(api, server):
         )
         if not job:
             return
-        data = job.payload
-        job.payload = {**data, "status": "sending"}
-        job_id = job.id
-    with admin.enter_session() as sess:
-        admin.votes.lock(sess, server)
-        job = sess.get(AdminIncidentEvent, job_id)
         p = job.payload
         now = time.time()
         if (
@@ -939,5 +943,12 @@ def flush_messages(api, server):
         )
         if p["key"] == "clarify":
             msg += "\n" + render(sess, "pc_clarify", p["locale"], case=str(case.id))
-        sent = _send(api, p["recipient"], msg)
-        job.payload = {**p, "status": "sent" if sent else "unknown"}
+        job_id, recipient = job.id, p["recipient"]
+        job.payload = {**p, "status": "sending"}
+
+    sent = _send(api, recipient, msg)
+    with admin.enter_session() as sess:
+        admin.votes.lock(sess, server)
+        job = sess.get(AdminIncidentEvent, job_id)
+        if job and job.payload["status"] == "sending":
+            job.payload = {**job.payload, "status": "sent" if sent else "unknown"}

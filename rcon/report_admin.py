@@ -681,6 +681,18 @@ def recover(server):
             )
         ):
             message.status = "unknown" if message.status == "sending" else "cancelled"
+        # A receipt reserved by the previous worker may already have reached
+        # the player. Preserve that uncertainty and never put it back in line.
+        for receipt in sess.scalars(
+            select(AdminIncidentEvent)
+            .join(AdminIncident)
+            .where(
+                AdminIncident.server_number == server,
+                AdminIncidentEvent.event_type == "voice_game_message",
+                AdminIncidentEvent.payload["status"].as_string() == "sending",
+            )
+        ):
+            receipt.payload = {**receipt.payload, "status": "unknown"}
         old_config = sess.scalar(
             select(UserConfig).where(UserConfig.key == votes.config_key(server))
         )
