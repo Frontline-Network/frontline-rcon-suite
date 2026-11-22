@@ -8,15 +8,18 @@ crash or ambiguous reply that marker must be reviewed, never replayed blindly.
 from datetime import datetime, timezone
 import hashlib
 import logging
+import re
 from time import monotonic
 
 from sqlalchemy import TIMESTAMP, CheckConstraint, LargeBinary, String, Text, func, select, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from rcon.models import Base, get_session_maker
+from rcon.types import GameEnum
 from rcon.vip_rewards.locking import lock
 
 logger = logging.getLogger(__name__)
+_EOS_ID = re.compile(r"[0-9a-fA-F]{32}")
 
 
 class BlacklistSyncDelivery(Base):
@@ -36,10 +39,25 @@ class BlacklistSyncDelivery(Base):
 
 
 def _lock_targets(session, targets: list[int]) -> None:
-    session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": 0x464C4E424C53594E})
-    for number in targets:
-        key = int.from_bytes(hashlib.sha256(f"blacklist-sync:{number}".encode()).digest()[:8], "big", signed=True)
-        session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+    keys = [int.from_bytes(hashlib.sha256(f"blacklist-sync:{number}".encode()).digest()[:8],
+                           "big", signed=True) for number in targets]
+    connection = session.connection()
+    while True:
+        # Acquire the whole mask or release this attempt, including the
+        # producer lock shared with connect reconciliation and older writers.
+        with connection.begin_nested() as attempt:
+            connection.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": 0x464C4E424C53594E})
+            for key in keys:
+                if not connection.scalar(text("SELECT pg_try_advisory_xact_lock(:key)"), {"key": key}):
+                    break
+            else:
+                return
+            attempt.rollback()
+        # Sleep in PostgreSQL's lock queue without holding unrelated targets.
+        # Drop the wait-only lock before retrying in the original lock order.
+        with connection.begin_nested() as wait:
+            connection.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+            wait.rollback()
 
 
 def enqueue(session, command: bytes, server_mask: int) -> int:
@@ -150,7 +168,19 @@ def enqueue_connect_reconciliation(server_number: int, player_id: str, record_id
         return True
 
 
-def process_one(server_number: int, handler, *, is_ready=None, prepare=None) -> str:
+def _unresolved_expiry_alias(left, right):
+    """A lone Steam ID and a lone EOS ID may describe one Vietnam player."""
+    from rcon.steam_utils import is_steam_id_64
+
+    if len(left) != 1 or len(right) != 1:
+        return False
+    a, = left
+    b, = right
+    return ((is_steam_id_64(a) and bool(_EOS_ID.fullmatch(b))) or
+            (is_steam_id_64(b) and bool(_EOS_ID.fullmatch(a))))
+
+
+def process_one(server_number: int, handler, *, is_ready=None, prepare=None, game=None) -> str:
     """Process the oldest server delivery, failing closed on ambiguous work."""
     if not 1 <= server_number <= 32:
         raise ValueError("Server number must be between 1 and 32")
@@ -244,23 +274,30 @@ def process_one(server_number: int, handler, *, is_ready=None, prepare=None) -> 
                 record_id, player_id = None, None
             def identity(command):
                 if command.command in (BlacklistCommandType.CREATE_RECORD, BlacklistCommandType.EXPIRE_ALL):
-                    values = {command.payload["player_id"]}
+                    player = command.payload["player_id"]
+                    values = {player}
                     if command.command == BlacklistCommandType.CREATE_RECORD and 'connected_eos_id' in command.payload:
                         eos = command.payload['connected_eos_id']
-                        if (not isinstance(eos, str) or len(eos) != 32
-                                or not all(c in '0123456789abcdefABCDEF' for c in eos)):
+                        if not isinstance(eos, str) or not _EOS_ID.fullmatch(eos):
                             raise ValueError('Invalid connected EOS identity')
                         values.add(eos)
-                    return values
-                if command.command in (BlacklistCommandType.EDIT_RECORD, BlacklistCommandType.DELETE_RECORD):
-                    return {command.payload["old_record"]["player_id"]}
-                return None
+                elif command.command in (BlacklistCommandType.EDIT_RECORD, BlacklistCommandType.DELETE_RECORD):
+                    player = command.payload["old_record"]["player_id"]
+                    values = {player}
+                else:
+                    return None
+                if not isinstance(player, str) or not player.strip():
+                    raise ValueError("Missing blacklist player identity")
+                return {value.lower() if _EOS_ID.fullmatch(value) else value for value in values}
 
             # A list-wide change or changes to different records for the same
             # player can invalidate the old-state assumptions of queued
             # handlers. Fail closed until an operator reconciles the affected
             # game-server state; never replay a potentially stale removal.
-            ambiguous_all = record_id is None and before is not None and bool(following)
+            # EXPIRE_ALL expires one player's records. It has no record ID,
+            # but operations for a different known player can still proceed.
+            ambiguous_all = (record_id is None and before is not None
+                             and before.command != BlacklistCommandType.EXPIRE_ALL and bool(following))
             ambiguous_player = False
             affected = []
             try:
@@ -280,8 +317,13 @@ def process_one(server_number: int, handler, *, is_ready=None, prepare=None) -> 
                         affected.append(item)
                         candidate_record = (candidate.payload.get("record_id") if candidate.command == BlacklistCommandType.CREATE_RECORD
                                             else candidate.payload.get("old_record", {}).get("id"))
-                        if candidate_record != record_id:
+                        if record_id is None or candidate_record != record_id:
                             ambiguous_player = True
+                    elif (game != GameEnum.HLL_WW2 and
+                          BlacklistCommandType.EXPIRE_ALL in (before.command, candidate.command) and
+                          _unresolved_expiry_alias(before_identities, candidate_players)):
+                        affected.append(item)
+                        ambiguous_player = True
                 except Exception:
                     ambiguous_all = True
             if ambiguous_all or ambiguous_player:

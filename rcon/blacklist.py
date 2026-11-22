@@ -1198,7 +1198,7 @@ class BlacklistCommandHandler:
             try:
                 from rcon.blacklist_sync_journal import process_one
                 process_one(SERVER_NUMBER, self.dispatch, is_ready=self._game_server_ready,
-                            prepare=self._prepare_delivery)
+                            prepare=self._prepare_delivery, game=self.rcon.game_profile.game)
             except Exception:
                 logger.exception("Unable to process durable blacklist delivery")
             message = self.pubsub.get_message(timeout=1.0)

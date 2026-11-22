@@ -1,8 +1,9 @@
 """Exercise durable delivery with a disposable PostgreSQL schema and fake RCON."""
 import os
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from threading import Event
+from time import monotonic, sleep
 from unittest import mock
 from uuid import uuid4
 
@@ -368,6 +369,81 @@ def test_commit_order_is_preserved_across_concurrent_producers(database):
         assert [row.command for row in rows] == [b"first", b"second"]
 
 
+def test_writer_waiting_for_dispatch_leaves_other_targets_free(database):
+    entered, release = Event(), Event()
+    writer_pid = Future()
+    queue(database, b"initial", 4)
+
+    def dispatch(_):
+        entered.set()
+        assert release.wait(15)
+
+    def enqueue_for_servers_one_and_three():
+        with database.begin() as session:
+            writer_pid.set_result(session.scalar(text("SELECT pg_backend_pid()")))
+            return journal.enqueue(session, b"shared", 1 | 4)
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        worker = pool.submit(journal.process_one, 3, dispatch)
+        try:
+            assert entered.wait(5)
+            waiting = pool.submit(enqueue_for_servers_one_and_three)
+            pid = writer_pid.result(timeout=5)
+            deadline = monotonic() + 5
+            with database() as observer:
+                while not observer.scalar(text(
+                    "SELECT EXISTS (SELECT FROM pg_locks WHERE pid = :pid "
+                    "AND locktype = 'advisory' AND NOT granted)"
+                ), {"pid": pid}):
+                    assert monotonic() < deadline, "writer did not reach the busy target"
+                    sleep(0.02)
+            # Even target 1, earlier in the waiting writer's mask, is free.
+            assert pool.submit(queue, database, b"independent", 1 | 8).result(timeout=3) == 2
+            assert not waiting.done()
+        finally:
+            release.set()
+        assert worker.result(timeout=5) == "done"
+        assert waiting.result(timeout=5) == 2
+    with database() as session:
+        rows = session.scalars(select(journal.BlacklistSyncDelivery.command).where(
+            journal.BlacklistSyncDelivery.server_number == 1).order_by(journal.BlacklistSyncDelivery.id))
+        assert list(rows) == [b"independent", b"shared"]
+
+
+@pytest.mark.parametrize("expire_first", [True, False])
+def test_expiry_and_creation_for_distinct_players_dispatch_in_order(database, expire_first):
+    kind = blacklist.BlacklistCommandType
+    expiry = blacklist.BlacklistCommand(kind.EXPIRE_ALL, 4, {"player_id": "player-a"}).encode()
+    create = blacklist.BlacklistCommand(kind.CREATE_RECORD, 4, {"player_id": "player-b", "record_id": 7}).encode()
+    commands = [expiry, create] if expire_first else [create, expiry]
+    for command in commands:
+        queue(database, command, 4)
+    seen = []
+    for _ in commands:
+        assert journal.process_one(3, seen.append) == "done"
+    assert seen == commands
+    assert journal.process_one(3, seen.append) == "empty"
+
+
+@pytest.mark.parametrize("following", ["expiry", "eos_alias", "list", "missing_identity"])
+def test_expiry_keeps_overlapping_or_unclear_work_in_review(database, following):
+    kind = blacklist.BlacklistCommandType
+    eos = "0123456789abcdef0123456789abcdef"
+    expiry = blacklist.BlacklistCommand(kind.EXPIRE_ALL, 4, {"player_id": eos})
+    next_command = {
+        "expiry": expiry,
+        "eos_alias": blacklist.BlacklistCommand(kind.CREATE_RECORD, 4, {
+            "record_id": 7, "player_id": "steam-player", "connected_eos_id": eos}),
+        "list": blacklist.BlacklistCommand(kind.DELETE_LIST, 4, {}),
+        "missing_identity": blacklist.BlacklistCommand(kind.EXPIRE_ALL, 4, {"player_id": None}),
+    }[following]
+    for command in (expiry, next_command):
+        queue(database, command.encode(), 4)
+    assert journal.process_one(3, lambda _: pytest.fail("unexpected dispatch")) == "review"
+    with database() as session:
+        assert list(session.scalars(select(journal.BlacklistSyncDelivery.status))) == ["review", "review"]
+
+
 @pytest.fixture
 def existing_blacklist(database, monkeypatch):
     engine = database.kw["bind"]
@@ -452,6 +528,28 @@ def test_hllv_connect_roster_lookup_does_not_block_other_blacklist_writes(databa
             release.set()
         assert worker.result(timeout=10) == (True, True)
     assert api.perma_ban.call_count == 1
+
+
+@pytest.mark.parametrize("game,alias,expected", [
+    ("hllv", None, "review"), ("hll", None, "done"),
+    ("hllv", "0" * 32, "done"), ("hllv", "ABCDEF" + "1" * 26, "review"),
+])
+@pytest.mark.parametrize("expire_first", [True, False])
+def test_expiry_respects_game_and_verified_steam_eos_alias(database, game, alias, expected, expire_first):
+    kind = blacklist.BlacklistCommandType
+    eos = "abcdef" + "1" * 26
+    expiry = blacklist.BlacklistCommand(kind.EXPIRE_ALL, 4, {"player_id": eos})
+    payload = {"player_id": "76561198000000001", "record_id": 12}
+    if alias:
+        payload["connected_eos_id"] = alias
+    create = blacklist.BlacklistCommand(kind.CREATE_RECORD, 4, payload)
+    commands = [expiry, create] if expire_first else [create, expiry]
+    for command in commands:
+        queue(database, command.encode(), 4)
+    seen = []
+    for _ in commands:
+        assert journal.process_one(3, seen.append, game=game) == expected
+    assert seen == ([cmd.encode() for cmd in commands] if expected == "done" else [])
 
 
 def test_connect_reconciliation_is_deduplicated_across_workers(database):
