@@ -202,6 +202,44 @@ def test_valid_roundtrip_and_in_place_update(scenario):
     scenario.remove.assert_not_called()
 
 
+@pytest.mark.parametrize("existing", [False, True], ids=["grant", "extension"])
+@pytest.mark.parametrize("outcome,status", [("confirmed", 200), ("rejected", 400), ("timeout", 504)])
+def test_single_vip_grant_response(scenario, monkeypatch, existing, outcome, status):
+    if not existing:
+        assert scenario.api.remove_vip(ALPHA)
+    before = scenario.stored()
+    members = dict(scenario.members)
+    grant = scenario.api.add_vip
+    monkeypatch.setattr(decorators, "ENDPOINT_HTTP_METHODS", {})
+    monkeypatch.setattr(decorators, "ENDPOINT_PERMISSIONS_LOOKUP", {})
+    monkeypatch.setattr(views.RconServerSettingsUserConfig, "load_from_db", lambda: SimpleNamespace(broadcast_unbans=False))
+    audit = Mock()
+    monkeypatch.setattr(views, "audit", audit)
+    if outcome != "confirmed":
+        monkeypatch.setattr(ServerCtl, "add_vip", Mock(
+            return_value=False, side_effect=TimeoutError() if outcome == "timeout" else None,
+        ))
+    endpoint = views.expose_api_endpoint(grant, "add_vip", "api.can_add_vip", {grant: ["POST"]})
+    new_end = END + timedelta(days=7)
+    request = RequestFactory().post("/api/add_vip", {
+        "player_id": ALPHA, "description": "Updated", "expiration": new_end.isoformat(),
+    }, content_type="application/json")
+    request.user = scenario.request().user
+    response = endpoint(request)
+    body = json.loads(response.content)
+    assert response.status_code == status
+    assert body["failed"] is (outcome != "confirmed")
+    if outcome == "confirmed":
+        assert body["result"] is True and not body["error"]
+        assert scenario.stored() == {**before, ALPHA: new_end}
+        assert scenario.members == {**members, ALPHA: "Updated"}
+        audit.assert_called_once()
+    else:
+        assert body["error"] and body["result"] is not True
+        assert scenario.stored() == before and scenario.members == members
+        audit.assert_not_called()
+
+
 @pytest.mark.parametrize("requested_id", [BRAVO.lower(), BRAVO.upper()])
 @pytest.mark.parametrize("state,code", [("listed", 200), ("stored_only", 200), ("rejected", 400), ("read_timeout", 504)])
 def test_single_revoke_endpoint_distinguishes_absence_from_failure(scenario, monkeypatch, state, code, requested_id):

@@ -334,6 +334,8 @@ def expose_api_endpoint(
         try:
             logger.debug("API command %s", command_name)
             res = func(**arguments)
+            if command_name == "add_vip" and res is False:
+                raise HLLCommandFailedError("The game server rejected the VIP grant")
             if command_name == "remove_vip" and res is False:
                 raise HLLCommandFailedError("VIP removal was not confirmed; the stored entitlement was kept")
 
