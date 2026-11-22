@@ -273,10 +273,10 @@ def reward_players(
             )
             # Refresh and calculate inside the same lock used by other VIP writers.
             from rcon.vip_rewards.locking import vip_lock
-            from rcon.vip_rewards.service import current_vip, expiration, permanent
+            from rcon.vip_rewards.service import expiration, permanent, vip_for_reward
             try:
                 with vip_lock(player_id):
-                    current = current_vip(rcon, player_id)
+                    current = vip_for_reward(rcon, player_id, vip_name)
                     if permanent(current):
                         continue
                     current_expiration = expiration(current["vip_expiration"]) if current else None

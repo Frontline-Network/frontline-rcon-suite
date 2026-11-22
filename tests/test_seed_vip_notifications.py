@@ -221,6 +221,7 @@ class NoticeTests(unittest.TestCase):
              patch('rcon.utils.get_server_number', return_value='1'), \
              patch.object(service.journal, 'get_session_maker', return_value=maker), \
              patch.object(service.journal, 'vip_lock', side_effect=lambda _player_id: nullcontext()), \
+             patch.object(service.journal, 'vip_for_reward', side_effect=lambda _rcon, pid, name: remote.get(pid)), \
              patch.object(service.journal, 'current_vip', side_effect=lambda _rcon, pid: remote.get(pid)), \
              patch.object(service, 'wait', side_effect=lambda _event, seconds: setattr(self, 'clock', self.clock + seconds) or False):
             service.run()

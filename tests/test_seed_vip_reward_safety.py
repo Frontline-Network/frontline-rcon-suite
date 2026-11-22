@@ -30,7 +30,7 @@ def test_rejected_or_uncertain_rewards_do_not_stop_others_or_report_success(monk
         return True
     api.add_vip.side_effect = award
     monkeypatch.setattr(locking, "vip_lock", lambda _: nullcontext())
-    monkeypatch.setattr(service, "current_vip", lambda *_: None)
+    monkeypatch.setattr(service, "vip_for_reward", lambda *_: None)
     ids = {"accepted", "rejected", "uncertain"}
     result = reward_players(api, config, ids, {}, {p: p for p in ids}, defaultdict(lambda: now), reward_time=now)
     assert result == {"accepted"}

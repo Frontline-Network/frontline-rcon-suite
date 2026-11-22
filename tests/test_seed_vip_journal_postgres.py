@@ -16,13 +16,13 @@ from sqlalchemy.orm import sessionmaker
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 
-from rcon.models import SeedVipCycle, SeedVipGrant, VipRewardGrant
+from rcon.models import PlayerID, PlayerVIP, SeedVipCycle, SeedVipGrant, VipRewardGrant
 from rcon.seed_vip import journal
 
 
 @pytest.fixture
 def database(monkeypatch):
-    dsn = os.environ.get("TEST_POSTGRES_DSN")
+    dsn = os.environ.get("TEST_POSTGRES_DSN") or os.environ.get("VIP_REWARDS_TEST_DB_URL")
     if not dsn:
         pytest.skip("requires a disposable PostgreSQL test database")
     root = create_engine(dsn)
@@ -30,11 +30,15 @@ def database(monkeypatch):
     with root.begin() as conn:
         conn.execute(text(f'CREATE SCHEMA "{schema}"'))
     engine = create_engine(dsn, connect_args={"options": f"-csearch_path={schema}"})
+    PlayerID.__table__.create(engine)
+    PlayerVIP.__table__.create(engine)
     SeedVipCycle.__table__.create(engine)
     SeedVipGrant.__table__.create(engine)
     VipRewardGrant.__table__.create(engine)
     maker = sessionmaker(bind=engine, expire_on_commit=False)
     monkeypatch.setattr(journal, "get_session_maker", lambda: maker)
+    from rcon.vip_rewards import service as rewards
+    monkeypatch.setattr(rewards, "get_session_maker", lambda: maker)
     try:
         yield maker
     finally:
@@ -127,10 +131,13 @@ def test_buffer_and_preview_are_isolated(database):
 @pytest.fixture
 def fake_vip(monkeypatch):
     import rcon.utils
+    from rcon.vip_rewards import service as rewards
     monkeypatch.setattr(rcon.utils, "get_server_number", lambda: "3")
     monkeypatch.setattr(journal, "vip_lock", lambda _pid: nullcontext())
     store = {}
     monkeypatch.setattr(journal, "current_vip", lambda _api, pid: store.get(pid))
+    monkeypatch.setattr(rewards, "current_vip", journal.current_vip)
+    monkeypatch.setattr(rewards, "server", lambda: 3)
     api = Mock()
     def add_vip(*, player_id, description, expiration):
         store[player_id] = {"name": description, "vip_expiration": expiration}
@@ -151,6 +158,46 @@ def test_successful_grant_is_not_repeated(database, fake_vip):
     assert journal.deliver(api, server_number=3, grant_id=grant_id) == "confirmed"
     assert journal.deliver(api, server_number=3, grant_id=grant_id) == "already_confirmed"
     assert store["fake-id-a"]["vip_expiration"] == "2026-01-01T01:00:00+00:00"
+    api.add_vip.assert_called_once()
+
+
+@pytest.mark.parametrize("cumulative,permanent", [(True, False), (False, False), (True, True)])
+def test_stored_seed_entitlement_missing_from_game(database, fake_vip, cumulative, permanent):
+    from rcon.utils import INDEFINITE_VIP_DATE
+
+    api, store = fake_vip
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    before = INDEFINITE_VIP_DATE if permanent else now + timedelta(days=30)
+    with database.begin() as session:
+        player = PlayerID(player_id="fake-id-a")
+        session.add(player)
+        session.flush()
+        session.add(PlayerVIP(player_id_id=player.id, server_number=3, expiration=before))
+    grant = create_grant(database, cumulative=cumulative, now=now)
+    result = journal.deliver(api, server_number=3, grant_id=grant)
+    if permanent:
+        assert result == "skipped"
+        api.add_vip.assert_not_called()
+    else:
+        assert result == "confirmed"
+        expected = before + timedelta(hours=1) if cumulative else before
+        assert datetime.fromisoformat(store["fake-id-a"]["vip_expiration"]) == expected
+
+
+def test_local_expiration_cannot_confirm_an_interrupted_seed_write(database, fake_vip):
+    api, _ = fake_vip
+    before = datetime(2026, 2, 1, tzinfo=timezone.utc)
+    with database.begin() as session:
+        player = PlayerID(player_id="fake-id-a")
+        session.add(player)
+        session.flush()
+        session.add(PlayerVIP(player_id_id=player.id, server_number=3, expiration=before))
+    grant = create_grant(database, cumulative=False)
+    api.add_vip.return_value = None
+    api.add_vip.side_effect = None
+    assert journal.deliver(api, server_number=3, grant_id=grant) == "prepared"
+    assert grants(database)[0].target == before
+    assert journal.deliver(api, server_number=3, grant_id=grant) == "review"
     api.add_vip.assert_called_once()
 
 
