@@ -321,7 +321,9 @@ def test_vietnam_single_revoke_waits_for_concurrent_restore(database, vip_admin,
     from rcon.rcon import ServerCtl
 
     api, members, _, removal, _ = vip_admin
-    pid = "fictional-player"
+    pid = "000200000000000000000000000000ab"
+    with database.begin() as db:
+        db.scalar(select(models.PlayerID)).player_id = pid
     members.clear()
     restoring, release, revoking = Event(), Event(), Event()
 
@@ -333,7 +335,7 @@ def test_vietnam_single_revoke_waits_for_concurrent_restore(database, vip_admin,
 
     def revoke():
         revoking.set()
-        return api.remove_vip(pid)
+        return api.remove_vip(pid.upper())
 
     monkeypatch.setattr(ServerCtl, "add_vip", add)
     with ThreadPoolExecutor(max_workers=2) as pool:
