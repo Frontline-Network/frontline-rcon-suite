@@ -134,9 +134,12 @@ def cancel(server, window_id):
                     AdminIncidentEvent.event_type == "report_admin",
                 )
             )
-            if not event or event.payload.get("status") != "sending":
+            if (
+                not event or event.payload.get("status") != "sending"
+                or event.payload.get("kick_started_at") is not None
+            ):
                 raise ValueError(
-                    "Test dispatch already finished; there is nothing to cancel"
+                    "Test dispatch has started or finished; there is nothing to cancel"
                 )
         row.value = {**row.value, "state": "cancelled", "cancelled_at": time.time()}
 

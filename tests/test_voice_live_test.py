@@ -87,6 +87,13 @@ def test_one_confirmed_kick_and_other_reporters_remain_in_simulation(volunteers)
     assert grant.inspect_window(1)["state"] == "bound"
     assert not voice_reports.answer(1, iid, "v0", False, ctx)
     assert voice_reports.answer(1, iid, REPORTER, False, ctx)
+
+    def confirm_after_dispatch(*args, **kwargs):
+        with pytest.raises(ValueError, match="dispatch has started"):
+            grant.cancel(1, window)
+        return True
+
+    api.kick.side_effect = confirm_after_dispatch
     service.tick(api, 1)
     api.kick.assert_called_once()
     assert api.kick.call_args.args[0] == TARGET
