@@ -27,7 +27,7 @@ from rcon.game.player_adapter import PlayerResponseAdapterError
 from rcon.maps import UNKNOWN_MAP_NAME, Layer, is_server_loading_map
 from rcon.models import GameLayout, PlayerID, PlayerVIP, enter_session
 from rcon.perf_statistics import PerformanceStatistics
-from rcon.vip_rewards.locking import serialized_vip
+from rcon.vip_rewards.locking import serialized_vip, vip_lock
 from rcon.player_history import (
     get_live_profiles,
     get_player_profile,
@@ -749,6 +749,10 @@ class Rcon(ServerCtl):
     def get_vip_ids(self) -> list[VipIdType]:
         return self.get_live_vip_ids()
 
+    def has_live_vip(self, player_id: str) -> bool:
+        """Read game membership directly, without cache or database expirations."""
+        return any(vip[PLAYER_ID] == player_id for vip in super().get_vip_ids())
+
     def get_live_vip_ids(self) -> list[VipIdType]:
         """Read current game-server VIPs with per-server database expirations."""
         res: list[VipId] = super().get_vip_ids()
@@ -907,13 +911,42 @@ class Rcon(ServerCtl):
         return result
 
     def remove_all_vips(self) -> bool:
-        vips = self.get_vip_ids()
-        for vip in vips:
-            try:
-                self.remove_vip(vip[PLAYER_ID])
-            except (HLLCommandFailedError, ValueError):
-                raise
+        server_number = get_server_number()
+        with enter_session() as session:
+            local_ids = (
+                session.query(PlayerID.player_id)
+                .join(PlayerVIP, PlayerVIP.player_id_id == PlayerID.id)
+                .filter(PlayerVIP.server_number == server_number)
+            )
+            stored = {row.player_id for row in local_ids}
+        listed = {vip[PLAYER_ID] for vip in super().get_vip_ids()}
+        rejected = 0
+        for player_id in sorted(stored | listed):
+            with vip_lock(player_id):
+                # Restoration may have put a missing player back since the scan.
+                if player_id in listed or self.has_live_vip(player_id):
+                    if self.remove_vip(player_id) is not True:
+                        rejected += 1
+                    continue
+                with enter_session() as session:
+                    record = (
+                        session.query(PlayerVIP)
+                        .join(PlayerID, PlayerVIP.player_id_id == PlayerID.id)
+                        .filter(PlayerVIP.server_number == server_number, PlayerID.player_id == player_id)
+                        .with_for_update()
+                        .one_or_none()
+                    )
+                    if record is not None:
+                        session.delete(record)
 
+        self.get_vip_ids.cache_clear()
+        if rejected:
+            raise HLLCommandFailedError(f"VIP removal was not confirmed for {rejected} player(s)")
+        remaining_live = super().get_vip_ids()
+        with enter_session() as session:
+            remaining_local = session.query(PlayerVIP.id).filter_by(server_number=server_number).first()
+        if remaining_live or remaining_local is not None:
+            raise HLLCommandFailedError("VIP entries remain after bulk removal")
         return True
 
     def message_player(

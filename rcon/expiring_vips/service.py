@@ -127,6 +127,33 @@ def restore_missing_vips(rcon_hook: Rcon) -> int:
     return restored
 
 
+def _backfill_vip_expiration(rcon_hook: Rcon, player_id: str, observed: datetime | None):
+    from rcon.vip_rewards.locking import vip_lock
+
+    # The scan can be stale. Hold the same lock as grants and revocations
+    # from the fresh server read through the local commit.
+    with vip_lock(player_id):
+        if not rcon_hook.has_live_vip(player_id):
+            return
+        with enter_session() as session:
+            player = session.query(PlayerID).filter_by(player_id=player_id).one_or_none()
+            if player is None:
+                return
+            server_number = get_server_number()
+            record = (
+                session.query(PlayerVIP)
+                .filter_by(player_id_id=player.id, server_number=server_number)
+                .with_for_update()
+                .one_or_none()
+            )
+            if record is None:
+                if observed is None:
+                    session.add(PlayerVIP(player_id_id=player.id, server_number=server_number,
+                                          expiration=INDEFINITE_VIP_DATE))
+            elif record.expiration == observed:
+                record.expiration = INDEFINITE_VIP_DATE
+
+
 def remove_expired_vips(rcon_hook: Rcon, webhook_url: Optional[HttpUrl] = None):
     logger.info(f"Checking for expired VIPs")
 
@@ -167,66 +194,15 @@ def remove_expired_vips(rcon_hook: Rcon, webhook_url: Optional[HttpUrl] = None):
             send_to_discord_audit(message=message, command_name="remove_vip", by=SERVICE_NAME,
                                   webhookurls=None if webhook_url is None else [webhook_url])
 
-        # Look for anyone with VIP but without a record and create one for them
-        vip_ids = rcon_hook.get_vip_ids()
-        missing_expiration_records = []
-        for player in vip_ids:
-            player_expiration: datetime | None = player["vip_expiration"]
-            if player_expiration is None:
-                missing_expiration_records.append(player)
-            # Find any old style records that had a floating creation date + 200 year expiration
-            # so they get changed to the new fixed UTC 3000-01-01 datetime
-            elif (
-                player_expiration
-                and player_expiration
-                >= datetime.now(timezone.utc) + timedelta(days=365 * 100)
-                and player_expiration.year < 3000
-            ):
-                missing_expiration_records.append(player)
-                logger.info(
-                    "Correcting old style expiration date for %s", player["player_id"]
-                )
+    legacy_threshold = datetime.now(timezone.utc) + timedelta(days=365 * 100)
+    for vip in rcon_hook.get_vip_ids():
+        observed = vip["vip_expiration"]
+        if observed is None or (observed.year < 3000 and observed >= legacy_threshold):
+            try:
+                _backfill_vip_expiration(rcon_hook, vip["player_id"], observed)
+            except Exception:
+                logger.exception("Unable to reconcile missing or legacy VIP expiration for %s", vip["player_id"])
 
-        for raw_player in missing_expiration_records:
-            player: PlayerID = (
-                session.query(PlayerID)
-                .filter(PlayerID.player_id == raw_player["player_id"])
-                .one_or_none()
-            )
-
-            if player:
-                expiration_date = INDEFINITE_VIP_DATE
-                vip_record = (
-                    session.query(PlayerVIP)
-                    .filter(
-                        PlayerVIP.player_id_id == player.id,
-                        PlayerVIP.server_number == get_server_number(),
-                    )
-                    .one_or_none()
-                )
-
-                if vip_record:
-                    vip_record.expiration = expiration_date
-                else:
-                    vip_record = PlayerVIP(
-                        expiration=expiration_date,
-                        player_id_id=player.id,
-                        server_number=server_number,
-                    )
-                    session.add(vip_record)
-
-                try:
-                    name = player.names[0].name
-                except IndexError:
-                    name = "No name found"
-
-                logger.info(
-                    f"Creating missing VIP expiration (indefinite) record for {name} / {player.player_id}"
-                )
-            else:
-                logger.info(
-                    f"{raw_player['player_id']} has VIP on the server but does not have a PlayerSteamID record."
-                )
 
     if count > 0:
         logger.info(f"Removed VIP from {count} player(s)")
