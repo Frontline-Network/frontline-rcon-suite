@@ -24,6 +24,8 @@ class PlayerInfoAdapter(Protocol):
 
     def adapt(self, raw: Mapping[str, Any]) -> CanonicalPlayerInfo: ...
 
+    def adapt_for_squad_check(self, raw: Mapping[str, Any]) -> CanonicalPlayerInfo: ...
+
 
 class BasePlayerInfoAdapter:
     """Shared defensive normalization used by the per-game protocol adapters."""
@@ -73,6 +75,19 @@ class BasePlayerInfoAdapter:
     def _mapping(cls, raw: Mapping[str, Any], *keys: str) -> Mapping[str, Any]:
         value = cls._lookup(raw, *keys, default={})
         return value if isinstance(value, Mapping) else {}
+
+    def adapt_for_squad_check(self, raw: Mapping[str, Any]) -> CanonicalPlayerInfo:
+        """A missing role or faction cannot safely default to a valid game ID."""
+        player = self.adapt(raw)
+        for field in ("team", "role"):
+            value = self._lookup(raw, field)
+            if type(value) is not int and not (
+                isinstance(value, str) and value.removeprefix("-").isdecimal()
+            ):
+                raise PlayerResponseAdapterError(f"Player response has invalid {field}")
+        if not isinstance(self._lookup(raw, "platoon"), str):
+            raise PlayerResponseAdapterError("Player response has no platoon information")
+        return player
 
     def adapt(self, raw: Mapping[str, Any]) -> CanonicalPlayerInfo:
         if not isinstance(raw, Mapping):

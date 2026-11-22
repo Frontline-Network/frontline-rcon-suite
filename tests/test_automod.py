@@ -32,6 +32,104 @@ def test_automod_uses_compact_live_roster_snapshot():
     rcon.get_team_view.assert_called_once_with(compact=True)
 
 
+def roster_player(player_id="target", team=0, squad="JIG", role=10):
+    return {
+        "iD": player_id, "team": team, "platoon": squad, "role": role,
+        "name": "Same display name", "level": 60, "loadout": "", "clanTag": "",
+        "platform": "steam", "worldPosition": {},
+        "stats": dict.fromkeys(("teamKills", "vehicleKills", "vehiclesDestroyed",
+                                "infantryKills", "deaths"), 0),
+        "scoreData": dict.fromkeys(("cOMBAT", "offense", "defense", "support"), 0),
+    }
+
+
+@pytest.mark.parametrize("rows,should_send", [
+    ([roster_player(), roster_player("other", squad="DOG", role=4)], True),
+    ([roster_player(squad="DOG"), roster_player("other")], False),
+    ([roster_player(team=1)], False),
+    ([roster_player("other")], False),
+    ([roster_player(), roster_player()], False),
+    ([roster_player(role=4)], False),
+    ([roster_player(), roster_player("spotter", role=4)], False),
+    ([roster_player(), roster_player("officer", role=9)], False),
+    ([roster_player(), roster_player("unknown", role=999)], False),
+    ([roster_player(), roster_player("unknown", role=None)], False),
+    ([roster_player(), roster_player("unknown", squad=None)], False),
+    (TimeoutError(), False),
+])
+def test_no_leader_rechecks_uncached_roster_at_dispatch(rows, should_send):
+    from rcon.rcon import Rcon
+    from rcon.game.hll.player_adapter import HLLPlayerInfoAdapter
+    from rcon.types import GameEnum
+
+    api = Mock(spec=Rcon)
+    api.config = Mock(game=GameEnum.HLL_WW2)
+    api.game_profile = Mock(player_adapter=HLLPlayerInfoAdapter())
+    api.still_in_leaderless_squad.side_effect = lambda *args: Rcon.still_in_leaderless_squad(api, *args)
+    if isinstance(rows, Exception):
+        api.get_uncached_player_snapshot.side_effect = rows
+    else:
+        api.get_uncached_player_snapshot.return_value = {"players": rows}
+    api.punish.return_value = True
+    origin = Mock(action_author="AutoMod_NoLeaderWatch")
+    player = PunishPlayer(player_id="target", name="Old display name", team="axis", squad="jig",
+                          details=PunishDetails(author=origin.action_author, message="missing leader"))
+
+    _do_punitions(api, ActionMethod.PUNISH, [player], [origin])
+
+    api.get_uncached_player_snapshot.assert_called_once_with()
+    if should_send:
+        api.punish.assert_called_once_with(player_id="target", player_name=player.name,
+                                           by=origin.action_author, reason="missing leader")
+        origin.player_punish_succeeded.assert_called_once_with(player)
+    else:
+        api.punish.assert_not_called()
+        origin.player_punish_started.assert_not_called()
+        origin.player_punish_failed.assert_called_once_with(player)
+
+
+@pytest.mark.parametrize("leader_first", [True, False])
+def test_stale_no_leader_does_not_discard_independent_punishment(leader_first):
+    mods = [Mock(action_author="AutoMod_NoLeaderWatch"), Mock(action_author="AutoMod_LevelThresholds")]
+    merged = PunitionsToApply()
+    for mod in mods if leader_first else reversed(mods):
+        player = PunishPlayer(player_id="target", name="Player", team="axis", squad="jig",
+                              details=PunishDetails(author=mod.action_author, message=mod.action_author))
+        merged.merge(PunitionsToApply(punish=[player]))
+    api = Mock()
+    api.still_in_leaderless_squad.return_value = False
+    api.punish.return_value = True
+    _do_punitions(api, ActionMethod.PUNISH, merged.punish, mods)
+    api.punish.assert_called_once_with(player_id="target", player_name="Player",
+                                       by=mods[1].action_author, reason=mods[1].action_author)
+    mods[0].player_punish_succeeded.assert_not_called()
+    mods[1].player_punish_succeeded.assert_called_once()
+
+
+def test_second_player_in_same_squad_gets_a_new_roster_even_within_one_batch():
+    from rcon.game.hllv.player_adapter import HLLVPlayerInfoAdapter
+    from rcon.rcon import Rcon
+    from rcon.types import GameEnum
+
+    api = Mock(spec=Rcon)
+    api.config = Mock(game=GameEnum.HLL_VIETNAM)
+    api.game_profile = Mock(player_adapter=HLLVPlayerInfoAdapter())
+    api.still_in_leaderless_squad.side_effect = lambda *args: Rcon.still_in_leaderless_squad(api, *args)
+    initial = [roster_player("first", team=6), roster_player("second", team=6)]
+    api.get_uncached_player_snapshot.side_effect = [
+        {"players": initial}, {"players": [*initial, roster_player("leader", team=6, role=9)]},
+    ]
+    api.punish.return_value = True
+    mod = Mock(action_author="AutoMod_NoLeaderWatch")
+    players = [PunishPlayer(player_id=row["iD"], name="Same name", team="axis", squad="jig",
+                            details=PunishDetails(author=mod.action_author)) for row in initial]
+    _do_punitions(api, ActionMethod.PUNISH, players, [mod])
+    assert api.get_uncached_player_snapshot.call_count == 2
+    api.punish.assert_called_once()
+    assert api.punish.call_args.kwargs["player_id"] == "first"
+    mod.player_punish_failed.assert_called_once_with(players[1])
+
+
 def test_punish_rcon_error_is_treated_as_uncertain_without_stopping_automod():
     player = PunishPlayer(
         player_id="player-id",
@@ -82,6 +180,7 @@ def test_failed_punishment_does_not_reset_other_rule():
     origin.action_author = "AutoMod_NoLeaderWatch"
     other.action_author = "AutoMod_SeedingRules"
     server = Mock()
+    server.still_in_leaderless_squad.return_value = True
     server.punish.return_value = False
     _do_punitions(server, ActionMethod.PUNISH, [player], [origin, other])
     origin.player_punish_failed.assert_not_called()
@@ -138,6 +237,7 @@ def test_action_outcome_controls_repeat_and_escalation(monkeypatch, method, resu
     player = PunishPlayer(player_id="fake-id", name="Player", squad="Able", team="allies",
                           details=PunishDetails(author=mod.action_author, message="reason"))
     server = Mock()
+    server.still_in_leaderless_squad.return_value = True
     target = server.punish if method == ActionMethod.PUNISH else server.kick
     if isinstance(result, Exception):
         target.side_effect = result
@@ -205,6 +305,7 @@ def test_interrupted_action_keeps_pending_reservation(monkeypatch, method):
                           details=PunishDetails(author=mod.action_author, message="reason"))
     server = Mock()
     target = server.punish if method == ActionMethod.PUNISH else server.kick
+    server.still_in_leaderless_squad.return_value = True
     target.side_effect = KeyboardInterrupt()
     monkeypatch.setattr(automod, "audit", Mock())
     with pytest.raises(KeyboardInterrupt):

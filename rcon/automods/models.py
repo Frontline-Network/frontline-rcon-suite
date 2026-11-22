@@ -172,6 +172,7 @@ class PunishPlayer:
     # Rules with the same live/dry-run mode can propose one shared action.
     # Keep their authors so every contributing watch receives its outcome.
     related_authors: List[str] = field(default_factory=list, repr=False, compare=False)
+    related_details: List[PunishDetails] = field(default_factory=list, repr=False, compare=False)
 
     def short_repr(self):
         return (
@@ -231,6 +232,8 @@ class PunitionsToApply:
                     current[index] = player
                 elif getattr(current[index].details, "dry_run", False) == getattr(player.details, "dry_run", False):
                     selected = current[index]
+                    if current is self.punish:
+                        selected.related_details.extend([player.details, *player.related_details])
                     for author in [player.details.author, *player.related_authors]:
                         if author != selected.details.author and author not in selected.related_authors:
                             selected.related_authors.append(author)

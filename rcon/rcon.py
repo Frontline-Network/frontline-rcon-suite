@@ -379,6 +379,24 @@ class Rcon(ServerCtl):
                 )
         return players
 
+    def still_in_leaderless_squad(self, player_id: str, team: str, squad: str) -> bool:
+        """Verify membership and leadership together against one uncached roster."""
+        if not player_id or team not in {"allies", "axis"} or not squad or squad == UNASSIGNED:
+            return False
+        leaders = get_squad_leader_roles(self.config.game)
+        matches = 0
+        adapter = self.game_profile.player_adapter
+        for raw in self.get_uncached_player_snapshot()["players"]:
+            player = parse_raw_player_info(adapter.adapt_for_squad_check(raw), self.config.game)
+            same_squad = player["team"] == team and player["unit_name"] == squad
+            if player["player_id"] == player_id:
+                if not same_squad:
+                    return False
+                matches += 1
+            if same_squad and (not player["role"] or player["role"] in leaders):
+                return False
+        return matches == 1
+
     def _get_adapted_player_info(self, player_id: str) -> CanonicalPlayerInfo | None:
         adapter = self.game_profile.player_adapter
         if adapter is None:

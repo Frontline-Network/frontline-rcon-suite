@@ -1,6 +1,7 @@
 import logging
 import hashlib
 import json
+from copy import copy
 from datetime import datetime, timezone
 from threading import Timer
 from typing import List
@@ -273,6 +274,31 @@ def _do_punitions(
                 )
 
             if method == ActionMethod.PUNISH:
+                if not aplayer.details.dry_run and NoLeaderAutomod.action_author in guard_rules:
+                    try:
+                        still_eligible = rcon.still_in_leaderless_squad(
+                            aplayer.player_id, aplayer.team, aplayer.squad
+                        )
+                    except Exception:
+                        logger.exception("Could not verify the current squad for %s", aplayer.player_id)
+                        still_eligible = False
+                    if still_eligible is not True:
+                        logger.info("Skipping unverified No-Leader punishment for %s in %s/%s",
+                                    aplayer.player_id, aplayer.team, aplayer.squad)
+                        for mod in origins:
+                            if mod.action_author == NoLeaderAutomod.action_author:
+                                mod.player_punish_failed(aplayer)
+                        # No command was sent. Release the reservation, then dispatch
+                        # any independent rule with its own reason and watch callbacks.
+                        alternatives = [d for d in [aplayer.details, *aplayer.related_details]
+                                        if d.author != NoLeaderAutomod.action_author]
+                        if settle_guard("rejected") and alternatives:
+                            remaining = copy(aplayer)
+                            remaining.details = alternatives[0]
+                            remaining.related_details = alternatives[1:]
+                            remaining.related_authors = [d.author for d in remaining.related_details]
+                            _do_punitions(rcon, method, [remaining], mods, event=event)
+                        continue
                 for moderator in _originating_moderators(mods, aplayer):
                     moderator.player_punish_started(aplayer)
                 if not aplayer.details.dry_run:
