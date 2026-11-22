@@ -177,6 +177,10 @@ def configure(server, cfg, actor=ACTOR):
             row.value = cfg.model_dump()
         # Never resume queued reports when settings are changed/re-enabled.
         for event in pending(sess, server):
+            if event.payload.get("kick_started_at") is not None:
+                from rcon.admin_incidents import IncidentConflict
+
+                raise IncidentConflict("Wait for the in-progress report kick before changing settings")
             publish(sess, event, "manual", "Einstellungen geändert / Settings changed")
     _invalidate_user_config_cache(key(server))
 
@@ -1043,7 +1047,11 @@ def tick(api, server):
         with enter_session() as sess:
             votes.lock(sess, server)
             event = sess.get(AdminIncidentEvent, event_id)
-            if event.payload["status"] != "sending":
+            if (
+                not event
+                or event.payload["status"] != "sending"
+                or event.payload.get("kick_started_at") is not None
+            ):
                 continue
             if reason := invalid_reason(sess, event, fresh, time.time()):
                 publish(
@@ -1068,24 +1076,28 @@ def tick(api, server):
                 publish(sess, event, "dry_run", "Voice pilot simulation; no kick sent")
                 continue
             reason = kick_reason(sess, p)
-            confirmed = False
-            try:
-                # Same lock as manual report actions/config updates. No retries,
-                # no offline==success inference, no warning or ban fallback.
-                with api.without_retries(), votes.automatic_action():
-                    confirmed = (
-                        api.kick(
-                            p["target_id"],
-                            reason,
-                            by=ACTOR,
-                            player_name=p["target_name"],
-                        )
-                        is True
-                    )
-            except Exception:
-                logger.exception(
-                    "Report-admin kick result uncertain; no automatic retry"
-                )
+            started_at = time.time()
+            event.payload = {**p, "kick_started_at": started_at}
+
+        # The committed dispatch protects this incident while other admins can work.
+        confirmed = False
+        try:
+            with api.without_retries(), votes.automatic_action():
+                confirmed = api.kick(
+                    p["target_id"], reason, by=ACTOR, player_name=p["target_name"]
+                ) is True
+        except Exception:
+            logger.exception("Report-admin kick result uncertain; no automatic retry")
+
+        with enter_session() as sess:
+            votes.lock(sess, server)
+            event = sess.get(AdminIncidentEvent, event_id)
+            if (
+                not event or event.payload["status"] != "sending"
+                or event.payload.get("kick_started_at") != started_at
+            ):
+                # Recovery already recorded an outcome while RCON was responding.
+                continue
             publish(
                 sess,
                 event,

@@ -134,6 +134,66 @@ def test_claim_during_voice_delivery(pilot, message):
         assert snapshot(database, incident_id)["status"] == "manual"
 
 
+@pytest.mark.parametrize("outcome", ["confirmed", "timeout", "recovered"])
+def test_claim_while_voice_kick_awaits_server(pilot, outcome):
+    scenario, advance = pilot
+    database, _, context = scenario
+    api = transport()
+    incident_id = report(scenario, reporter_id="member")["id"]
+    service.tick(api, 1)
+    advance(60)
+    service.tick(api, 1)
+    assert voice_reports.answer(1, incident_id, "member", False, context)
+    with database() as sess:
+        other = AdminIncident(server_number=1, reason="Independent report")
+        sess.add(other)
+        sess.flush()
+        other_id = other.id
+
+    entered, release = Event(), Event()
+
+    def wait_for_server(*args, **kwargs):
+        entered.set()
+        if not release.wait(30) or outcome == "timeout":
+            raise TimeoutError("no acknowledgement from game server")
+        return True
+
+    api.kick.side_effect = wait_for_server
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        delivery = pool.submit(service.tick, api, 1)
+        try:
+            assert entered.wait(10)
+            claim = pool.submit(
+                admin_incidents.mutate_incident, other_id, actor="admin",
+                expected_revision=1, operation="claim",
+            )
+            assert claim.result(timeout=5)["assigned_to"] == "admin"
+            with database() as sess:
+                revision = sess.get(AdminIncident, incident_id).revision
+            takeover = pool.submit(
+                admin_incidents.mutate_incident, incident_id, actor="admin",
+                expected_revision=revision, operation="claim",
+            )
+            with pytest.raises(admin_incidents.IncidentConflict, match="kick in progress"):
+                takeover.result(timeout=5)
+            with pytest.raises(admin_incidents.IncidentConflict, match="in-progress report kick"):
+                pool.submit(service.configure, 1, service.Config(enabled=False)).result(timeout=5)
+            pool.submit(service.tick, api, 1).result(timeout=5)
+            if outcome == "recovered":
+                pool.submit(service.recover, 1).result(timeout=5)
+                assert snapshot(database, incident_id)["status"] == "unknown"
+        finally:
+            release.set()
+        delivery.result(timeout=5)
+
+    assert snapshot(database, incident_id)["status"] == (
+        "kicked" if outcome == "confirmed" else "unknown"
+    )
+    service.recover(1)
+    service.tick(api, 1)
+    api.kick.assert_called_once()
+
+
 @pytest.mark.parametrize("outcome", ["restart", "timeout"])
 def test_uncertain_receipt_is_never_replayed(pilot, outcome):
     scenario, _ = pilot
