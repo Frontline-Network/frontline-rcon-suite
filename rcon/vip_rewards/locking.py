@@ -9,6 +9,8 @@ from functools import wraps
 
 from sqlalchemy import text
 
+from rcon.types import GameEnum
+
 _held = ContextVar("vip_reward_locks", default=frozenset())
 
 
@@ -44,6 +46,10 @@ def eos_vip_key(player_id):
     if isinstance(player_id, str) and re.fullmatch(r"[0-9a-fA-F]{32}", player_id):
         return player_id.lower()
     return None
+
+
+def vietnam_eos_key(game, player_id):
+    return eos_vip_key(player_id) if game == GameEnum.HLL_VIETNAM else None
 
 
 def vip_lock(player_id):

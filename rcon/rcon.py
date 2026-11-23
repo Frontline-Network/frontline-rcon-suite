@@ -27,7 +27,7 @@ from rcon.game.player_adapter import PlayerResponseAdapterError
 from rcon.maps import UNKNOWN_MAP_NAME, Layer, is_server_loading_map
 from rcon.models import GameLayout, PlayerID, PlayerVIP, enter_session
 from rcon.perf_statistics import PerformanceStatistics
-from rcon.vip_rewards.locking import eos_vip_key, serialized_vip
+from rcon.vip_rewards.locking import eos_vip_key, serialized_vip, vietnam_eos_key
 from rcon.player_history import (
     get_live_profiles,
     get_player_profile,
@@ -759,7 +759,8 @@ class Rcon(ServerCtl):
         res: list[VipId] = super().get_vip_ids()
         player_dicts = []
 
-        vip_expirations: dict[str, datetime]
+        vip_expirations: dict[str, datetime] = {}
+        eos_expirations: dict[str, datetime | None] = {}
         with enter_session() as session:
             server_number = get_server_number()
 
@@ -768,17 +769,23 @@ class Rcon(ServerCtl):
                 .filter(PlayerVIP.server_number == server_number)
                 .all()
             )
-            vip_expirations = {
-                player.player.player_id: player.expiration for player in players
-            }
+            for vip in players:
+                stored_id = vip.player.player_id
+                vip_expirations[stored_id] = vip.expiration
+                if key := vietnam_eos_key(self.config.game, stored_id):
+                    # Only infer a different spelling's expiry from a unique entitlement.
+                    eos_expirations[key] = None if key in eos_expirations else vip.expiration
 
         for item in res:
+            live_id = item[PLAYER_ID]
+            deadline = vip_expirations.get(live_id)
+            if deadline is None and (key := vietnam_eos_key(self.config.game, live_id)):
+                deadline = eos_expirations.get(key)
             player: VipIdType = {
-                PLAYER_ID: item[PLAYER_ID],
+                PLAYER_ID: live_id,
                 NAME: item["name"],
-                "vip_expiration": None,
+                "vip_expiration": deadline,
             }
-            player["vip_expiration"] = vip_expirations.get(item[PLAYER_ID], None)
             player_dicts.append(player)
 
         return sorted(player_dicts, key=lambda d: d[NAME])
@@ -789,7 +796,7 @@ class Rcon(ServerCtl):
         listed = expected_expiration is not None or self.config.game != GameEnum.HLL_VIETNAM
         return self._revoke_stored_or_live_vip(player_id, listed, expected_expiration)
 
-    def _vietnam_vip_ids_for_revoke(self, eos_key):
+    def _vietnam_vip_ids(self, eos_key: str) -> tuple[str | None, str | None]:
         # Each source may retain a different spelling of the same EOS ID.
         live = [row[PLAYER_ID] for row in super().get_vip_ids()
                 if eos_vip_key(row[PLAYER_ID]) == eos_key]
@@ -803,24 +810,25 @@ class Rcon(ServerCtl):
             )
         if len(live) > 1 or len(stored) > 1:
             raise HLLCommandFailedError("Multiple VIP entries match this EOS ID")
-        return (stored[0].player_id if stored else eos_key, live[0] if live else None)
+        return (stored[0].player_id if stored else None, live[0] if live else None)
 
     @serialized_vip
     def _revoke_stored_or_live_vip(self, player_id, listed, expected_expiration=None):
+        live_id = player_id
+        key = vietnam_eos_key(self.config.game, player_id)
+        if key and (not listed or expected_expiration is not None):
+            stored_id, live_id = self._vietnam_vip_ids(key)
+            player_id = stored_id or key
+        elif not listed and not self.has_live_vip(player_id):
+            live_id = None
         if expected_expiration is not None:
             from rcon.vip_rewards.service import current_vip, expiration
-            current = current_vip(self, player_id)
+            current = current_vip(self, live_id) if live_id is not None else None
             if current is None or current["vip_expiration"] is None or expiration(current["vip_expiration"]) != expiration(expected_expiration):
                 return False
 
         with invalidates(Rcon.get_vip_ids):
             # The restore worker holds this player lock through its own DB and RCON writes.
-            live_id = player_id
-            if not listed:
-                if self.config.game == GameEnum.HLL_VIETNAM and (key := eos_vip_key(player_id)):
-                    player_id, live_id = self._vietnam_vip_ids_for_revoke(key)
-                elif not self.has_live_vip(player_id):
-                    live_id = None
             if live_id is not None:
                 if super().remove_vip(live_id) is not True:
                     logger.warning("Game server did not confirm VIP removal for %s", player_id)
