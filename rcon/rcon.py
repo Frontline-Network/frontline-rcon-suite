@@ -27,7 +27,7 @@ from rcon.game.player_adapter import PlayerResponseAdapterError
 from rcon.maps import UNKNOWN_MAP_NAME, Layer, is_server_loading_map
 from rcon.models import GameLayout, PlayerID, PlayerVIP, enter_session
 from rcon.perf_statistics import PerformanceStatistics
-from rcon.vip_rewards.locking import eos_vip_key, serialized_vip, vietnam_eos_key
+from rcon.vip_rewards.locking import eos_vip_key, lock, serialized_vip, vietnam_eos_key
 from rcon.player_history import (
     get_live_profiles,
     get_player_profile,
@@ -117,6 +117,11 @@ LOG_ACTIONS = [
     "MESSAGE",
 ]
 logger = logging.getLogger(__name__)
+
+
+def player_ban_lock(player_id):
+    """Serialize game ban writes with a conditional blacklist removal for this account."""
+    return lock(f"player-ban:{get_server_number()}:{eos_vip_key(player_id) or player_id}")
 
 
 def _validate_map_replacement(requested: list[str], available: list[str]) -> None:
@@ -1408,7 +1413,7 @@ class Rcon(ServerCtl):
     ) -> bool:
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id, by)
-        with invalidates(Rcon.get_players, Rcon.get_temp_bans):
+        with player_ban_lock(player_id), invalidates(Rcon.get_players, Rcon.get_temp_bans):
             res = super().temp_ban(player_id, duration_hours, reason, admin_name=by)
 
         if res:
@@ -1438,7 +1443,7 @@ class Rcon(ServerCtl):
     ) -> bool:
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id, by)
-        with invalidates(Rcon.get_players, Rcon.get_perma_bans):
+        with player_ban_lock(player_id), invalidates(Rcon.get_players, Rcon.get_perma_bans):
             res = super().perma_ban(player_id, reason, admin_name=by)
 
         if res:

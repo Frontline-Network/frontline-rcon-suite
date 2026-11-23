@@ -1357,6 +1357,187 @@ def test_record_deletion_and_its_delivery_commit_together(database, existing_bla
         assert command.payload["old_record"]["player_id"] == "synthetic-player"
 
 
+@pytest.mark.parametrize("temporary", [False, True], ids=["permanent", "temporary"])
+@pytest.mark.parametrize("case,expected", [
+    ("newer", "done"), ("owned", "done"), ("absent", "done"), ("kick_only", "done"),
+    ("other_admin", "review"), ("other_record", "review"), ("untagged", "review"),
+    ("ambiguous_time", "review"), ("legacy_order", "review"), ("duplicates", "review"),
+    ("unreadable", "review"), ("rejected", "review"), ("timeout", "review"),
+    ("queued_edit", "done"),
+])
+def test_delayed_single_delete_preserves_independent_bans(
+        database, existing_blacklist, monkeypatch, temporary, case, expected):
+    from types import SimpleNamespace
+    from rcon.rcon import Rcon
+    from rcon.types import GameEnum
+
+    record_id, list_id, other_list_id = existing_blacklist
+    pid = "abcdef0123456789abcdef0123456789"
+    monkeypatch.setattr(blacklist, "SERVER_NUMBER", 3)
+    with database.begin() as db:
+        record = db.get(BlacklistRecord, record_id)
+        record.player.player_id = pid
+        if temporary:
+            record.expires_at = datetime.now(timezone.utc) + timedelta(hours=6)
+        blocklist = db.get(Blacklist, list_id)
+        blocklist.servers = 4
+        blocklist.sync = BlacklistSyncMethod.KICK_ONLY if case == "kick_only" else BlacklistSyncMethod.BAN_ON_CONNECT
+        actor = blacklist._blacklist_ban_actor(record)
+        assert actor.startswith(f"BLACKLIST #{record_id}/") and actor.endswith(": test")
+        if case == "queued_edit":
+            other = db.get(Blacklist, other_list_id)
+            other.servers, other.sync = 4, BlacklistSyncMethod.KICK_ONLY
+    if case == "queued_edit":
+        blacklist.edit_record_from_blacklist(record_id, blacklist_id=other_list_id)
+    assert blacklist.remove_record_from_blacklist(record_id)
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    ctl = receiver.rcon = Rcon.__new__(Rcon)
+    ctl.game_profile = SimpleNamespace(game=GameEnum.HLL_VIETNAM)
+    def process(ready=True):
+        return journal.process_one(3, receiver.dispatch, is_ready=lambda: ready,
+                                   prepare=receiver._prepare_delivery, game=GameEnum.HLL_VIETNAM)
+    assert process(False) == "deferred"
+    with database.begin() as db:
+        row = db.scalar(select(journal.BlacklistSyncDelivery).order_by(journal.BlacklistSyncDelivery.id.desc()))
+        command = blacklist.BlacklistCommand.decode(row.command)
+        requested = datetime.fromisoformat(command.payload["requested_at"])
+        assert requested <= row.created_at
+        if case == "legacy_order":
+            del command.payload["requested_at"]
+            row.command = command.encode()
+    kind = "Temporary" if temporary else "Permanent"
+    stamp = (requested - timedelta(seconds=5)).isoformat()
+    if case in {"newer", "queued_edit"}:
+        stamp = (requested + timedelta(seconds=5)).isoformat()
+    elif case == "ambiguous_time":
+        stamp = requested.isoformat(timespec="seconds")
+    by = {"other_admin": "Moderator", "untagged": "BLACKLIST: test",
+          "other_record": f"BLACKLIST #{record_id + 1}: test"}.get(case, actor)
+    ban = {"userId": pid.upper(), "userName": "Fixture", "timeOfBanning": stamp,
+           "durationHours": 2, "banReason": "Reason", "adminName": by}
+    rows = [] if case == "absent" else [ban] * (2 if case == "duplicates" else 1)
+    def read(command, version):
+        if case == "unreadable":
+            raise TimeoutError()
+        return SimpleNamespace(content_dict={"banList": rows if command == f"Get{kind}Bans" else []})
+    ctl.exchange = mock.Mock(side_effect=read)
+    ctl.exchange_success = mock.Mock(return_value=case != "rejected",
+                                     side_effect=TimeoutError() if case == "timeout" else None)
+    assert process() == expected
+    if case in {"owned", "rejected", "timeout"}:
+        ctl.exchange_success.assert_called_once_with(f"Remove{kind}Ban", 2, {"PlayerId": pid.upper()})
+    else:
+        ctl.exchange_success.assert_not_called()
+    if case == "kick_only":
+        ctl.exchange.assert_not_called()
+    with database() as db:
+        deliveries = db.scalars(select(journal.BlacklistSyncDelivery)).all()
+        assert all(row.status == expected for row in deliveries)
+        if case in {"queued_edit", "newer"}:
+            assert all(row.reason == "Newer game ban preserved" for row in deliveries)
+        elif expected == "review":
+            assert all(row.reason for row in deliveries)
+    attempts = ctl.exchange_success.call_count
+    assert process() == ("empty" if expected == "done" else "review")
+    assert ctl.exchange_success.call_count == attempts
+
+
+@pytest.mark.parametrize("present", ["remaining", "independent", "absent"])
+def test_delete_preserves_or_applies_remaining_list(database, existing_blacklist, monkeypatch, present):
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+    from rcon.types import GameEnum
+
+    record_id, _, second = existing_blacklist
+    monkeypatch.setattr(blacklist, "SERVER_NUMBER", 1)
+    with database.begin() as db:
+        old = db.get(BlacklistRecord, record_id)
+        db.get(Blacklist, second).servers = 1
+        other = BlacklistRecord(blacklist_id=second, player_id_id=old.player_id_id, reason="Other",
+                                admin_name="test", created_at=old.created_at - timedelta(days=1))
+        db.add(other)
+        db.flush()
+        actor = blacklist._blacklist_ban_actor(other)
+        stamp = (old.created_at - timedelta(minutes=2)).isoformat()
+        independent = (old.created_at + timedelta(hours=1)).isoformat()
+    assert blacklist.remove_record_from_blacklist(record_id)
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    ctl = receiver.rcon = mock.Mock()
+    ctl.game_profile = SimpleNamespace(game=GameEnum.HLL_WW2)
+    ctl.get_temp_bans.return_value = []
+    ctl.get_perma_bans.return_value = [] if present == "absent" else [
+        {"player_id": "synthetic-player", "ban_time": stamp if present == "remaining" else independent,
+         "by": actor if present == "remaining" else "Moderator"}]
+    ctl.get_detailed_player_info.return_value = {"name": "Test"}
+    ctl.without_retries.side_effect = nullcontext
+    ctl.perma_ban.return_value = True
+    monkeypatch.setattr(blacklist, "send_to_discord_audit", mock.Mock())
+    assert journal.process_one(1, receiver.dispatch) == "done"
+    assert ctl.perma_ban.call_count == int(present == "absent")
+    if present == "absent":
+        assert ctl.perma_ban.call_args.kwargs["by"] == actor
+    ctl.remove_perma_ban.assert_not_called()
+
+
+@pytest.mark.parametrize("temporary", [False, True])
+def test_manual_ban_waiting_during_conditional_removal_survives(
+        database, existing_blacklist, monkeypatch, temporary):
+    from types import SimpleNamespace
+    from rcon import rcon as api
+    from rcon.leadership_vote import storage
+    from rcon.types import GameEnum
+
+    record_id, _, _ = existing_blacklist
+    pid = "abcdef0123456789abcdef0123456789"
+    monkeypatch.setenv("SERVER_NUMBER", "1")
+    monkeypatch.setattr(blacklist, "SERVER_NUMBER", 1)
+    monkeypatch.setattr(storage, "before_manual_action", lambda *_: None)
+    monkeypatch.setattr(api, "safe_save_player_action", lambda **_: None)
+    with database.begin() as db:
+        record = db.get(BlacklistRecord, record_id)
+        record.player.player_id = pid
+        record.created_at = datetime.now(timezone.utc) - timedelta(minutes=5)
+        if temporary:
+            record.expires_at = datetime.now(timezone.utc) + timedelta(hours=4)
+        actor = blacklist._blacklist_ban_actor(record)
+    assert blacklist.remove_record_from_blacklist(record_id)
+    receiver = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
+    ctl = receiver.rcon = api.Rcon.__new__(api.Rcon)
+    ctl.game_profile = SimpleNamespace(game=GameEnum.HLL_VIETNAM)
+    kind = "Temporary" if temporary else "Permanent"
+    read_started, manual_attempt, release_read = Event(), Event(), Event()
+    writes = []
+    def read(command, version):
+        assert command == f"Get{kind}Bans"
+        read_started.set()
+        assert release_read.wait(10)
+        return SimpleNamespace(content_dict={"banList": [{"userId": pid, "userName": "Test",
+            "timeOfBanning": (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(),
+            "durationHours": 3, "banReason": "List", "adminName": actor}]})
+    ctl.exchange = read
+    def write(command, version, payload):
+        writes.append(command)
+        return True
+    ctl.exchange_success = write
+    def manual_ban():
+        manual_attempt.set()
+        ban = ctl.temp_ban if temporary else ctl.perma_ban
+        return ban(player_id=pid.upper(), reason="Independent decision", by="Moderator")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        deleting = pool.submit(journal.process_one, 1, receiver.dispatch)
+        try:
+            assert read_started.wait(10)
+            manual = pool.submit(manual_ban)
+            assert manual_attempt.wait(10)
+            with pytest.raises(TimeoutError):
+                manual.result(timeout=0.15)
+        finally:
+            release_read.set()
+        assert deleting.result(timeout=10) == "done"
+        assert manual.result(timeout=10) is True
+    assert writes == [f"Remove{kind}Ban", f"{kind}BanPlayer"]
+
+
 def test_create_edit_list_and_expire_each_create_durable_events(database, existing_blacklist, monkeypatch):
     _record_id, first, _second = existing_blacklist
     monkeypatch.setattr(blacklist, "_get_set_player", lambda session, player_id: session.scalar(

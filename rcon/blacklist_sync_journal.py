@@ -363,6 +363,14 @@ def process_one(server_number: int, handler, *, is_ready=None, prepare=None, gam
             for item in group:
                 item.status, item.updated_at = "sending", now
             delivery_ids, command = [item.id for item in group], row.command
+            if (len(group) > 1 and before.command == BlacklistCommandType.EDIT_RECORD
+                    and last_command.command == BlacklistCommandType.DELETE_RECORD):
+                # No queued edit was applied. Reconcile the state before the
+                # first edit, using the time of the actual deletion.
+                command = BlacklistCommand(
+                    BlacklistCommandType.DELETE_RECORD, before.server_mask,
+                    {**last_command.payload, "old_record": before.payload["old_record"]},
+                ).encode()
 
         try:
             outcome = handler(command, prepared) if prepare is not None else handler(command)
