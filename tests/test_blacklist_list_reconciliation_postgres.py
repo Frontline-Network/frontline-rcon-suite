@@ -81,7 +81,8 @@ def test_list_removal_preserves_independent_ban(database, existing_blacklist, re
 
 @pytest.mark.parametrize("alias", [False, True])
 @pytest.mark.parametrize("second_wins", [False, True])
-def test_list_activation_applies_winner_once(database, existing_blacklist, receiver, alias, second_wins):
+@pytest.mark.parametrize("terms", ["permanent", "temporary", "mixed"])
+def test_list_activation_applies_winner_once(database, existing_blacklist, receiver, alias, second_wins, terms):
     record_id, list_id, unrelated = existing_blacklist
     with database.begin() as db:
         first = db.get(BlacklistRecord, record_id)
@@ -94,23 +95,28 @@ def test_list_activation_applies_winner_once(database, existing_blacklist, recei
             db.flush()
         second = BlacklistRecord(player_id_id=other_player.id, blacklist_id=list_id, reason="Second",
                                  admin_name="Other", created_at=first.created_at + timedelta(minutes=1 if second_wins else -1))
+        winner, loser = (second, first) if second_wins else (first, second)
+        if terms != "permanent":
+            loser.expires_at = datetime.now(timezone.utc) + timedelta(days=1)
+        if terms == "temporary":
+            winner.expires_at = loser.expires_at + timedelta(days=1)
         db.add(second)
         db.flush()
-        winner = second if second_wins else first
         owner = blacklist._blacklist_ban_actor(winner)
         target = winner.player.player_id
 
     blacklist.edit_blacklist(list_id, servers=[4, 3])
     ctl = receiver.rcon
-    ctl.perma_ban.side_effect = [True, False]
+    send = ctl.temp_ban if terms == "temporary" else ctl.perma_ban
+    send.side_effect = [True, False]
     assert deliver(receiver) == "done"
-    ctl.perma_ban.assert_called_once()
-    assert ctl.perma_ban.call_args.kwargs["by"] == owner
-    assert ctl.perma_ban.call_args.kwargs["player_id"] == target
+    send.assert_called_once()
+    assert send.call_args.kwargs["by"] == owner
+    assert send.call_args.kwargs["player_id"] == target
     blacklist.edit_blacklist(unrelated, servers=[3])
     assert deliver(receiver) == "done"
     assert deliver(receiver) == "empty"
-    ctl.perma_ban.assert_called_once()
+    assert ctl.perma_ban.call_count + ctl.temp_ban.call_count == 1
 
 
 @pytest.mark.parametrize("operation", ["delete", "edit"])
@@ -171,3 +177,50 @@ def test_replaces_owned_ban_with_other_lists_record(database, existing_blacklist
     ctl.perma_ban.assert_called_once()
     assert ctl.perma_ban.call_args.kwargs["by"] == remaining_owner
     assert deliver(receiver) == "empty"
+
+
+@pytest.mark.parametrize("operation", ["delete", "remove_server"])
+@pytest.mark.parametrize("second_result", ["later_manual", "rejected"])
+def test_batch_does_not_replay_confirmed_removal(database, existing_blacklist, receiver, operation, second_result):
+    record_id, list_id, _ = existing_blacklist
+    second_id = "123456789abcdef0123456789abcdef0"
+    with database.begin() as db:
+        first = db.get(BlacklistRecord, record_id)
+        first.player.player_id = EOS
+        first.blacklist.servers = 4
+        second_player = PlayerID(player_id=second_id)
+        db.add(second_player)
+        db.flush()
+        second = BlacklistRecord(player_id_id=second_player.id, blacklist_id=list_id,
+                                 reason="Second player", admin_name="Fixture")
+        db.add(second)
+        db.flush()
+        owners = {EOS: blacklist._blacklist_ban_actor(first), second_id: blacklist._blacklist_ban_actor(second)}
+    if operation == "delete":
+        blacklist.delete_blacklist(list_id)
+    else:
+        blacklist.edit_blacklist(list_id, servers=[4])
+    now = datetime.now(timezone.utc)
+    live = {}
+    for player_id, owner in owners.items():
+        later = player_id == second_id and second_result == "later_manual"
+        live[player_id] = {"player_id": player_id, "by": "Moderator" if later else owner,
+                           "ban_time": (now + timedelta(seconds=10 if later else -10)).isoformat()}
+
+    def remove(player_id):
+        if player_id == second_id:
+            return False
+        return live.pop(player_id, None) is not None
+
+    ctl = receiver.rcon
+    ctl.get_perma_bans.side_effect = lambda: list(live.values())
+    ctl.remove_perma_ban.side_effect = remove
+    if second_result == "rejected":
+        assert deliver(receiver) == "review"
+        assert deliver(receiver) == "review"
+    else:
+        assert deliver(receiver) == "done"
+        assert deliver(receiver) == "empty"
+    assert list(live) == [second_id]
+    expected = [EOS, second_id] if second_result == "rejected" else [EOS]
+    assert [call.args[0] for call in ctl.remove_perma_ban.call_args_list] == expected
