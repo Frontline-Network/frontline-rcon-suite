@@ -572,12 +572,15 @@ def test_kick_only_list_delete_keeps_other_eos_processing():
     handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
     handler.rcon = api
     payload = SimpleNamespace(blacklist={'sync': BlacklistSyncMethod.KICK_ONLY},
-                              banned_players={EOS: (None, None), STEAM: (None, None)})
+                              requested_at=None, record_ids=None, banned_players={EOS: (None, None), STEAM: (None, None)})
     with patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
          patch.object(blacklist, 'is_player_blacklisted', return_value=None), \
-         patch.object(blacklist, 'synchronize_ban') as sync:
+         patch.object(blacklist, 'get_player_blacklist_records', return_value=[]) as lookup:
         handler.handle_delete_list(payload)
-    sync.assert_called_once_with(api, EOS, None, blacklist.BanState.NONE)
+    lookup.assert_called_once_with(lookup.call_args.args[0], EOS, include_expired=False,
+                                   include_other_servers=False, match_eos_case=True)
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
 
 
 def test_classic_hll_steam_list_delete_keeps_existing_behavior():
@@ -586,9 +589,12 @@ def test_classic_hll_steam_list_delete_keeps_existing_behavior():
     handler = blacklist.BlacklistCommandHandler.__new__(blacklist.BlacklistCommandHandler)
     handler.rcon = api
     payload = SimpleNamespace(blacklist={'sync': BlacklistSyncMethod.KICK_ONLY},
-                              banned_players={STEAM: (None, None)})
+                              requested_at=None, record_ids=None, banned_players={STEAM: (None, None)})
     with patch.object(blacklist, 'blacklist_change_session', return_value=nullcontext(object())), \
          patch.object(blacklist, 'is_player_blacklisted', return_value=None), \
-         patch.object(blacklist, 'synchronize_ban') as sync:
+         patch.object(blacklist, 'get_player_blacklist_records', return_value=[]) as lookup:
         handler.handle_delete_list(payload)
-    sync.assert_called_once_with(api, STEAM, None, blacklist.BanState.NONE)
+    lookup.assert_called_once_with(lookup.call_args.args[0], STEAM, include_expired=False,
+                                   include_other_servers=False, match_eos_case=False)
+    api.remove_temp_ban.assert_not_called()
+    api.remove_perma_ban.assert_not_called()
