@@ -362,7 +362,7 @@ def search_blacklist_records(
 
 
 def is_player_blacklisted(
-    sess: Session, player_id: str, exclude: set[int] = {}
+    sess: Session, player_id: str, exclude: set[int] | None = None, *, match_eos_case: bool = False,
 ) -> BlacklistRecord | None:
     """Determine whether a player is blacklisted, and return
     the blacklist record with the highest priority.
@@ -387,6 +387,7 @@ def is_player_blacklisted(
         include_expired=False,
         include_other_servers=False,
         exclude=exclude,
+        match_eos_case=match_eos_case,
     )
 
     if not records:
@@ -440,6 +441,17 @@ def get_highest_priority_record(records: Sequence[BlacklistRecord]):
     return highest
 
 
+def _snapshot_had_priority(old, current):
+    if current is None:
+        return True
+    if old["expires_at"] == current.expires_at and old["created_at"] == current.created_at:
+        # Active records are fetched in ascending ID order.
+        return old["id"] < current.id
+    return _is_higher_priority_record(
+        old["created_at"], old["expires_at"], current.created_at, current.expires_at,
+    )
+
+
 def round_timedelta_to_hours(td: timedelta | datetime):
     if isinstance(td, datetime):
         td = normalize_blacklist_expiry(td) - datetime.now(tz=timezone.utc)
@@ -488,22 +500,27 @@ def get_ban_state_from_record(record: BlacklistRecord | BlacklistRecordType | No
         return BanState.TEMP
 
 
-def _require_blacklist_action_review_clear(player_id: str):
+def _require_blacklist_action_review_clear(player_id: str, *, match_eos_case: bool = False):
     pending = action_guard.pending_players(SERVER_NUMBER, BLACKLIST_ACTION_GUARD_RULE)
+    if match_eos_case:
+        pending = {_ban_identity(key) for key in pending}
+        player_id = _ban_identity(player_id)
     if '*' in pending or player_id in pending:
         raise RuntimeError("Previous blacklist action awaits review")
 
 
 def synchronize_ban(
-    rcon: Rcon, player_id: str, new_record: BlacklistRecord | None, old_state: BanState
+    rcon: Rcon, player_id: str, new_record: BlacklistRecord | None, old_state: BanState,
+    *, replace_active_ban: bool = False,
 ):
     with lock(f"blacklist-sync:{SERVER_NUMBER}"):
         _require_blacklist_action_review_clear(player_id)
-        return _synchronize_ban(rcon, player_id, new_record, old_state)
+        return _synchronize_ban(rcon, player_id, new_record, old_state, replace_active_ban=replace_active_ban)
 
 
 def _synchronize_ban(
-    rcon: Rcon, player_id: str, new_record: BlacklistRecord | None, old_state: BanState
+    rcon: Rcon, player_id: str, new_record: BlacklistRecord | None, old_state: BanState,
+    *, replace_active_ban: bool = False,
 ):
     """Update a ban associated with a blacklist record.
 
@@ -574,6 +591,7 @@ def _synchronize_ban(
     if (
         new_record.blacklist.sync != BlacklistSyncMethod.BAN_IMMEDIATELY
         and not is_online
+        and not replace_active_ban
     ):
         # We only kick or ban the player once they come online, so
         # we don't need to do anything as of now.
@@ -863,7 +881,7 @@ def edit_record_from_blacklist(
                     command=BlacklistCommandType.EDIT_RECORD,
                     server_mask=server_mask,
                     payload=BlacklistEditRecordCommand(
-                        old_record=old_record
+                        old_record=old_record, requested_at=datetime.now(timezone.utc),
                     ).model_dump(),
                 )
             )
@@ -1154,6 +1172,7 @@ class BlacklistCreateRecordCommand(BaseModel):
 
 class BlacklistEditRecordCommand(BaseModel):
     old_record: BlacklistRecordWithBlacklistType
+    requested_at: AwareDatetime | None = None
 
 
 class BlacklistDeleteRecordCommand(BaseModel):
@@ -1437,7 +1456,9 @@ class BlacklistCommandHandler:
         - record.blacklist.sync"""
         old_record = payload.old_record
         with blacklist_change_session() as sess:
-            new_record = is_player_blacklisted(sess, player_id=old_record["player_id"])
+            vietnam = getattr(getattr(self.rcon, "game_profile", None), "game", None) == GameEnum.HLL_VIETNAM
+            player = _ban_identity(old_record["player_id"]) if vietnam else old_record["player_id"]
+            new_record = is_player_blacklisted(sess, player, match_eos_case=vietnam)
             if _is_hllv_steam_id(self.rcon, old_record['player_id']):
                 self._handle_hllv_steam_record_change(sess, old_record, new_record, prepared)
                 return
@@ -1449,30 +1470,20 @@ class BlacklistCommandHandler:
                     and sess.get(BlacklistRecord, old_record["id"]) is None):
                 raise BlacklistBanOwnershipUnverified("Edited record disappeared before delivery")
 
-            if not new_record and old_applies:
-                synchronize_ban(
-                    self.rcon,
-                    player_id=old_record["player_id"],
-                    new_record=None,
-                    old_state=get_ban_state_from_record(old_record),
-                )
+            same_record = new_record is not None and new_record.id == old_record["id"]
+            if not same_record and not (old_applies and _snapshot_had_priority(old_record, new_record)):
+                return
 
-            # Check whether the old or new record had or has priority
-            elif new_record and (new_record.id == old_record["id"] or (
-                old_applies
-                and _is_higher_priority_record(
-                    old_record["created_at"],
-                    old_record["expires_at"],
-                    new_record.created_at,
-                    new_record.expires_at,
-                )
-            )):
-                synchronize_ban(
-                    self.rcon,
-                    player_id=old_record["player_id"],
-                    new_record=new_record,
-                    old_state=get_ban_state_from_record(old_record) if old_applies else BanState.NONE,
-                )
+            # The ownership marker identifies a record, not a revision of its
+            # reason or expiry. A matching older ban may still need updating.
+            replace_active = old_applies and same_record and (
+                old_record["reason"] != new_record.reason or old_record["expires_at"] != new_record.expires_at
+            )
+            return self._reconcile_game_ban(
+                player, get_ban_state_from_record(old_record) if old_applies else BanState.NONE,
+                _record_ban_prefix(old_record["id"], old_record["created_at"]) if old_applies else None,
+                new_record, payload.requested_at, replace_active=replace_active,
+            )
 
     def handle_delete_record(self, payload: BlacklistDeleteRecordCommand, prepared=None):
         """Handle a record being deleted.
@@ -1482,38 +1493,31 @@ class BlacklistCommandHandler:
         """
         old_record = payload.old_record
         with blacklist_change_session() as sess:
-            new_record = is_player_blacklisted(sess, player_id=old_record["player_id"])
+            vietnam = getattr(getattr(self.rcon, "game_profile", None), "game", None) == GameEnum.HLL_VIETNAM
+            player = _ban_identity(old_record["player_id"]) if vietnam else old_record["player_id"]
+            new_record = is_player_blacklisted(sess, player, match_eos_case=vietnam)
             if _is_hllv_steam_id(self.rcon, old_record['player_id']):
                 self._handle_hllv_steam_record_change(sess, old_record, new_record, prepared)
                 return
 
-            if (
-                # Check whether the removed record had a higher priority
-                # than the current top record
-                new_record is None
-                or _is_higher_priority_record(
-                    old_record["created_at"],
-                    old_record["expires_at"],
-                    new_record.created_at,
-                    new_record.expires_at,
-                )
-            ):
+            if _snapshot_had_priority(old_record, new_record):
                 servers = old_record["blacklist"]["servers"]
                 if servers is None or SERVER_NUMBER in servers:
                     return self._reconcile_game_ban(
-                        old_record["player_id"], get_ban_state_from_record(old_record),
+                        player, get_ban_state_from_record(old_record),
                         _record_ban_prefix(old_record["id"], old_record["created_at"]),
                         new_record, payload.requested_at,
                     )
 
-    def _reconcile_game_ban(self, player, old_state, old_prefix, remaining, requested_at):
+    def _reconcile_game_ban(self, player, old_state, old_prefix, remaining, requested_at, *, replace_active=False):
         """Replace only a provably owned game ban, serialized with manual bans."""
         if old_state == BanState.NONE and remaining is None:
             return
         with player_ban_lock(player):
             # dispatch holds the server's blacklist lock. Inspect every ban that
             # reconciliation might remove or overwrite before changing anything.
-            _require_blacklist_action_review_clear(player)
+            vietnam = getattr(getattr(self.rcon, "game_profile", None), "game", None) == GameEnum.HLL_VIETNAM
+            _require_blacklist_action_review_clear(player, match_eos_case=vietnam)
             owned = None
             remaining_applied = False
             for state, reader, remove in (
@@ -1534,7 +1538,8 @@ class BlacklistCommandHandler:
                 actor = ban.get("by")
                 if not isinstance(actor, str):
                     raise BlacklistBanOwnershipUnverified("Game ban has no identifiable issuer")
-                if (remaining is not None and state == get_ban_state_from_record(remaining)
+                if (not (replace_active and state == old_state)
+                        and remaining is not None and state == get_ban_state_from_record(remaining)
                         and actor.startswith(_record_ban_prefix(remaining.id, remaining.created_at))):
                     remaining_applied = True
                     continue
@@ -1548,6 +1553,11 @@ class BlacklistCommandHandler:
                     if remove(live_id) is not True:
                         raise RuntimeError("Game server did not confirm blacklist ban removal")
             if remaining is not None and not remaining_applied:
+                if replace_active and owned is not None:
+                    # A confirmed active ban can still need its new expiry
+                    # while the player is offline, including on connect-only lists.
+                    with self.rcon.without_retries():
+                        return synchronize_ban(self.rcon, player, remaining, BanState.NONE, replace_active_ban=True)
                 return synchronize_ban(self.rcon, player, remaining, BanState.NONE)
 
     @staticmethod

@@ -482,9 +482,9 @@ def test_moved_record_does_not_assume_old_ban_on_new_server(monkeypatch):
     monkeypatch.setattr(blacklist, "SERVER_NUMBER", 2)
     monkeypatch.setattr(blacklist, "blacklist_change_session", session)
     monkeypatch.setattr(blacklist, "is_player_blacklisted", lambda *_args, **_kwargs: new)
-    monkeypatch.setattr(blacklist, "synchronize_ban", sync)
-    blacklist.BlacklistCommandHandler.handle_edit_record(SimpleNamespace(rcon=Mock()), SimpleNamespace(old_record=old))
-    assert sync.call_args.kwargs["old_state"] == blacklist.BanState.NONE
+    handler = SimpleNamespace(rcon=Mock(), _reconcile_game_ban=sync)
+    blacklist.BlacklistCommandHandler.handle_edit_record(handler, SimpleNamespace(old_record=old, requested_at=None))
+    sync.assert_called_once_with("id", blacklist.BanState.NONE, None, new, None, replace_active=False)
 
 
 def test_editing_one_list_keeps_higher_priority_ban_on_another(monkeypatch):
