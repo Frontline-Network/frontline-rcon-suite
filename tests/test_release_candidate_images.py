@@ -41,16 +41,38 @@ def test_wrong_candidate_tag_is_rejected_before_latest_check():
     assert registry.call_count == 1
 
 
-def test_ci_uses_truthy_stable_tag_not_falsy_empty_candidate_branch():
-    workflow = (Path(__file__).parents[1] / ".github/workflows/docker-images.yml").read_text()
-    assert "contains(github.ref_name, 'rc') && ''" not in workflow
-    assert workflow.count("!contains(github.ref_name, 'rc') && format(") == 2
-    # GitHub &&/|| is a short-circuit expression, not a ternary. An empty
-    # true-branch falls through to the right-hand side, publishing latest.
-    for is_candidate in (False, True):
-        assert ((not is_candidate and "repository:latest") or "") == (
-            "" if is_candidate else "repository:latest"
-        )
+def test_only_verified_workflow_can_publish_stable_images():
+    import yaml
+
+    workflows = Path(__file__).parents[1] / ".github/workflows"
+    jobs = yaml.safe_load((workflows / "docker-images.yml").read_text())["jobs"]
+    for name in ("backend", "frontend"):
+        push, = [step for step in jobs[name]["steps"] if step.get("with", {}).get("push")]
+        assert ":latest" not in push["with"]["tags"]
+        assert "needs.source.outputs.version" in push["with"]["tags"]
+    verify = jobs["verify-published-images"]
+    assert {"backend", "frontend"} <= set(verify["needs"])
+    assert "needs.backend.result == 'success' && needs.frontend.result == 'success'" in verify["if"]
+    assert "github.event_name == 'release'" not in verify["if"]
+    assert all("continue-on-error" not in step for step in verify["steps"])
+    assert any("playwright test" in step.get("run", "") for step in verify["steps"])
+    promote = jobs["promote-stable"]
+    assert "verify-published-images" in promote["needs"] and "always()" not in promote["if"]
+    assert not promote["concurrency"]["cancel-in-progress"]
+    assert promote["concurrency"]["group"] == jobs["restore-stable-latest"]["concurrency"]["group"]
+    assert not promote.get("continue-on-error", False)
+    assert "!github.event.release.prerelease" in promote["if"]
+    for name, stable in [("docker-images-manual.yml", True), ("build-docker-images-manual-tag-only.yml", False)]:
+        wrapper, = yaml.safe_load((workflows / name).read_text())["jobs"].values()
+        assert wrapper["uses"] == "./.github/workflows/docker-images.yml"
+        assert wrapper["with"]["publish_stable"] is stable
+
+
+def test_stable_version_can_be_verified_before_latest_moves():
+    candidate, old = {"digest": "candidate"}, {"digest": "old"}
+    with patch.object(verifier, "docker", side_effect=[json.dumps(candidate), json.dumps(old)]):
+        result = verifier.verify_tags("example/image", "v1.0.0", candidate, before_promotion=True)
+    assert not result["latest_matches"]
 
 
 @pytest.mark.parametrize("latest,allowed,writes", [("candidate", True, 1), ("stable", True, 0), ("other", False, 0)])

@@ -11,15 +11,17 @@ def docker(*args):
     return subprocess.check_output(["docker", *args], text=True).strip()
 
 
-def verify_tags(repository, version, manifest):
+def verify_tags(repository, version, manifest, *, before_promotion=False):
     """An RC must match its own tag, never replace the stable latest image."""
-    prerelease = re.fullmatch(r"v\d+\.\d+\.\d+-rc\.\d+", version) is not None
+    if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?", version):
+        raise ValueError("Invalid release version")
+    prerelease = "-" in version
     published = json.loads(docker("buildx", "imagetools", "inspect", repository + ":" + version, "--raw"))
     assert published == manifest, f"{repository}:{version} does not match built digest"
     latest = json.loads(docker("buildx", "imagetools", "inspect", repository + ":latest", "--raw"))
     if prerelease:
         assert latest != manifest, "Release candidate unexpectedly replaced stable latest"
-    else:
+    elif not before_promotion:
         assert latest == manifest, f"{repository}:latest does not match built digest"
     return {"prerelease": prerelease, "latest_matches": latest == manifest}
 
@@ -31,6 +33,8 @@ def main():
     parser.add_argument("--backend-digest", required=True)
     parser.add_argument("--frontend-digest", required=True)
     parser.add_argument("--require-highlights", action="store_true")
+    parser.add_argument("--before-promotion", action="store_true",
+                        help="Verify the versioned images while the previous stable pair is still live")
     parser.add_argument("--require-history-version")
     args = parser.parse_args()
     evidence = {"version": args.version, "revision": args.revision, "images": {}}
@@ -39,7 +43,7 @@ def main():
         repository = "ghcr.io/frontline-network/frontline-rcon-suite" + suffix
         reference = repository + "@" + digest
         manifest = json.loads(docker("buildx", "imagetools", "inspect", reference, "--raw"))
-        tag_checks = verify_tags(repository, args.version, manifest)
+        tag_checks = verify_tags(repository, args.version, manifest, before_promotion=args.before_promotion)
         platforms = {f'{item["platform"]["os"]}/{item["platform"]["architecture"]}': item["digest"]
                      for item in manifest["manifests"] if item["platform"]["os"] != "unknown"}
         assert set(platforms) == {"linux/amd64", "linux/arm64"}, platforms

@@ -11,50 +11,9 @@ permissions:
   contents: read
   packages: write
 
-env:
-  REGISTRY: ghcr.io
-  BACKEND_IMAGE: frontline-network/frontline-rcon-suite
-  FRONTEND_IMAGE: frontline-network/frontline-rcon-suite-frontend
-
 jobs:
-  docker:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.tag }}
-          fetch-depth: 0
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Bundle private release notes
-        env:
-          CRCON_RELEASES_GITHUB_TOKEN: ${{ github.token }}
-        run: python3 scripts/sync_release_notes.py
-      - name: Build and push backend
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          build-args: |
-            CRCON_VERSION=${{ github.event.inputs.tag }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest,${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.event.inputs.tag }}
-      - name: Build and push frontend
-        uses: docker/build-push-action@v5
-        with:
-          file: Dockerfile-frontend
-          context: .
-          build-args: |
-            CRCON_VERSION=${{ github.event.inputs.tag }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest,${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.event.inputs.tag }}
+  verified-build:
+    uses: ./.github/workflows/docker-images.yml
+    with:
+      build_tag: ${{ inputs.tag }}
+      publish_stable: true

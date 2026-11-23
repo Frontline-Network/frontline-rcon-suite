@@ -1,6 +1,14 @@
 name: build-docker-images
 
 on:
+  workflow_call:
+    inputs:
+      build_tag:
+        type: string
+        required: true
+      publish_stable:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       restore_stable_latest:
@@ -11,8 +19,7 @@ on:
       release_version:
         description: "Existing release to verify (no image builds or pushes)"
         required: true
-        type: choice
-        options: [v0.9.0, v0.9.1, v0.9.2, v0.9.3-rc.1, v0.9.3, v0.9.4-rc.1, v0.9.4, v0.9.10, v0.9.11, v0.9.12]
+        type: string
       revision:
         description: "Exact released commit SHA"
         required: true
@@ -32,8 +39,8 @@ on:
       - "*"
 
 concurrency:
-  group: release-images-${{ github.ref_name }}
-  cancel-in-progress: true
+  group: release-images-${{ inputs.build_tag || inputs.release_version || github.ref_name }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -46,6 +53,9 @@ env:
 
 jobs:
   restore-stable-latest:
+    concurrency:
+      group: stable-image-promotion
+      cancel-in-progress: false
     if: github.event_name == 'workflow_dispatch' && inputs.restore_stable_latest
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -62,8 +72,31 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - run: python3 scripts/restore_v092_latest.py
 
+  source:
+    if: github.event_name != 'workflow_dispatch' || inputs.build_tag != ''
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.source.outputs.version }}
+      revision: ${{ steps.source.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: source
+        env:
+          TAG: ${{ inputs.build_tag || github.ref_name }}
+        run: |
+          set -eu
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9][A-Za-z0-9.-]*)?$ ]]
+          revision=$(git rev-parse --verify "refs/tags/$TAG^{commit}")
+          if [[ "$GITHUB_EVENT_NAME" != workflow_dispatch ]]; then
+            test "$(git rev-parse HEAD)" = "$revision"
+          fi
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
   backend:
-    if: github.event_name != 'workflow_dispatch'
+    needs: source
     runs-on: ubuntu-latest
     outputs:
       digest: ${{ steps.build.outputs.digest }}
@@ -85,19 +118,19 @@ jobs:
           CRCON_RELEASES_GITHUB_TOKEN: ${{ github.token }}
         run: python3 scripts/sync_release_notes.py
       - name: Require published v0.9.0 notes before building
-        if: github.ref_name == 'v0.9.0'
+        if: needs.source.outputs.version == 'v0.9.0'
         run: python3 scripts/verify_bundled_release.py v0.9.0 --require-highlights
       - name: Require reviewed hotfix notes before building
-        if: contains(fromJSON('["v0.9.1", "v0.9.2", "v0.9.3-rc.1", "v0.9.3", "v0.9.4-rc.1", "v0.9.4", "v0.9.10", "v0.9.11", "v0.9.12"]'), github.ref_name)
-        run: python3 scripts/verify_bundled_release.py "${{ github.ref_name }}"
+        if: contains(fromJSON('["v0.9.1", "v0.9.2", "v0.9.3-rc.1", "v0.9.3", "v0.9.4-rc.1", "v0.9.4", "v0.9.10", "v0.9.11", "v0.9.12"]'), needs.source.outputs.version)
+        run: python3 scripts/verify_bundled_release.py "${{ needs.source.outputs.version }}"
       - name: Require the new v0.9.4 announcement
-        if: github.ref_name == 'v0.9.4'
+        if: needs.source.outputs.version == 'v0.9.4'
         run: python3 scripts/verify_bundled_release.py v0.9.4 --require-highlights
       - name: Require the lightweight-runtime announcement
-        if: contains(fromJSON('["v0.9.10", "v0.9.11", "v0.9.12"]'), github.ref_name)
-        run: python3 scripts/verify_bundled_release.py "${{ github.ref_name }}" --require-highlights
+        if: contains(fromJSON('["v0.9.10", "v0.9.11", "v0.9.12"]'), needs.source.outputs.version)
+        run: python3 scripts/verify_bundled_release.py "${{ needs.source.outputs.version }}" --require-highlights
       - name: Require inherited feature announcement before building
-        if: contains(fromJSON('["v0.9.2", "v0.9.3", "v0.9.4-rc.1", "v0.9.4"]'), github.ref_name)
+        if: contains(fromJSON('["v0.9.2", "v0.9.3", "v0.9.4-rc.1", "v0.9.4"]'), needs.source.outputs.version)
         run: python3 scripts/verify_bundled_release.py v0.9.0 --require-highlights
       - name: Build and push backend
         id: build
@@ -105,17 +138,16 @@ jobs:
         with:
           context: .
           build-args: |
-            CRCON_VERSION=${{ github.ref_name }}
+            CRCON_VERSION=${{ needs.source.outputs.version }}
           platforms: linux/amd64,linux/arm64
           labels: |
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.revision=${{ needs.source.outputs.revision }}
+            org.opencontainers.image.version=${{ needs.source.outputs.version }}
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.ref_name }}
-            ${{ !contains(github.ref_name, 'rc') && format('{0}/{1}:latest', env.REGISTRY, env.BACKEND_IMAGE) || '' }}
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ needs.source.outputs.version }}
   frontend:
-    if: github.event_name != 'workflow_dispatch'
+    needs: source
     runs-on: ubuntu-latest
     outputs:
       digest: ${{ steps.build.outputs.digest }}
@@ -139,28 +171,26 @@ jobs:
           file: Dockerfile-frontend
           context: .
           build-args: |
-            CRCON_VERSION=${{ github.ref_name }}
+            CRCON_VERSION=${{ needs.source.outputs.version }}
           platforms: linux/amd64,linux/arm64
           labels: |
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.revision=${{ needs.source.outputs.revision }}
+            org.opencontainers.image.version=${{ needs.source.outputs.version }}
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.ref_name }}
-            ${{ !contains(github.ref_name, 'rc') && format('{0}/{1}:latest', env.REGISTRY, env.FRONTEND_IMAGE) || '' }}
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ needs.source.outputs.version }}
 
   verify-published-images:
-    needs: [backend, frontend]
-    # RC verification checks that stable latest was NOT replaced.
-    if: always() && !inputs.restore_stable_latest && (github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && needs.backend.result == 'success' && needs.frontend.result == 'success'))
+    needs: [source, backend, frontend]
+    if: always() && !cancelled() && !inputs.restore_stable_latest && ((github.event_name == 'workflow_dispatch' && !inputs.build_tag) || (needs.backend.result == 'success' && needs.frontend.result == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
       packages: read
     env:
-      RELEASE_VERSION: ${{ inputs.release_version || github.ref_name }}
-      RELEASE_REVISION: ${{ inputs.revision || github.sha }}
+      RELEASE_VERSION: ${{ inputs.release_version || needs.source.outputs.version }}
+      RELEASE_REVISION: ${{ inputs.revision || needs.source.outputs.revision }}
       BACKEND_DIGEST: ${{ inputs.backend_digest || needs.backend.outputs.digest }}
       FRONTEND_DIGEST: ${{ inputs.frontend_digest || needs.frontend.outputs.digest }}
     steps:
@@ -172,9 +202,12 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Verify immutable multi-architecture contents and latest
+      - name: Verify immutable multi-architecture contents
+        env:
+          BUILT_DIGEST: ${{ needs.backend.outputs.digest }}
         run: |
           highlight_args=()
+          if [[ -n "$BUILT_DIGEST" ]]; then highlight_args+=(--before-promotion); fi
           if [ "$RELEASE_VERSION" = v0.9.0 ] || [ "$RELEASE_VERSION" = v0.9.4 ] || [ "$RELEASE_VERSION" = v0.9.10 ] || [ "$RELEASE_VERSION" = v0.9.11 ] || [ "$RELEASE_VERSION" = v0.9.12 ]; then highlight_args+=(--require-highlights); fi
           if [ "$RELEASE_VERSION" = v0.9.2 ] || [ "$RELEASE_VERSION" = v0.9.3 ] || [ "$RELEASE_VERSION" = v0.9.4-rc.1 ] || [ "$RELEASE_VERSION" = v0.9.4 ]; then highlight_args+=(--require-history-version v0.9.0); fi
           python3 scripts/verify_release_images.py --version "$RELEASE_VERSION" --revision "$RELEASE_REVISION" --backend-digest "$BACKEND_DIGEST" --frontend-digest "$FRONTEND_DIGEST" "${highlight_args[@]}"
@@ -225,3 +258,30 @@ jobs:
           path: |
             release-image-evidence.json
             rcongui/release-tests/release-test-results
+
+  promote-stable:
+    needs: [source, backend, frontend, verify-published-images]
+    if: (github.event_name == 'release' && !github.event.release.prerelease || inputs.publish_stable) && !contains(needs.source.outputs.version, '-')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: stable-image-promotion
+      cancel-in-progress: false
+    env:
+      RELEASE_VERSION: ${{ needs.source.outputs.version }}
+      BACKEND_DIGEST: ${{ needs.backend.outputs.digest }}
+      FRONTEND_DIGEST: ${{ needs.frontend.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Promote the verified pair by digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          test "$current" = "$RELEASE_VERSION"
+          python3 scripts/promote_release_images.py "$RELEASE_VERSION" "$BACKEND_DIGEST" "$FRONTEND_DIGEST"
