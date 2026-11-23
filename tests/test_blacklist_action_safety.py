@@ -501,8 +501,7 @@ def test_editing_one_list_keeps_higher_priority_ban_on_another(monkeypatch):
     monkeypatch.setattr(blacklist, "blacklist_change_session", session)
     monkeypatch.setattr(blacklist, "get_active_blacklist_records", lambda *_: [edited])
     monkeypatch.setattr(blacklist, "get_player_blacklist_records", lambda *_args, **_kwargs: [other])
-    monkeypatch.setattr(blacklist, "synchronize_ban", sync)
-    blacklist.BlacklistCommandHandler.handle_edit_list(SimpleNamespace(rcon=Mock()), SimpleNamespace(old_blacklist=old, new_blacklist=new))
+    blacklist.BlacklistCommandHandler.handle_edit_list(SimpleNamespace(rcon=Mock(), _reconcile_game_ban=sync), SimpleNamespace(old_blacklist=old, new_blacklist=new, requested_at=None))
     sync.assert_not_called()
 
 
@@ -511,16 +510,14 @@ def test_enabling_immediate_bans_syncs_only_current_priority(monkeypatch, curren
     @contextmanager
     def session():
         yield object()
-    record = SimpleNamespace(id=1, player=SimpleNamespace(player_id="id"))
+    record = SimpleNamespace(id=1, created_at=datetime.now(timezone.utc), expires_at=None, player=SimpleNamespace(player_id="id"))
     old = {"id": 10, "servers": None, "sync": BlacklistSyncMethod.BAN_ON_CONNECT}
     new = {"id": 10, "servers": None, "sync": BlacklistSyncMethod.BAN_IMMEDIATELY}
     sync = Mock()
     monkeypatch.setattr(blacklist, "blacklist_change_session", session)
     monkeypatch.setattr(blacklist, "get_active_blacklist_records", lambda *_: [record])
-    monkeypatch.setattr(blacklist, "is_player_blacklisted", lambda *_args: SimpleNamespace(id=current_id))
-    monkeypatch.setattr(blacklist, "get_ban_state_from_record", lambda _: blacklist.BanState.PERMA)
-    monkeypatch.setattr(blacklist, "synchronize_ban", sync)
-    blacklist.BlacklistCommandHandler.handle_edit_list(SimpleNamespace(rcon=Mock()), SimpleNamespace(old_blacklist=old, new_blacklist=new))
+    monkeypatch.setattr(blacklist, "get_player_blacklist_records", lambda *a, **kw: [SimpleNamespace(id=current_id)])
+    blacklist.BlacklistCommandHandler.handle_edit_list(SimpleNamespace(rcon=Mock(), _reconcile_game_ban=sync), SimpleNamespace(old_blacklist=old, new_blacklist=new, requested_at=None))
     assert sync.call_count == int(should_sync)
 
 
@@ -538,10 +535,8 @@ def test_editing_higher_priority_list_reconciles_remaining_ban(monkeypatch):
     monkeypatch.setattr(blacklist, "blacklist_change_session", session)
     monkeypatch.setattr(blacklist, "get_active_blacklist_records", lambda *_: [edited])
     monkeypatch.setattr(blacklist, "get_player_blacklist_records", lambda *_args, **_kwargs: [other])
-    monkeypatch.setattr(blacklist, "synchronize_ban", sync)
-    blacklist.BlacklistCommandHandler.handle_edit_list(SimpleNamespace(rcon=Mock()), SimpleNamespace(old_blacklist=old, new_blacklist=new))
-    assert sync.call_args.kwargs["new_record"] is other
-    assert sync.call_args.kwargs["old_state"] == blacklist.BanState.PERMA
+    blacklist.BlacklistCommandHandler.handle_edit_list(SimpleNamespace(rcon=Mock(), _reconcile_game_ban=sync), SimpleNamespace(old_blacklist=old, new_blacklist=new, requested_at=None))
+    sync.assert_called_once_with("id", blacklist.BanState.PERMA, blacklist._record_ban_prefix(edited.id, now), other, None)
 
 
 def test_edit_overlapping_lists_uses_current_database_state(monkeypatch):
