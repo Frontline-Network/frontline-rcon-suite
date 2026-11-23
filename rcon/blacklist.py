@@ -35,7 +35,7 @@ from rcon.player_history import (
     safe_save_player_action,
     unaccent,
 )
-from rcon.rcon import Rcon, get_rcon
+from rcon.rcon import Rcon, get_rcon, player_ban_lock
 from rcon.steam_utils import is_steam_id_64
 from rcon.types import (
     BlacklistRecordType,
@@ -71,6 +71,18 @@ class BlacklistExpiryTimeUnverified(RuntimeError):
 
 
 NEWER_GAME_BAN_PRESERVED = object()
+
+
+def _record_ban_prefix(record_id, created_at):
+    # IDs alone can recur in another installation managing the same server.
+    created = normalize_blacklist_expiry(created_at)
+    return f"BLACKLIST #{record_id}/{created:%Y%m%dT%H%M%S%fZ}: "
+
+
+def _blacklist_ban_actor(record):
+    if isinstance(getattr(record, "id", None), int) and isinstance(record.created_at, datetime):
+        return _record_ban_prefix(record.id, record.created_at) + record.admin_name
+    return f"BLACKLIST: {record.admin_name}"
 
 
 def _ban_identity(value: str) -> str:
@@ -694,7 +706,7 @@ def _apply_blacklist_punishment(
                     player_id=player_id,
                     duration_hours=hours,
                     reason=reason,
-                    by=f"BLACKLIST: {record.admin_name}",
+                    by=_blacklist_ban_actor(record),
                 )
 
             case BanState.PERMA:
@@ -706,7 +718,7 @@ def _apply_blacklist_punishment(
                 accepted = rcon.perma_ban(
                     player_id=player_id,
                     reason=reason,
-                    by=f"BLACKLIST: {record.admin_name}",
+                    by=_blacklist_ban_actor(record),
                 )
 
         if accepted is not True:
@@ -916,6 +928,7 @@ def remove_record_from_blacklist(record_id: int, *, expected_blacklist_id: int |
                     server_mask=server_mask,
                     payload=BlacklistDeleteRecordCommand(
                         old_record=res,
+                        requested_at=datetime.now(timezone.utc),
                     ).model_dump(),
                 )
             )
@@ -1139,6 +1152,7 @@ class BlacklistEditRecordCommand(BaseModel):
 
 class BlacklistDeleteRecordCommand(BaseModel):
     old_record: BlacklistRecordWithBlacklistType
+    requested_at: AwareDatetime | None = None
 
 
 class BlacklistEditListCommand(BaseModel):
@@ -1313,7 +1327,7 @@ class BlacklistCommandHandler:
         payload = schema.model_validate(cmd.payload)
         if cmd.command in (BlacklistCommandType.CREATE_RECORD, BlacklistCommandType.EDIT_RECORD,
                            BlacklistCommandType.DELETE_RECORD, BlacklistCommandType.EDIT_LIST):
-            handler(payload, prepared=prepared)
+            return handler(payload, prepared=prepared)
         else:
             return handler(payload)
 
@@ -1422,6 +1436,9 @@ class BlacklistCommandHandler:
                 old_record["blacklist"]["servers"] is None
                 or SERVER_NUMBER in old_record["blacklist"]["servers"]
             )
+            if (old_applies and (new_record is None or new_record.id != old_record["id"])
+                    and sess.get(BlacklistRecord, old_record["id"]) is None):
+                raise BlacklistBanOwnershipUnverified("Edited record disappeared before delivery")
 
             if not new_record and old_applies:
                 synchronize_ban(
@@ -1472,12 +1489,57 @@ class BlacklistCommandHandler:
                     new_record.expires_at,
                 )
             ):
-                synchronize_ban(
-                    self.rcon,
-                    player_id=old_record["player_id"],
-                    new_record=new_record,
-                    old_state=get_ban_state_from_record(old_record),
-                )
+                with player_ban_lock(old_record["player_id"]):
+                    return self._reconcile_deleted_record(payload, new_record)
+
+    def _reconcile_deleted_record(self, payload, remaining):
+        old = payload.old_record
+        player = old["player_id"]
+        servers = old["blacklist"]["servers"]
+        if servers is not None and SERVER_NUMBER not in servers:
+            return
+        old_state = get_ban_state_from_record(old)
+        if old_state == BanState.NONE and remaining is None:
+            return
+
+        # dispatch holds the server's blacklist lock. Inspect every ban that
+        # reconciliation might remove or overwrite before changing anything.
+        _require_blacklist_action_review_clear(player)
+        owned = None
+        remaining_applied = False
+        for state, reader, remove in (
+            (BanState.TEMP, 'get_temp_bans', self.rcon.remove_temp_ban),
+            (BanState.PERMA, 'get_perma_bans', self.rcon.remove_perma_ban),
+        ):
+            if state != old_state and remaining is None:
+                continue
+            matches = [ban for ban in _fresh_game_bans(self.rcon, reader)
+                       if _ban_identity(ban['player_id']) == _ban_identity(player)]
+            if not matches:
+                continue
+            if len(matches) != 1:
+                raise BlacklistBanOwnershipUnverified("Multiple game bans match the deleted record")
+            ban = matches[0]
+            if not _ban_predates_request(ban.get("ban_time"), payload.requested_at):
+                return NEWER_GAME_BAN_PRESERVED
+            actor = ban.get("by")
+            if not isinstance(actor, str):
+                raise BlacklistBanOwnershipUnverified("Game ban has no identifiable issuer")
+            if (remaining is not None and state == get_ban_state_from_record(remaining)
+                    and actor.startswith(_record_ban_prefix(remaining.id, remaining.created_at))):
+                remaining_applied = True
+                continue
+            if state != old_state or not actor.startswith(_record_ban_prefix(old["id"], old["created_at"])):
+                raise BlacklistBanOwnershipUnverified("Game ban cannot be attributed to the deleted record")
+            owned = (remove, ban["player_id"])
+
+        if owned is not None:
+            remove, live_id = owned
+            with self.rcon.without_retries():
+                if remove(live_id) is not True:
+                    raise RuntimeError("Game server did not confirm blacklist ban removal")
+        if remaining is not None and not remaining_applied:
+            return synchronize_ban(self.rcon, player, remaining, BanState.NONE)
 
     @staticmethod
     def _hllv_kick_list_newly_enabled(payload):
