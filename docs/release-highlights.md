@@ -99,3 +99,24 @@ The frontend resolves the spotlight from `highlight_state.release_version` in
 the verified release list, not from `current`. The account menu and update page
 use the same selection. The installed changelog and its unread indicator remain
 separate. No migration or bulk reset of existing seen states is needed.
+
+### Rebuilding an existing version after a changelog edit
+
+Review the revised `docs/releases/<tag>.md` on `master` and use the same text
+for the GitHub Release. Run `docker-images-manual.yml` from `master` with the
+existing tag as its input. For example:
+
+```sh
+gh workflow run docker-images-manual.yml --ref master -f tag=v0.9.34
+```
+
+The rebuild checks out the tag's application source for both images. It takes
+the selected release's Markdown from the commit running the workflow and checks
+the bundled GitHub text against that file. The backend records the notes commit
+in `io.frontline.release-notes.revision`. Both images retain the tagged
+application revision in `org.opencontainers.image.revision`.
+
+The stable workflow verifies the images together before updating `latest`.
+Installations using bundled notes show the revision after pulling the rebuilt
+image and recreating the backend. Digest-pinned installations need the new
+backend digest. The authenticated reader is at `/updates`.

@@ -101,8 +101,18 @@ jobs:
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
-      - name: Checkout
+      - name: Checkout release source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.source.outputs.revision }}
+      - name: Apply the reviewed note from the rebuild workflow revision
+        if: inputs.build_tag != ''
+        env:
+          RELEASE_VERSION: ${{ needs.source.outputs.version }}
+        run: |
+          set -eu
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git restore --source="$GITHUB_SHA" --worktree -- "docs/releases/$RELEASE_VERSION.md"
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -117,6 +127,11 @@ jobs:
         env:
           CRCON_RELEASES_GITHUB_TOKEN: ${{ github.token }}
         run: python3 scripts/sync_release_notes.py
+      - name: Check the rebuilt snapshot against the reviewed note
+        if: inputs.build_tag != ''
+        env:
+          RELEASE_VERSION: ${{ needs.source.outputs.version }}
+        run: python3 scripts/verify_bundled_release.py "$RELEASE_VERSION"
       - name: Require published v0.9.0 notes before building
         if: needs.source.outputs.version == 'v0.9.0'
         run: python3 scripts/verify_bundled_release.py v0.9.0 --require-highlights
@@ -143,6 +158,7 @@ jobs:
           labels: |
             org.opencontainers.image.revision=${{ needs.source.outputs.revision }}
             org.opencontainers.image.version=${{ needs.source.outputs.version }}
+            io.frontline.release-notes.revision=${{ github.sha }}
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ needs.source.outputs.version }}
@@ -152,8 +168,10 @@ jobs:
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
-      - name: Checkout
+      - name: Checkout release source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.source.outputs.revision }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -224,6 +242,7 @@ jobs:
         env:
           RELEASE_SMOKE_URL: http://127.0.0.1:8049
           RELEASE_SMOKE_BACKEND_URL: http://127.0.0.1:8048
+          REVIEWED_REBUILD_TAG: ${{ inputs.build_tag }}
         run: |
           docker network create release-verification
           cleanup() {
