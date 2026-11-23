@@ -10,7 +10,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from sqlalchemy import or_, select, text
+from sqlalchemy import case, or_, select, text
 
 from rcon.leadership_vote import storage as votes
 from rcon.leadership_vote.domain import identity
@@ -70,9 +70,9 @@ def pending(sess, server, limit=None, due_at=None):
             AdminIncidentEvent.event_type == "report_admin",
             AdminIncidentEvent.payload["status"].as_string().in_(OPEN),
         )
-        .order_by(AdminIncidentEvent.id)
     )
     if due_at is not None:
+        payload = AdminIncidentEvent.payload
         query = query.where(
             or_(
                 ~AdminIncidentEvent.payload["status"].as_string().in_({"waiting", "voice"}),
@@ -81,6 +81,15 @@ def pending(sess, server, limit=None, due_at=None):
                 <= due_at - evidence_rules.CASE_TTL,
             )
         )
+        # Waiting for the classifier is a no-op until its result or timeout.
+        # Use spare slots for those cases so cancellation checks still run.
+        awaiting_ai = (
+            (payload["status"].as_string() == "classifying")
+            & payload["reason_request"]["status"].as_string().in_(("pending", "sending"))
+            & payload["report_time"].as_float().between(due_at - MAX_REPORT_AGE, due_at)
+        )
+        query = query.order_by(case((awaiting_ai, 1), else_=0))
+    query = query.order_by(AdminIncidentEvent.id)
     if limit is not None:
         query = query.limit(limit)
     return sess.scalars(query).all()
