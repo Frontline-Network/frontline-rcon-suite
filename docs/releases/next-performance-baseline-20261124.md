@@ -59,3 +59,17 @@ Bei Installationen mit dem Standard-Startbefehl lässt sich `compose.redis-list-
 Bei einer Vorschau mit expliziten `-f`-Pfaden auch `--project-directory` und `--env-file` der Installation angeben. Insbesondere wenn die erste Datei in einem archivierten Deployment-Verzeichnis liegt, kann eine andere Profilauswahl sonst Dienste ausblenden. Auf RCON3 wurde das vollständig gerenderte Modell verglichen. Mit derselben Umgebung änderte der Zusatz ausschließlich den Redis-Startbefehl. Der isolierte Start mit der ausgelieferten Konfigurationsdatei bestätigte Tiefe 128 mit Zusatz und Tiefe 0 nach dessen Entfernung.
 
 Vor dem Pilot das gerenderte Redis-Kommando prüfen. Den Neustart des gemeinsamen Redis mit aktuellem Rückfallstand im Wartungsfenster planen. Anschließend `CONFIG GET list-compress-depth`, Speicherbelegung, Verarbeitungsrückstand und p95 des vollständigen Statistikabrufs bei gleicher Last vergleichen. Für den Rückbau den Zusatz aus der Compose-Auswahl nehmen und Redis im Wartungsfenster mit seiner bisherigen Konfiguration starten. Die Auswahl des Piloten erfordert keine Löschung, Verkürzung oder Umbenennung der Historie.
+
+## Runden-Replay auf RCON3
+
+Am 24. November wurden zwei abgeschottete Redis-8.10.1-Instanzen auf RCON3 aus derselben fertig geschriebenen RDB-Datei geladen. Vor der Auswahl der Runde betrug `used_memory` für das gesamte Abbild 501,1 MiB bei Tiefe 0 und 186,0 MiB bei Tiefe 128. Auf die RCON3-Liste mit 100.000 Logeinträgen entfielen davon 83,8 bzw. 22,2 MiB. Das sind Redis-Allokationen im Paralleltest. Der tatsächlich frei werdende Host-RAM bei einer Umschaltung ist separat zu messen.
+
+Die Runde vom 21. November um 17:22 Uhr MEZ umfasste 2.729 protokollierte Ereignisse mit 228 unterschiedlichen Spielerkennungen über die gesamte Runde. Das Release-Backend berechnete `current_game_stats` für den eingefrorenen Rundenendzeitpunkt. Für die Profilabfrage diente eine leere isolierte SQLite-Tabelle. Die Zeit umfasst Loglesen, Statistikberechnung und Serialisierung, aber keinen HTTP-Aufruf oder Zugriff auf produktive PostgreSQL-Profile. Die Prüfsummen der serialisierten Ergebnisse waren für alle 228 Statistiken in beiden Varianten identisch.
+
+| Messung | Tiefe 0 | Tiefe 128 |
+|---|---:|---:|
+| Rundenberechnung, Median / p95 | 92,92 / 110,19 ms | 105,63 / 123,16 ms |
+| Rundenberechnung bei gleichzeitiger Testwarteschlange, Median / p95 | 101,80 / 116,84 ms | 105,77 / 114,67 ms |
+| Synthetisches Einreihen und Abholen, p95 | 1,458 ms | 1,923 ms |
+
+Je Variante und Lastfall gingen 24 Berechnungen in die Auswertung ein. Aufwärmdurchläufe wurden ausgelassen und die Reihenfolge der Varianten gewechselt. Alle 316 bzw. 328 synthetischen Warteschlangenpaare lieferten den erwarteten Wert. Ein gemeinsam genutztes Redis unter mehreren gleichzeitig aktiven Spielservern, produktive Moderationsabläufe und ein Live-Rundenwechsel bleiben eigene Abnahmepunkte.
