@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, contains_eager, joinedload, selectinload
 from sqlalchemy.sql.functions import ReturnTypeFromArgs
 
 from rcon.commands import HLLCommandFailedError
-from rcon.active_session_selection import session_created_microseconds
+from rcon.active_session_selection import latest_open_sessions, session_created_microseconds
 from rcon.models import (
     BlacklistRecord,
     LogLine,
@@ -226,17 +226,13 @@ def get_player_profile(player_id: str, nb_sessions: int):
 
 
 def get_player_profile_by_player_ids(sess, player_ids):
+    """Load the player metadata emitted by session and time-window statistics."""
     return (
         sess.query(PlayerID)
         .filter(PlayerID.player_id.in_(player_ids))
         .options(
-            selectinload(PlayerID.names),
-            selectinload(PlayerID.received_actions),
-            selectinload(PlayerID.blacklists),
-            selectinload(PlayerID.flags),
-            selectinload(PlayerID.watchlist),
-            selectinload(PlayerID.steaminfo),
-            selectinload(PlayerID.soldier),
+            joinedload(PlayerID.steaminfo),
+            joinedload(PlayerID.soldier).load_only(PlayerSoldier.platform),
         )
         .all()
     )
@@ -257,6 +253,19 @@ def _get_profiles(sess, player_ids, nb_sessions=0):
         .options(selectinload(PlayerID.soldier))
         .all()
     )
+
+
+def get_live_stats_profiles(sess, player_ids):
+    """Fetch only scoreboard metadata and the newest open local session per player."""
+    profiles = get_player_profile_by_player_ids(sess, player_ids)
+    session_times = {
+        player.player_id: {
+            "current_session_start": session.to_dict()["start"],
+            "current_playtime_seconds": _current_playtime_seconds(session),
+        }
+        for player, session in latest_open_sessions(sess, player_ids, int(get_server_number()))
+    }
+    return {player.player_id: player for player in profiles}, session_times
 
 
 def _get_serializable_profiles(sess, player_ids):

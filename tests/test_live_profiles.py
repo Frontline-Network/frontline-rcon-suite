@@ -4,6 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine, event
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -17,12 +19,14 @@ from rcon.models import (
     PlayerSession,
     PlayerSoldier,
     PlayerVIP,
+    SteamInfo,
     WatchList,
 )
 from rcon.player_history import (
     _current_playtime_seconds,
     _watchlist_dict,
     get_live_profiles,
+    get_live_stats_profiles,
 )
 
 
@@ -133,6 +137,51 @@ def test_empty_live_profile_request_does_not_open_a_database_session(monkeypatch
     monkeypatch.setattr("rcon.player_history.enter_session", fail_if_called)
 
     assert get_live_profiles([]) == []
+
+
+def test_live_stats_queries_only_metadata_and_latest_local_session(live_profile_database):
+    engine, sessions = live_profile_database
+
+    @compiles(JSONB, "sqlite")
+    def sqlite_json(_type, _compiler, **_kwargs):
+        return "JSON"
+
+    SteamInfo.__table__.create(engine)
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(minutes=5)
+    with sessions.begin() as sess:
+        for pid in ("online", "reconnected"):
+            player = PlayerID(player_id=pid)
+            player.soldier = PlayerSoldier(name=pid, platform="ps5", level=1, updated=now)
+            player.steaminfo = SteamInfo(updated=now, profile={}, bans={}, country="DE")
+            sess.add(player)
+            sess.flush()
+            history = [(1, start, False), (2, now, False)]
+            if pid == "reconnected":
+                history.append((1, now, True))
+            for server, instant, closed in history:
+                us = int(instant.timestamp() * 1_000_000)
+                sess.add(PlayerSession(player_id_id=player.id, server_number=server,
+                                       start_event_us=us, end_event_us=us if closed else None))
+
+    statements = []
+    def record(_conn, _cursor, sql, *_args):
+        statements.append(sql)
+
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        with sessions() as sess:
+            profiles, times = get_live_stats_profiles(sess, ["online", "reconnected", "missing"])
+            assert set(profiles) == {"online", "reconnected"}
+            assert profiles["reconnected"].soldier.platform == "ps5"
+            assert profiles["online"].steaminfo.to_dict()["country"] == "DE"
+            assert set(times) == {"online"}
+            assert times["online"]["current_session_start"] == start
+            assert 299 <= times["online"]["current_playtime_seconds"] <= 310
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+    assert len(statements) == 2
+    assert all("players_actions" not in sql and "player_names" not in sql for sql in statements)
 
 
 def test_total_playtime_counts_active_local_session_when_newer_remote_session_ended(monkeypatch):
