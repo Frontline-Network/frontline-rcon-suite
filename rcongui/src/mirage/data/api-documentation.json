@@ -2136,12 +2136,12 @@
     "endpoint": "get_detailed_players",
     "arguments": {
       "compact": {
-        "default": "False",
+        "default": "True",
         "annotation": null
       }
     },
     "return_type": "<class 'rcon.types.GetDetailedPlayers'>",
-    "doc_string": null,
+    "doc_string": "Return compact live player data and failed-query counts.",
     "auto_settings_capable": true,
     "permissions_required": [
       "api.can_view_detailed_players"
@@ -2150,8 +2150,8 @@
       "GET"
     ],
     "description_translations": {
-      "de": "Liefert die ausführliche Spielerliste nach Spieler-ID sowie Informationen zur laufenden Karte und fehlgeschlagenen Einzelabfragen. compact ist für regelmäßige Live-Abfragen gedacht.",
-      "en": "Returns detailed players keyed by player ID, plus current-map information and failed player-query counts. compact is intended for regular live polling."
+      "de": "Liefert Live-Spielerdaten nach Spieler-ID mit kompakten Profilen und Informationen zu fehlgeschlagenen Einzelabfragen. compact ist standardmäßig true. get_player_profile lädt die Historie bei Bedarf, compact=false bettet vollständige Profile ein.",
+      "en": "Returns live players keyed by player ID with compact profiles and failed player-query counts. compact defaults to true. get_player_profile loads history on demand, while compact=false embeds complete profiles."
     }
   },
   {
@@ -2968,12 +2968,12 @@
     "endpoint": "get_players",
     "arguments": {
       "compact": {
-        "default": "False",
+        "default": "True",
         "annotation": null
       }
     },
     "return_type": "list[rcon.types.GetPlayersType]",
-    "doc_string": null,
+    "doc_string": "Return compact live profiles. Use compact=false for complete history.",
     "auto_settings_capable": true,
     "permissions_required": [
       "api.can_view_get_players"
@@ -2982,8 +2982,8 @@
       "GET"
     ],
     "description_translations": {
-      "de": "Liefert die verbundenen Spieler, ergänzt um verfügbare Profil- und VIP-Informationen. compact reduziert die Profilauflösung für häufige Live-Abfragen.",
-      "en": "Returns connected players with available profile and VIP information. compact reduces profile enrichment for frequent live queries."
+      "de": "Liefert verbundene Spieler mit kompakten Live-Profilen und VIP-Status. compact ist standardmäßig true. get_player_profile lädt die Historie eines Spielers bei Bedarf, compact=false bettet vollständige Profile ein.",
+      "en": "Returns connected players with compact live profiles and VIP status. compact defaults to true. get_player_profile loads one player's history on demand, while compact=false embeds complete profiles."
     }
   },
   {
@@ -3652,12 +3652,12 @@
     "endpoint": "get_team_view",
     "arguments": {
       "compact": {
-        "default": "False",
+        "default": "True",
         "annotation": null
       }
     },
     "return_type": null,
-    "doc_string": null,
+    "doc_string": "Return teams with live profiles. Load full history on player selection.",
     "auto_settings_capable": true,
     "permissions_required": [
       "api.can_view_team_view"
@@ -3666,8 +3666,8 @@
       "GET"
     ],
     "description_translations": {
-      "de": "Gruppiert die Live-Spielerdaten nach Teams und Trupps. Grundlage für die Teamansicht und die Beurteilung der Teamverteilung.",
-      "en": "Groups live player data by team and squad. Used for the team view and evaluating team distribution."
+      "de": "Gruppiert Live-Spielerdaten nach Teams und Trupps. compact ist standardmäßig true. get_player_profile lädt die Historie bei Bedarf, compact=false bettet vollständige Profile ein.",
+      "en": "Groups live players by team and squad. compact defaults to true. get_player_profile loads history on demand, while compact=false embeds complete profiles."
     }
   },
   {
