@@ -5,13 +5,14 @@ import math
 import os
 import time
 import unicodedata
+from array import array
 from contextlib import contextmanager
 from functools import cmp_to_key
 
 from dateutil import parser
 from sqlalchemy import and_, case, func, literal, or_, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, contains_eager, joinedload, selectinload
+from sqlalchemy.orm import Session, contains_eager, joinedload, raiseload, selectinload
 from sqlalchemy.sql.functions import ReturnTypeFromArgs
 
 from rcon.commands import HLLCommandFailedError
@@ -542,6 +543,125 @@ def remove_accent(s):
     ))
 
 
+def _record_session_summaries(sess, player_database_ids):
+    """Stream scalar history, retaining numeric durations and two rows per player.
+
+    Keep duration addition in the relationship's existing order. Summing or
+    truncating individual durations in SQL can change a displayed second for
+    histories with fractional timestamps. ORM session graphs are unnecessary.
+    """
+    if not player_database_ids:
+        return {}
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    now_local = datetime.datetime.now()
+    states = {}
+    rows = (
+        sess.query(
+            PlayerSession.id, PlayerSession.player_id_id, PlayerSession.start,
+            PlayerSession.end, PlayerSession.start_event_us, PlayerSession.end_event_us,
+            PlayerSession.created, PlayerSession.server_number,
+        )
+        .filter(PlayerSession.player_id_id.in_(player_database_ids))
+        .order_by(PlayerSession.player_id_id, PlayerSession.created.desc())
+        .yield_per(512)
+    )
+    server = int(get_server_number())
+    for row in rows:
+        state = states.get(row.player_id_id)
+        if state is None:
+            state = states[row.player_id_id] = {"seconds": array("d"), "latest": None, "local": None}
+        index = len(state["seconds"])
+        seconds = 0.0
+        if row.start_event_us is not None and row.end_event_us is not None:
+            seconds = max(0, (row.end_event_us - row.start_event_us) / 1_000_000)
+        elif row.end and row.start:
+            seconds = max(0, (row.end - row.start).total_seconds())
+        state["seconds"].append(seconds)
+        key = PlayerID._session_order_key(row)
+        if state["latest"] is None or key > state["latest"][0]:
+            state["latest"] = (key, row, index)
+        if row.server_number == server and (state["local"] is None or key > state["local"][0]):
+            state["local"] = (key, row, index)
+
+    result = {}
+    for player_id, state in states.items():
+        latest = state["latest"]
+        local = state["local"]
+        if local and (local[1].end is not None or local[1].end_event_us is not None):
+            local = None
+        # Preserve PlayerID.get_total_playtime_seconds: an ended newer remote
+        # session must not hide a current local session; an active newest
+        # remote session remains the existing global fallback.
+        if latest[1].end is not None or latest[1].end_event_us is not None:
+            latest = local or latest
+        row = latest[1]
+        if row.start_event_us is not None and row.end is None and row.end_event_us is None:
+            state["seconds"][latest[2]] = max(0, now_utc.timestamp() - row.start_event_us / 1_000_000)
+        elif row.end is None and row.end_event_us is None and row.start:
+            state["seconds"][latest[2]] = max(0, (now_local - row.start).total_seconds())
+        current = local[1] if local else None
+        current_start = None
+        if current:
+            current_start = (
+                datetime.datetime.fromtimestamp(current.start_event_us / 1_000_000, datetime.timezone.utc)
+                if current.start_event_us is not None else current.start
+            )
+        current_clock = now_utc if current and current.start_event_us is not None else now_local
+        # Python 3.12's sum(float) uses a different accumulation algorithm.
+        # Match the existing model's left-to-right += before truncating.
+        total_seconds = 0
+        for seconds in state["seconds"]:
+            total_seconds += seconds
+        result[player_id] = {
+            "sessions_count": len(state["seconds"]),
+            "current_session_start": current_start,
+            "current_playtime_seconds": _current_playtime_seconds(current, now=current_clock),
+            "total_playtime_seconds": int(total_seconds),
+        }
+    return result
+
+
+def _record_profile_summaries(sess, players, vips_by_player):
+    """Build player-record cards without materializing action or session objects."""
+    database_ids = [player.id for player in players]
+    sessions = _record_session_summaries(sess, database_ids)
+    penalty_types = tuple(action.name for action in (
+        PlayerActionState.KICK, PlayerActionState.PUNISH,
+        PlayerActionState.TEMPBAN, PlayerActionState.PERMABAN,
+    ))
+    counts = {pid: dict.fromkeys(penalty_types, 0) for pid in database_ids}
+    if database_ids:
+        for pid, kind, count in (
+            sess.query(PlayersAction.player_id_id, PlayersAction.action_type, func.count(PlayersAction.id))
+            .filter(PlayersAction.player_id_id.in_(database_ids), PlayersAction.action_type.in_(penalty_types))
+            .group_by(PlayersAction.player_id_id, PlayersAction.action_type)
+        ):
+            counts[pid][kind] = count
+    server = int(get_server_number())
+    result = {}
+    for player in players:
+        blacklists = [record.to_dict() for record in player.blacklists]
+        vips = [vip.to_dict() for vip in vips_by_player.get(player.id, [])]
+        watchlist = _watchlist_dict(player)
+        result[player.id] = {
+            "id": player.id, "player_id": player.player_id, "steam_id": player.steam_id,
+            "created": player.created, "names": [name.to_dict() for name in player.names],
+            **sessions.get(player.id, {"sessions_count": 0, "current_session_start": None,
+                                      "current_playtime_seconds": 0, "total_playtime_seconds": 0}),
+            "penalty_count": counts[player.id], "blacklists": blacklists,
+            "is_blacklisted": any(record["is_active"] and (
+                record["blacklist"]["servers"] is None or server in record["blacklist"]["servers"]
+            ) for record in blacklists),
+            "flags": [flag.to_dict() for flag in (player.flags or [])],
+            "watchlist": watchlist, "is_watched": bool(watchlist and watchlist["is_watched"]),
+            "steaminfo": player.steaminfo.to_dict() if player.steaminfo else None,
+            "vips": vips, "is_vip": any(vip["server_number"] == server for vip in vips),
+            "soldier": player.soldier.to_dict() if player.soldier else None,
+            "account": player.account.to_dict() if player.account else None,
+        }
+    return result
+
+
 def get_players_by_appearance(
     page: int = 1,
     page_size: int = 500,
@@ -558,9 +678,11 @@ def get_players_by_appearance(
     online_now_ids: set[str] | None = None,
     observed_at: datetime.datetime | None = None,
     remote_observations: dict | None = None,
+    compact: bool = False,
 ):
     page = int(page)
     page_size = int(page_size)
+    compact = strtobool(compact)
 
     if isinstance(last_seen_from, str):
         last_seen_from = parser.parse(last_seen_from)
@@ -786,9 +908,10 @@ def get_players_by_appearance(
             # All relations used in PlayerID.to_dict should be loaded here to avoid lazyloading in the for loop below
             .options(
                 selectinload(PlayerID.names),
-                selectinload(PlayerID.sessions),
-                selectinload(PlayerID.received_actions),
-                selectinload(PlayerID.blacklists),
+                raiseload(PlayerID.sessions) if compact else selectinload(PlayerID.sessions),
+                raiseload(PlayerID.received_actions) if compact else selectinload(PlayerID.received_actions),
+                (selectinload(PlayerID.blacklists).selectinload(BlacklistRecord.blacklist)
+                 if compact else selectinload(PlayerID.blacklists)),
                 selectinload(PlayerID.flags),
                 selectinload(PlayerID.watchlist),
                 selectinload(PlayerID.steaminfo),
@@ -836,6 +959,10 @@ def get_players_by_appearance(
         )
 
         vips_by_player = _get_vips_by_player(sess, [row[0].id for row in players])
+        compact_profiles = (
+            _record_profile_summaries(sess, [row[0] for row in players], vips_by_player)
+            if compact else None
+        )
         server_number = int(get_server_number())
         vip_expirations = {
             vip.player_id_id: vip.expiration for vips in vips_by_player.values()
@@ -879,7 +1006,8 @@ def get_players_by_appearance(
             "local_online_snapshot_available": local_online_snapshot_available,
             "players": [
                 {
-                    **p[0].to_dict(limit_sessions=0, preloaded_vips=vips_by_player.get(p[0].id, [])),
+                    **(compact_profiles[p[0].id] if compact else p[0].to_dict(
+                        limit_sessions=0, preloaded_vips=vips_by_player.get(p[0].id, []))),
                     "identity": identity_links[p[0].player_id],
                     "names_by_match": sorted(
                         (n.name for n in p[0].names), key=cmp_to_key(sort_name_match)

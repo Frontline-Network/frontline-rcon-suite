@@ -282,7 +282,7 @@ DESCRIPTIONS_FR.update({
     "message_player": "Envoie un message privé en jeu à un joueur. save_message permet aussi de l'enregistrer dans son historique de messages CRCON.",
     "message_all_players": "Envoie immédiatement le message à tous les joueurs actuellement connectés.",
     "get_player_profile": "Charge la fiche du joueur avec son identité, ses sessions précédentes, bannissements et commentaires. num_sessions limite le nombre de sessions incluses.",
-    "get_players_history": "Recherche dans les fiches des joueurs par page, période, nom, identifiant, statut de liste de blocage ou de surveillance et marqueurs. Les résultats ne se limitent pas aux joueurs connectés.",
+    "get_players_history": "Recherche dans les fiches des joueurs par page, période, nom, identifiant, statut de liste de blocage ou de surveillance et marqueurs. Les résultats ne se limitent pas aux joueurs connectés. compact=true renvoie des résumés sans les historiques complets des sessions et des actions ; ceux-ci restent inclus par défaut.",
     "get_player_comments": "Lit les commentaires enregistrés dans la fiche du joueur.",
     "post_player_comment": "Ajoute un commentaire et son auteur à la fiche du joueur. Aucun message en jeu n'est envoyé.",
     "get_player_messages": "Lit l'historique des messages enregistrés d'un joueur. Les messages directs non enregistrés n'y figurent pas.",

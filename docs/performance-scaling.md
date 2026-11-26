@@ -800,3 +800,31 @@ polling and write multiplier.
 Database retention and index replacement require their own migration, backup
 and rollback plans. Process consolidation must be canaried separately from
 database lifecycle work.
+
+## Player records and background cache refreshes
+
+The player-record overview requests `get_players_history` with `compact=true`.
+This projection keeps card metadata, moderation counters, identities and exact
+playtime semantics, without loading complete action or session ORM histories.
+Session durations are streamed as scalar columns; action counters are grouped
+in SQL. Full histories remain available from the dedicated player profile and
+from the default, non-compact records API. The browser retains recipient IDs and
+names only for selected players across pages, rather than caching every visited
+full profile.
+
+Each process permits at most four stale-cache background refresh jobs, without
+a pending work queue. An already running key or a full budget returns the still
+valid stale value immediately. A single daemon keeper renews each job's owned
+30-second Redis lease every five seconds. Cache publication checks both the
+lease token and the invalidation epochs; replacement owners and invalidations
+cannot be overwritten by a late background result. Shutdown rejects new jobs,
+and abandoned process leases expire. This budget covers background refreshes;
+cold-cache and Redis-unavailable synchronous fallbacks retain their existing
+availability behavior and are not a global cap on all incoming RCON reads.
+
+The Supervisor image must also contain the live-statistics snapshot cleanup:
+decoded log pages are released after both readers finish, before the loop sleeps.
+Updating only the HTTP backend does not update that separate running process.
+Validate a rollout with identical statistics inputs and repeated load/idle
+cycles; a decrease immediately after restarting a process is not itself evidence
+of a sustained memory improvement.

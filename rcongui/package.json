@@ -32,7 +32,7 @@
     "check:polling": "node scripts/check-polling-budget.mjs",
     "check:teamkill-risk": "node scripts/check-teamkill-risk.mjs",
     "check:player-warnings": "node --test src/utils/player-warnings.test.mjs",
-    "check:player-identities": "node --test src/utils/player-identity.test.mjs",
+    "check:player-identities": "node --test src/utils/player-identity.test.mjs src/pages/records/players/selection.test.mjs",
     "check:design-foundation": "node scripts/check-design-foundation.mjs",
     "check:page-semantics": "node scripts/check-page-semantics.mjs",
     "check:action-feedback": "node scripts/check-action-feedback.mjs",

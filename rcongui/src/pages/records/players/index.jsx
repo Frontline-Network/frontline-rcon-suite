@@ -16,7 +16,7 @@ import {
 import ViewListIcon from "@mui/icons-material/ViewList";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import { Await, defer, useLoaderData, useNavigation } from "react-router-dom";
-import { Suspense, useMemo, useState, memo, useCallback, useEffect } from "react";
+import { Suspense, useMemo, useState, memo, useCallback } from "react";
 import PlayerCard from "@/components/shared/card/PlayerCard";
 import PlayerRecordsList from "./PlayerRecordsList";
 import NavPagination from "@/pages/stats/games/nav-pagination";
@@ -27,9 +27,10 @@ import { newRecordActions } from "@/features/player-action/actions";
 import PlayerFiltersForm from "./PlayerFiltersForm";
 import { useTranslation } from "react-i18next";
 import PageHeader from "@/components/shared/PageHeader";
-import { demoPlayerRecords, isFakeMode } from "@/mirage/demo-data";
+import { isFakeMode } from "@/mirage/demo-data";
 import { useStorageState } from "@/hooks/useStorageState";
 import AutomodActionReview from "./AutomodActionReview";
+import { selectRecordPage, toggleRecordSelection } from "./selection.mjs";
 
 // Create a memoized version of PlayerCard
 const MemoizedPlayerCard = memo(PlayerCard);
@@ -103,19 +104,20 @@ export const loader = ({ request }) => {
 
 async function loadRecords(fields, signal) {
   const { page, page_size } = fields;
-  const [playersRecords, bans] = isFakeMode()
-    ? [{ result: { players: demoPlayerRecords, total: demoPlayerRecords.length } }, []]
-    : await Promise.all([
-      cmd.GET_PLAYERS_RECORDS({
-        signal,
-        payload: Object.fromEntries(
+  const [playersRecords, bans] = await Promise.all([
+    cmd.GET_PLAYERS_RECORDS({
+      signal,
+      payload: {
+        ...Object.fromEntries(
           Object.entries(fields).filter(
             ([_, value]) => value !== "" && value !== null
           )
         ),
-      }),
-      cmd.GET_BANS({ signal }),
-    ]);
+        compact: true,
+      },
+    }),
+    isFakeMode() ? [] : cmd.GET_BANS({ signal }),
+  ]);
   const bannedPlayerIds = new Set(bans.map((ban) => ban.player_id));
 
   return {
@@ -138,7 +140,7 @@ async function loadRecords(fields, signal) {
         : 1,
     total: Number(playersRecords.result.total),
     localOnlineSnapshotAvailable: playersRecords.result.local_online_snapshot_available,
-    page: Number(page),
+    page: Number(playersRecords.result.page ?? page),
   };
 }
 
@@ -178,9 +180,13 @@ function PlayerResults({ data }) {
   );
   const server = useGlobalStore((state) => state.serverState);
   const onlinePlayers = useGlobalStore((state) => state.onlinePlayers) ?? [];
-  const [selectedPlayerIds, setSelectedPlayerIds] = useState(new Set());
-  // Cache player data by player_id to support multi-page selection
-  const [playerCache, setPlayerCache] = useState(new Map());
+  // Keep only action recipients across pages. The current page already lives
+  // in loader data; retaining every visited profile would accumulate histories.
+  const [selectedRecipients, setSelectedRecipients] = useState(new Map());
+  const selectedPlayerIds = useMemo(
+    () => new Set(selectedRecipients.keys()),
+    [selectedRecipients]
+  );
   const [storedViewMode, setStoredViewMode] = useStorageState(
     isWardogs ? "wardogs.playerRecords.viewMode" : "playerRecords.viewMode",
     isWardogs ? "list" : "cards"
@@ -215,92 +221,26 @@ function PlayerResults({ data }) {
     });
   }, [playersData, server, onlinePlayersById]);
 
-  // Update cache with current page players
-  useEffect(() => {
-    setPlayerCache((prevCache) => {
-      const newCache = new Map(prevCache);
-      for (const player of players) {
-        newCache.set(player.player_id, player);
-      }
-      return newCache;
-    });
-  }, [players]);
-
   const handlePlayerSelect = useCallback((player) => {
-    setSelectedPlayerIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(player.player_id)) {
-        newSet.delete(player.player_id);
-      } else {
-        newSet.add(player.player_id);
-      }
-      return newSet;
-    });
+    setSelectedRecipients((previous) => toggleRecordSelection(previous, player));
   }, []);
 
   const handleSelectAllPlayers = useCallback(() => {
-    setSelectedPlayerIds((prev) => {
-      // Check if all current page players are already selected
-      const currentPageIds = new Set(players.map((p) => p.player_id));
-      const allCurrentPageSelected = players.every((p) =>
-        prev.has(p.player_id)
-      );
-
-      if (allCurrentPageSelected && players.length > 0) {
-        // All current page players are selected, return unchanged
-        return prev;
-      }
-
-      // Add all current page players to existing selection
-      const newSet = new Set(prev);
-      for (const player of players) {
-        newSet.add(player.player_id);
-      }
-      return newSet;
-    });
+    setSelectedRecipients((previous) => selectRecordPage(previous, players));
   }, [players]);
 
   const handleUnselectAllPlayers = () => {
-    setSelectedPlayerIds(new Set());
+    setSelectedRecipients(new Map());
   };
 
   const handleViewModeChange = (event, nextViewMode) => {
     if (nextViewMode) setStoredViewMode(nextViewMode);
   };
 
-  // Convert Set to array of player objects for ActionBar
-  // Uses cache to include players from all pages, not just current page
-  const selectedPlayers = useMemo(() => {
-    const result = [];
-    for (const playerId of selectedPlayerIds) {
-      const cachedPlayer = playerCache.get(playerId);
-      if (cachedPlayer) {
-        // Ensure the player has a name field for ActionForm
-        const playerName =
-          cachedPlayer.name ??
-          cachedPlayer.account?.name ??
-          cachedPlayer.names?.[0]?.name ??
-          cachedPlayer.soldier?.name ??
-          playerId;
-
-        result.push({
-          ...cachedPlayer,
-          name: playerName,
-          player_name: playerName, // Explicitly set player_name for actions
-        });
-      } else {
-        // Fallback: create minimal player object if not in cache
-        // This shouldn't happen often, but handles edge cases
-        result.push({
-          player_id: playerId,
-          player_name: playerId,
-          name: playerId,
-          names: [{ name: playerId }],
-        });
-      }
-    }
-    return result;
-  }, [selectedPlayerIds, playerCache]);
+  const selectedPlayers = useMemo(
+    () => Array.from(selectedRecipients.values()),
+    [selectedRecipients]
+  );
 
   return (
     <Stack

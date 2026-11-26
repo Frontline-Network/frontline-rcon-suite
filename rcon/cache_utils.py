@@ -1,3 +1,4 @@
+import atexit
 import functools
 import inspect
 import logging
@@ -6,7 +7,7 @@ import pickle
 import threading
 import time
 import uuid
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from typing import Callable
 
 import redis
@@ -22,6 +23,155 @@ _GLOBAL_REDIS_POOL = None
 REDIS_SCAN_COUNT = 500
 STALE_CACHE_MIN_GRACE_SECONDS = 5
 STALE_CACHE_MAX_GRACE_SECONDS = 300
+# A slow game-server read must not create one new thread every cache TTL.
+# These are process limits, independent of freshness and stale-serving TTLs.
+BACKGROUND_REFRESH_WORKERS = 4
+CACHE_REFRESH_LEASE_SECONDS = 30
+CACHE_REFRESH_RENEW_SECONDS = 5
+
+
+class _BackgroundRefreshJob:
+    def __init__(self, identity, function, renew, release, name, interval, lease_mutex):
+        self.identity = identity
+        self.function = function
+        self.renew = renew
+        self.release = release
+        self.name = name
+        self.next_renewal = time.monotonic() + interval
+        self.lease_mutex = lease_mutex or threading.Lock()
+        self.finishing = False
+        self.lease_lost = False
+
+
+class BackgroundRefreshCoordinator:
+    """Bound active daemon refreshes without retaining an executor work queue.
+
+    A single lazy keeper renews their distributed leases. Closing rejects new
+    jobs but lets active jobs finish and release their own token; process exit
+    never waits for daemon readers, and a crashed process leaves expiring leases.
+    """
+
+    def __init__(self, max_workers=BACKGROUND_REFRESH_WORKERS, renew_interval=CACHE_REFRESH_RENEW_SECONDS):
+        self.max_workers = max_workers
+        self.renew_interval = renew_interval
+        self._reset()
+
+    def _reset(self):
+        self._mutex = threading.Lock()
+        self._wake = threading.Event()
+        self._active = {}
+        self._keeper = None
+        self._closed = False
+
+    def after_fork(self):
+        # Parent threads and their mutex owners do not survive fork. The child
+        # must not retain their closures or release the parent's Redis leases.
+        self._reset()
+
+    def can_submit(self, identity):
+        with self._mutex:
+            return not self._closed and identity not in self._active and len(self._active) < self.max_workers
+
+    def submit(self, identity, function, *, renew, release, name, lease_mutex=None):
+        with self._mutex:
+            if self._closed or identity in self._active or len(self._active) >= self.max_workers:
+                return False
+            job = _BackgroundRefreshJob(identity, function, renew, release, name, self.renew_interval, lease_mutex)
+            self._active[identity] = job
+            try:
+                if self._keeper is None:
+                    self._keeper = threading.Thread(target=self._keep_leases,
+                        name="cache-refresh-leases", daemon=True)
+                    self._keeper.start()
+                worker = threading.Thread(target=self._execute, args=(job,), name=name, daemon=True)
+                worker.start()
+            except (RuntimeError, OSError, MemoryError):
+                # No worker owns the lease until submit succeeds. The caller
+                # releases it on rejection, including interpreter shutdown.
+                self._active.pop(identity, None)
+                if self._keeper is not None and not self._keeper.is_alive():
+                    self._keeper = None
+                self._wake.set()
+                logger.exception("Unable to start bounded cache refresh")
+                return False
+            self._wake.set()
+            return True
+
+    def _execute(self, job):
+        try:
+            with self._mutex:
+                run = not self._closed
+            if run:
+                job.function()
+        except Exception:
+            logger.exception("Unable to refresh stale cache value")
+        finally:
+            with self._mutex:
+                job.finishing = True
+            try:
+                # Serialize renewal and release for this token, without holding
+                # the process-wide mutex across any Redis I/O.
+                with job.lease_mutex:
+                    job.release()
+            except Exception:
+                logger.exception("Unable to release background refresh lease")
+            finally:
+                with self._mutex:
+                    self._active.pop(job.identity, None)
+                    self._wake.set()
+
+    def _keep_leases(self):
+        while True:
+            with self._mutex:
+                if not self._active:
+                    if self._closed:
+                        self._keeper = None
+                        return
+                jobs = tuple(self._active.values())
+            if not jobs:
+                # Keep the one daemon keeper asleep between refreshes instead
+                # of creating another native thread on every short cache TTL.
+                self._wake.wait()
+                self._wake.clear()
+                continue
+            now = time.monotonic()
+            for job in jobs:
+                if job.finishing or job.lease_lost or job.next_renewal > now:
+                    continue
+                try:
+                    with job.lease_mutex:
+                        if not job.finishing:
+                            if job.renew() is False:
+                                job.lease_lost = True
+                            job.next_renewal = time.monotonic() + self.renew_interval
+                except Exception:
+                    # An uncertain Redis result does not authorize deleting or
+                    # replacing a lease. Publication rechecks its current token.
+                    logger.exception("Unable to renew background refresh lease")
+                    job.next_renewal = time.monotonic() + self.renew_interval
+            # Do not keep a completed job's callback/arguments in this frame
+            # while waiting for another lease-renewal interval.
+            del jobs
+            job = None
+            self._wake.wait(self.renew_interval)
+            self._wake.clear()
+
+    def close(self):
+        with self._mutex:
+            self._closed = True
+            self._wake.set()
+
+
+_BACKGROUND_REFRESHES = BackgroundRefreshCoordinator()
+
+
+def _shutdown_background_refreshes():
+    _BACKGROUND_REFRESHES.close()
+
+
+atexit.register(_shutdown_background_refreshes)
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=lambda: _BACKGROUND_REFRESHES.after_fork())
 
 
 def validate_ttl_seconds(ttl_seconds: object, *, setting: str = "ttl_seconds") -> int:
@@ -197,11 +347,17 @@ class RedisCached:
         except redis.exceptions.RedisError:
             logger.exception("Unable to release cache refresh lock")
 
-    def _store_cached_value(self, key, value, epochs) -> None:
+    def _store_cached_value(self, key, value, epochs, lease=None) -> None:
         serialized = self.serializer(value)
         try:
             with self.red.pipeline() as pipe:
                 pipe.watch(self.GLOBAL_EPOCH, self.epoch_key)
+                if lease is not None:
+                    lock_key, lock_token = lease
+                    pipe.watch(lock_key)
+                    if pipe.get(lock_key) not in (lock_token, lock_token.encode()):
+                        pipe.unwatch()
+                        return
                 if (pipe.get(self.GLOBAL_EPOCH), pipe.get(self.epoch_key)) != epochs:
                     pipe.unwatch()
                     return
@@ -213,7 +369,7 @@ class RedisCached:
             # Invalidation won the race; never retry an old value.
             return
 
-    def _refresh_cached_value(self, func, key):
+    def _refresh_cached_value(self, func, key, lease=None, lease_mutex=None):
         epochs = None
         try:
             # Random persistent tokens also change after a Redis restart or
@@ -231,36 +387,52 @@ class RedisCached:
             return value
         try:
             if epochs is not None:
-                self._store_cached_value(key, value, epochs)
+                # Lease renewal changes the watched lock's expiry. Coordinate
+                # our own renewal with publication; never hold it during the
+                # slow read, and keep epoch invalidation independently fenced.
+                with lease_mutex or nullcontext():
+                    self._store_cached_value(key, value, epochs, lease=lease)
         except redis.exceptions.RedisError:
             # The RCON call succeeded, so continue serving its result even if
             # Redis disappears between the read and the write.
             logger.exception("Unable to set cache")
         return value
 
-    def _refresh_stale_in_background(self, func, key, lock_key, lock_token) -> None:
-        """Refresh a stale key without holding the request thread open."""
-
-        def refresh() -> None:
-            try:
-                self._refresh_cached_value(func, key)
-            except Exception:
-                logger.exception("Unable to refresh stale cache value")
-            finally:
-                self._release_lock(lock_key, lock_token)
-
-        worker = threading.Thread(
-            target=refresh,
-            name=f"cache-refresh-{self.__name__}",
-            daemon=True,
-        )
+    def _renew_lock(self, lock_key, lock_token):
         try:
-            worker.start()
-        except RuntimeError:
-            # Do not leave an NX lock behind when process shutdown prevents
-            # starting the refresh thread. The stale value remains usable.
-            logger.exception("Unable to start stale cache refresh")
+            with self.red.pipeline() as pipe:
+                pipe.watch(lock_key)
+                if pipe.get(lock_key) not in (lock_token, lock_token.encode()):
+                    pipe.unwatch()
+                    return False
+                pipe.multi()
+                pipe.expire(lock_key, CACHE_REFRESH_LEASE_SECONDS)
+                return pipe.execute() == [True]
+        except redis.exceptions.WatchError:
+            return False
+        except redis.exceptions.RedisError:
+            logger.exception("Unable to renew cache refresh lock")
+            return None
+
+    def _refresh_stale_in_background(self, func, key, lock_key, lock_token) -> None:
+        """Serve stale promptly and refresh only within the process budget."""
+        # One installation's key must not suppress another Redis database's
+        # refresh. Normal wrappers share a pool; distinct pools remain protected
+        # by the distributed lease even when they refer to the same database.
+        lease_mutex = threading.Lock()
+        accepted = _BACKGROUND_REFRESHES.submit(
+            self._background_refresh_identity(key),
+            lambda: self._refresh_cached_value(func, key, lease=(lock_key, lock_token), lease_mutex=lease_mutex),
+            renew=lambda: self._renew_lock(lock_key, lock_token),
+            release=lambda: self._release_lock(lock_key, lock_token),
+            name=f"cache-refresh-{self.__name__}",
+            lease_mutex=lease_mutex,
+        )
+        if not accepted:
             self._release_lock(lock_key, lock_token)
+
+    def _background_refresh_identity(self, key):
+        return (id(getattr(self.red, "connection_pool", self.red)), key)
 
     def __call__(self, *args, **kwargs):
         val = stale_val = None
@@ -292,6 +464,11 @@ class RedisCached:
         except redis.exceptions.RedisError:
             logger.exception("Unable to use stale cache value")
 
+        if stale_val is not None and not _BACKGROUND_REFRESHES.can_submit(self._background_refresh_identity(key)):
+            # The local budget or this key is already busy. Avoid another
+            # distributed lock round trip on the common overload path.
+            return self.deserializer(stale_val)
+
         # logger.debug("Cache MISS for %s", self.key(*args, **kwargs))
         try:
             lock_acquired = bool(
@@ -299,7 +476,7 @@ class RedisCached:
                     lock_key,
                     lock_token,
                     nx=True,
-                    ex=max(1, min(30, self.ttl_seconds)),
+                    ex=CACHE_REFRESH_LEASE_SECONDS,
                 )
             )
         except redis.exceptions.RedisError:

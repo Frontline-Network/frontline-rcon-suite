@@ -774,11 +774,24 @@ export function makeServer({ environment = "development" } = {}) {
         player_count_by_team: { allied: 43, axis: 43 },
       }));
 
-      this.post("/get_players_history", () => ({ result: { players: playerRecords(), total: playerRecords().length } }));
+      this.post("/get_players_history", (schema, request) => {
+        const payload = JSON.parse(request.requestBody || "{}");
+        if (payload.compact !== true) {
+          return { result: { players: playerRecords(), total: playerRecords().length } };
+        }
+        window.__CRCON_DEMO_RECORD_REQUESTS__ ??= [];
+        window.__CRCON_DEMO_RECORD_REQUESTS__.push(payload);
+        const pageSize = Math.max(1, Number(payload.page_size) || 50);
+        const page = Math.max(1, Number(payload.page) || 1);
+        const players = demoPlayerRecords
+          .slice((page - 1) * pageSize, page * pageSize)
+          .map(({ sessions, received_actions, ...summary }) => summary);
+        return { result: { players, total: demoPlayerRecords.length, page, page_size: pageSize } };
+      });
       this.get("/get_player_profile", (schema, request) => {
         protectedRequestLog.push("/api/get_player_profile");
         const demoQuery = new URLSearchParams(window.location.search);
-        const records = demoQuery.get("demo_warning_sources") === "1" || demoQuery.get("demo_platform_identities") === "1"
+        const records = demoQuery.get("demo_warning_sources") === "1" || demoQuery.get("demo_platform_identities") === "1" || demoQuery.get("demo_records_projection") === "1"
           ? demoPlayerRecords
           : playerRecords();
         const player = records.find(
