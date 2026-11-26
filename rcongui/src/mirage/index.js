@@ -805,6 +805,14 @@ export function makeServer({ environment = "development" } = {}) {
             });
       });
       this.get("/get_player_messages", () => ok([]));
+      this.get("/get_player_comments", (schema, request) => {
+        const playerId = request.queryParams.player_id;
+        return ok(playerComments.get(playerId)
+          ?? playerRecords().find((player) => player.player_id === playerId)?.comments
+          ?? demoPlayerRecords.find((player) => player.player_id === playerId)?.comments
+          ?? []);
+      });
+      this.get("/get_ban", () => ok([]));
       this.get("/get_message_templates", () => ok([
         {
           id: 1,
