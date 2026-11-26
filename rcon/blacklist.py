@@ -70,6 +70,10 @@ class BlacklistExpiryTimeUnverified(RuntimeError):
     """The original unban request and the current game ban cannot be ordered."""
 
 
+class InvalidBlacklistExpiration(ValueError):
+    """The supplied blacklist deadline is not a valid date and time."""
+
+
 NEWER_GAME_BAN_PRESERVED = object()
 
 
@@ -150,13 +154,25 @@ def commit_blacklist_change(session: Session, command):
     session.commit()
 
 
-def normalize_blacklist_expiry(value: datetime | None) -> datetime | None:
-    """Legacy callers pass naive UTC timestamps; store a consistent instant."""
+def normalize_blacklist_expiry(value: datetime | str | None) -> datetime | None:
+    """Parse JSON deadlines and normalize them, treating legacy naive dates as UTC."""
     if value is None:
         return None
-    if value.tzinfo is None or value.utcoffset() is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+    try:
+        if isinstance(value, str):
+            if not re.fullmatch(
+                r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?",
+                value,
+            ):
+                raise ValueError("Expected an ISO date and time")
+            value = datetime.fromisoformat(value)
+        if not isinstance(value, datetime):
+            raise ValueError("Expected a date and time")
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+    except (ValueError, OverflowError) as exc:
+        raise InvalidBlacklistExpiration("Invalid blacklist expiration date") from exc
 
 
 def update_penalty_count(
@@ -783,6 +799,7 @@ def add_record_to_blacklist(
     expires_at: datetime | None = None,
     admin_name: str = "",
 ):
+    expires_at = normalize_blacklist_expiry(expires_at)
     with blacklist_change_session() as sess:
         player = _get_set_player(sess, player_id)
         player_names = [n.name for n in player.names]
@@ -797,7 +814,7 @@ def add_record_to_blacklist(
             player=player,
             blacklist=blacklist,
             reason=reason,
-            expires_at=normalize_blacklist_expiry(expires_at),
+            expires_at=expires_at,
             admin_name=admin_name,
         )
         sess.add(record)
@@ -837,6 +854,8 @@ def edit_record_from_blacklist(
     reason: str = MISSING,
     expires_at: datetime | None = MISSING,
 ):
+    if expires_at != MISSING:
+        expires_at = normalize_blacklist_expiry(expires_at)
     with blacklist_change_session() as sess:
         record = get_record(sess, record_id, True)
         player_names = [n.name for n in record.player.names]
@@ -851,7 +870,7 @@ def edit_record_from_blacklist(
         if reason != MISSING:
             record.reason = reason
         if expires_at != MISSING:
-            record.expires_at = normalize_blacklist_expiry(expires_at)
+            record.expires_at = expires_at
 
         # Return if nothing was modified
         if not sess.is_modified(record):
