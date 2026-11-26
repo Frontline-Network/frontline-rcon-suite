@@ -69,9 +69,6 @@ export const getPlayerDetailModel = (value = {}) => {
   );
   const calculatedKpm =
     playtimeSeconds > 0 ? kills / (playtimeSeconds / 60) : 0;
-  const receivedActions = Array.isArray(profile.received_actions)
-    ? profile.received_actions
-    : [];
   const banDetails = Array.isArray(player.activeBanStatus?.details)
     ? player.activeBanStatus.details
     : [];
@@ -110,7 +107,7 @@ export const getPlayerDetailModel = (value = {}) => {
     },
     isVip: Boolean(player.is_vip || profile.vips?.length),
     isWatched: Boolean(profile.watchlist?.is_watched),
-    warningsCount: countRecentWarnings(receivedActions),
+    warningsCount: countRecentWarnings(profile),
     bansCount: hasActiveBan ? Math.max(1, banDetails.length) : 0,
   };
 };

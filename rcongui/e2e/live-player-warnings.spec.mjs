@@ -7,7 +7,7 @@ test("campaign recipients have no warning badge or warning count; moderation rem
   page,
 }) => {
   await openDemoPage(page, "/views/live", {
-    query: { demo_warning_sources: 1 },
+    query: { demo_warning_sources: 1, demo_compact_profiles: 1 },
   });
   const panel = page.getByTestId("live-players-panel");
   await panel
@@ -62,16 +62,12 @@ test("campaign recipients have no warning badge or warning count; moderation rem
   // Information is only excluded from warning indicators, never from history.
   // The dedicated profile fetch must agree with the compact live roster;
   // otherwise its late response can silently replace the message history.
-  const profileActionCount = await page.evaluate(async () => {
-    const response = await fetch(
-      "/api/get_player_profile?player_id=76561198000000001"
-    );
-    const data = await response.json();
-    return data.result.received_actions.filter(
-      (action) => action.by === "Campaign: Mic-Pflicht DE"
-    ).length;
-  });
-  expect(profileActionCount).toBe(100);
+  const requestsBeforeSelection = await page.evaluate(() =>
+    window.__CRCON_DEMO_PROTECTED_REQUESTS__.filter(
+      (path) => path === "/api/get_player_profile"
+    )
+  );
+  expect(requestsBeforeSelection).toEqual([]);
   await panel.getByRole("button", { name: "FLN_Raven", exact: true }).click();
   await page.getByRole("tab", { name: "Nachrichten", exact: true }).click();
   await expect(
@@ -79,4 +75,7 @@ test("campaign recipients have no warning badge or warning count; moderation rem
       .getByRole("tabpanel")
       .getByText("Campaign: Mic-Pflicht DE", { exact: false })
   ).toHaveCount(100);
+  expect(await page.evaluate(() =>
+    window.__CRCON_DEMO_PROTECTED_REQUESTS__.includes("/api/get_player_profile")
+  )).toBe(true);
 });

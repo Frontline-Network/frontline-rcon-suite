@@ -9,6 +9,14 @@ import {
 } from "./player-warnings.mjs";
 
 const now = Date.parse("2026-09-13T12:00:00Z");
+test("live profiles use the warning summary and complete profiles retain history support", () => {
+  assert.equal(countRecentWarnings({ recent_warning_count: 7 }, now), 7);
+  assert.equal(hasRecentWarnings({ recent_warning_count: 0 }, now), false);
+  assert.equal(countRecentWarnings({ received_actions: [
+    { action_type: "KICK", time: "2026-09-13T11:00:00Z" },
+  ] }, now), 1);
+  assert.equal(countRecentWarnings({ recent_warning_count: -1 }, now), 0);
+});
 const action = (overrides = {}) => ({
   action_type: "MESSAGE",
   by: "Frontline Admin",

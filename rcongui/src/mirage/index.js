@@ -8,6 +8,7 @@ import { previewHighlightState, updatePreviewHighlightState } from "./data/highl
 import { normalizeAppearance } from "../themes/appearance";
 import { normalizeLiveViewPreferences } from "../pages/views/live/live-view-preferences.mjs";
 import { handleTeamView } from "./routes/team-view";
+import { countRecentWarnings } from "../utils/player-warnings.mjs";
 import { createGameState } from "./state/game";
 import {
   handleRecentLogs,
@@ -775,6 +776,7 @@ export function makeServer({ environment = "development" } = {}) {
 
       this.post("/get_players_history", () => ({ result: { players: playerRecords(), total: playerRecords().length } }));
       this.get("/get_player_profile", (schema, request) => {
+        protectedRequestLog.push("/api/get_player_profile");
         const demoQuery = new URLSearchParams(window.location.search);
         const records = demoQuery.get("demo_warning_sources") === "1" || demoQuery.get("demo_platform_identities") === "1"
           ? demoPlayerRecords
@@ -1122,11 +1124,33 @@ export function makeServer({ environment = "development" } = {}) {
       
       this.get(
         "/get_team_view",
-        trackProtectedRequest("/api/get_team_view", () =>
-          new URLSearchParams(window.location.search).has("demo_balance")
+        trackProtectedRequest("/api/get_team_view", () => {
+          const query = new URLSearchParams(window.location.search);
+          const response = query.has("demo_balance")
             ? ok(getDemoTeamView())
-            : handleTeamView(gameState)
-        )
+            : handleTeamView(gameState);
+          if (query.has("demo_compact_profiles")) {
+            const compactPlayer = (player) => ({
+              ...player,
+              profile: {
+                ...player.profile,
+                recent_warning_count: countRecentWarnings(player.profile),
+                received_actions: undefined,
+              },
+            });
+            for (const team of ["allies", "axis"]) {
+              const current = response.result[team];
+              response.result[team] = {
+                ...current,
+                commander: current.commander ? compactPlayer(current.commander) : null,
+                squads: Object.fromEntries(Object.entries(current.squads).map(
+                  ([name, squad]) => [name, { ...squad, players: squad.players.map(compactPlayer) }]
+                )),
+              };
+            }
+          }
+          return response;
+        })
       );
 
       this.post("/get_recent_logs", (schema, request) => {

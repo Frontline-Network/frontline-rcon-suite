@@ -5083,6 +5083,9 @@ const de = {
       metrics: { cpu: "CPU", ram: "RAM", disk: "SSD" },
       usedTotal: "{{used}} / {{total}} {{unit}} verwendet",
       percentUsed: "{{percent}} Prozent verwendet",
+      containerRam: "Backend-RAM",
+      hostRam: "Host-RAM",
+      memoryCapacity: "{{used}} von {{total}} belegt",
       source: "Quelle: {{source}}",
       sources: {
         cgroup_v2: "Container (cgroup v2)",

@@ -25,6 +25,11 @@ export function isModerationAction(action) {
 }
 
 export function countRecentWarnings(receivedActions, now = Date.now()) {
+  if (receivedActions && !Array.isArray(receivedActions)) {
+    const count = receivedActions.recent_warning_count;
+    if (Number.isInteger(count) && count >= 0) return count;
+    receivedActions = receivedActions.received_actions;
+  }
   if (!Array.isArray(receivedActions)) return 0;
   const earliest = now - RECENT_WARNING_WINDOW_MS;
   return receivedActions.filter((action) => {

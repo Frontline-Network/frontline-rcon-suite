@@ -1,5 +1,7 @@
 import os
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 import time
 
 import pytest
@@ -85,6 +87,41 @@ def test_live_first_appearance_preserves_aware_session_instant():
     start = datetime(2026, 1, 1, 13, tzinfo=timezone(timedelta(hours=1)))
     calc = LiveStats.__new__(LiveStats)
     assert calc._get_player_first_appearance({"profile": {"sessions": [{"start": start}]}}) == datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
+
+
+def test_live_statistics_use_one_roster_and_keep_unknown_players(monkeypatch):
+    from rcon import player_stats
+
+    calc = LiveStats.__new__(LiveStats)
+    roster = []
+    def snapshot(*, strict):
+        assert strict
+        return roster
+
+    calc.rcon = SimpleNamespace(get_all_player_info=snapshot)
+    assert calc.get_current_players_stats() == {}
+    roster.extend([
+        {"iD": "old", "name": "Before rename", "platform": "steam"},
+        {"iD": "old", "name": "Same name", "platform": "ps5"},
+        {"iD": "other", "name": "Same name", "platform": ""},
+        {"iD": "new", "name": "Joining", "platform": "xbox"},
+    ])
+    def profiles(_session, ids):
+        assert ids == ["old", "other", "new"]
+        saved = SimpleNamespace(soldier=SimpleNamespace(platform="steam"), steaminfo=None)
+        return {"old": saved, "other": saved}, {}
+
+    monkeypatch.setattr(player_stats, "enter_session", nullcontext)
+    monkeypatch.setattr(player_stats, "get_live_stats_profiles", profiles)
+    monkeypatch.setattr(player_stats, "get_recent_logs", lambda **_kw: {"logs": []})
+    monkeypatch.setattr(player_stats, "MapsHistory", lambda: [])
+    result = calc.get_current_players_stats()
+    assert set(result) == {"old", "other", "new"}
+    assert result["old"]["platform"] == "ps5"
+    assert result["other"]["platform"] == "steam"
+    assert result["old"]["player"] == result["other"]["player"] == "Same name"
+    assert result["new"]["time_seconds"] == 0
+    assert result["new"]["last_spawn"] is None
 
 
 def test_live_first_appearance_uses_selected_local_session():

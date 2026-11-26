@@ -6084,6 +6084,9 @@
       },
       "usedTotal": "{{used}} / {{total}} {{unit}} utilisé",
       "percentUsed": "{{percent}} pour cent utilisé",
+      "containerRam": "RAM du backend",
+      "hostRam": "RAM de l’hôte",
+      "memoryCapacity": "{{used}} utilisés sur {{total}}",
       "source": "Source : {{source}}",
       "sources": {
         "cgroup_v2": "Conteneur (cgroup v2)",

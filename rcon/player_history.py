@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, contains_eager, joinedload, selectinload
 from sqlalchemy.sql.functions import ReturnTypeFromArgs
 
 from rcon.commands import HLLCommandFailedError
-from rcon.active_session_selection import session_created_microseconds
+from rcon.active_session_selection import latest_open_sessions, session_created_microseconds
 from rcon.models import (
     BlacklistRecord,
     LogLine,
@@ -226,17 +226,13 @@ def get_player_profile(player_id: str, nb_sessions: int):
 
 
 def get_player_profile_by_player_ids(sess, player_ids):
+    """Load the player metadata emitted by session and time-window statistics."""
     return (
         sess.query(PlayerID)
         .filter(PlayerID.player_id.in_(player_ids))
         .options(
-            selectinload(PlayerID.names),
-            selectinload(PlayerID.received_actions),
-            selectinload(PlayerID.blacklists),
-            selectinload(PlayerID.flags),
-            selectinload(PlayerID.watchlist),
-            selectinload(PlayerID.steaminfo),
-            selectinload(PlayerID.soldier),
+            joinedload(PlayerID.steaminfo),
+            joinedload(PlayerID.soldier).load_only(PlayerSoldier.platform),
         )
         .all()
     )
@@ -257,6 +253,19 @@ def _get_profiles(sess, player_ids, nb_sessions=0):
         .options(selectinload(PlayerID.soldier))
         .all()
     )
+
+
+def get_live_stats_profiles(sess, player_ids):
+    """Fetch only scoreboard metadata and the newest open local session per player."""
+    profiles = get_player_profile_by_player_ids(sess, player_ids)
+    session_times = {
+        player.player_id: {
+            "current_session_start": session.to_dict()["start"],
+            "current_playtime_seconds": _current_playtime_seconds(session),
+        }
+        for player, session in latest_open_sessions(sess, player_ids, int(get_server_number()))
+    }
+    return {player.player_id: player for player in profiles}, session_times
 
 
 def _get_serializable_profiles(sess, player_ids):
@@ -423,22 +432,27 @@ def get_live_profiles(
         this_server = int(get_server_number())
         session_summaries = _current_session_summary(sess, database_ids, this_server)
 
-        actions_by_player: dict[int, list[dict]] = {}
         action_cutoff = datetime.datetime.utcnow() - datetime.timedelta(
             hours=max(1, int(action_window_hours))
         )
-        for player_database_id, action_time in (
-            sess.query(PlayersAction.player_id_id, PlayersAction.time)
+        warning_counts = dict(
+            sess.query(PlayersAction.player_id_id, func.count(PlayersAction.id))
             .filter(
                 PlayersAction.player_id_id.in_(database_ids),
                 PlayersAction.time > action_cutoff,
+                PlayersAction.action_type != "",
+                ~and_(
+                    PlayersAction.action_type == PlayerActionState.MESSAGE.name,
+                    or_(
+                        func.coalesce(PlayersAction.by, "").startswith("Campaign:"),
+                        func.coalesce(PlayersAction.by, "").startswith("VIP lifecycle:"),
+                        func.coalesce(PlayersAction.by, "").startswith("VIP lifecycle test:"),
+                    ),
+                ),
             )
-            .order_by(PlayersAction.player_id_id, PlayersAction.time.desc())
+            .group_by(PlayersAction.player_id_id)
             .all()
-        ):
-            actions_by_player.setdefault(player_database_id, []).append(
-                {"time": action_time}
-            )
+        )
 
         blacklist_records_by_player: dict[int, list[dict]] = {}
         blacklist_cutoff = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -479,7 +493,7 @@ def get_live_profiles(
                     "current_playtime_seconds": _current_playtime_seconds(
                         summary if summary and summary.server_number == this_server else None
                     ),
-                    "received_actions": actions_by_player.get(player.id, []),
+                    "recent_warning_count": warning_counts.get(player.id, 0),
                     "blacklists": blacklists,
                     "is_blacklisted": is_blacklisted,
                     "flags": [flag.to_dict() for flag in (player.flags or [])],

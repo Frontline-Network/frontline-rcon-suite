@@ -13,7 +13,7 @@ from rcon.game.registry import game_switch
 from rcon.game_logs import get_historical_logs_records, get_recent_logs
 from rcon.maps import Layer, Team
 from rcon.models import enter_session
-from rcon.player_history import _get_profiles, get_player_profile_by_player_ids
+from rcon.player_history import get_live_stats_profiles, get_player_profile_by_player_ids
 from rcon.rcon import get_rcon
 from rcon.types import (
     STAT_DISPLAY_LOOKUP,
@@ -448,25 +448,21 @@ class LiveStats(BaseStats):
         return logs_indexed, id_to_name
 
     def get_current_players_stats(self, log_history: LogsHistorySnapshot | None = None):
-        players: list[GetPlayersType] = self.rcon.get_players()
-        if not players:
+        id_to_player = {
+            p["iD"]: {"name": p["name"], "player_id": p["iD"], "platform": p["platform"]}
+            for p in self.rcon.get_all_player_info(strict=True) if p["iD"]
+        }
+        if not id_to_player:
             logger.debug("No players")
             return {}
 
-        players = [p for p in players if p.get(PLAYER_ID)]
-        detailed_players = self.rcon.get_detailed_players()["players"]
-        for player in players:
-            details = detailed_players.get(player[PLAYER_ID])
-            if details:
-                player["platform"] = details.get("platform")
-
         with enter_session() as sess:
-            id_to_PlayerID = {
-                profile.player_id: profile
-                for profile in _get_profiles(
-                    sess, [p[PLAYER_ID] for p in players], nb_sessions=1
+            id_to_PlayerID, session_times = get_live_stats_profiles(sess, list(id_to_player))
+            players = list(id_to_player.values())
+            for player in players:
+                player["profile"] = session_times.get(
+                    player[PLAYER_ID], {"current_session_start": None, "current_playtime_seconds": 0}
                 )
-            }
             logger.info(
                 "%s players, %s profiles loaded", len(players), len(id_to_PlayerID)
             )
@@ -486,7 +482,6 @@ class LiveStats(BaseStats):
 
             logger.info("%s log lines to process", len(logs["logs"]))
 
-            id_to_player = {p[PLAYER_ID]: p for p in players if p.get(PLAYER_ID)}
             name_to_player = {p["name"]: p for p in players}
             indexed_logs, id_to_name = self._get_indexed_logs_by_player_for_session(
                 now, id_to_player, name_to_player, list(reversed(logs["logs"]))

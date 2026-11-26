@@ -73,3 +73,22 @@ Die Runde vom 21. November um 17:22 Uhr MEZ umfasste 2.729 protokollierte Ereign
 | Synthetisches Einreihen und Abholen, p95 | 1,458 ms | 1,923 ms |
 
 Je Variante und Lastfall gingen 24 Berechnungen in die Auswertung ein. Aufwärmdurchläufe wurden ausgelassen und die Reihenfolge der Varianten gewechselt. Alle 316 bzw. 328 synthetischen Warteschlangenpaare lieferten den erwarteten Wert. Ein gemeinsam genutztes Redis unter mehreren gleichzeitig aktiven Spielservern, produktive Moderationsabläufe und ein Live-Rundenwechsel bleiben eigene Abnahmepunkte.
+
+## Live-Profile und Statistikprojektion vom 26. November
+
+Die Live-Statistik lädt die benötigten Metadaten und die neueste lokale Sitzung pro Spieler gebündelt. Die HTTP-Live-Endpunkte liefern standardmäßig kompakte Profile. Vollständige Profile sind über `compact=false` abrufbar. Die Spielerakte lädt ihre vollständige Historie beim Öffnen. Für Warnsymbole liefert die Live-Projektion einen aggregierten Zähler der letzten 24 Stunden, der Kampagnen- und VIP-Nachrichten herausfiltert. Historische Einträge ohne Autor werden berücksichtigt.
+
+Die drei Profil-Caches tragen die Schemaversion `live-profiles-v2`, damit gleichzeitig laufende ältere Worker ihre bisherigen Profile verwenden können. Der Ladezustand der Spielerakte wartet auf das vollständige Profil. Die RAM-Anzeige nennt die Datenquelle und zeigt belegten Speicher sowie das jeweilige Limit an.
+
+Im gepaarten HTTP-Vergleich auf dem RCON3-Host verwendeten beide Varianten denselben Snapshot mit 96 Spielern und 15.000 Logereignissen. Pro Serie wurden zwölf Abfragen auf einem frischen Daphne-Prozess ausgeführt. Nach 30 Sekunden Ruhe ergaben sich folgende zusätzliche Belegungen des anonymen Prozessspeichers.
+
+| Abfrage | Ausgangsstand in MiB | Kandidat in MiB |
+|---|---:|---:|
+| Spielerliste | 18,7–21,2 | 1,9 |
+| Detaillierte Spielerliste | 23,5–25,7 | 3,2–3,7 |
+| Kompakte Teamansicht | 3,3–3,9 | 3,2 |
+| Live-Logs | 2,5 | 2,4–2,5 |
+
+Nach 36 gemischten Abfragen und zwei Minuten Ruhe blieben 25,3 MiB im Ausgangsstand und 7,6 MiB im Kandidaten zusätzlich belegt. Die Schlussprüfung umfasste 84 Backend-Tests, neun Tests der Warnlogik, sechs Browserprüfungen und den Produktionsbuild.
+
+Nach dem produktiven Rollout wurden über 882,7 Sekunden 177 Speicherproben aufgezeichnet. Daphne lag vor dem Neustart bei 403,3 MiB PSS und am Ende bei 188,3 MiB. In den letzten fünf Minuten bewegte sich der Wert zwischen 187,5 und 188,3 MiB. Alle 203 beobachteten relevanten HTTP-Aufrufe lieferten Status 200. Die Live-Ansicht, Warnsymbole, nachgeladene Maßnahmenhistorie und getrennte Nachrichtenanzeige wurden mit einer regulären Browser-Anmeldung geprüft. Der Produktionsvergleich umfasst den Neustart und diesen Beobachtungszeitraum.
