@@ -80,15 +80,4 @@ Die Live-Statistik lädt die benötigten Metadaten und die neueste lokale Sitzun
 
 Die drei Profil-Caches tragen die Schemaversion `live-profiles-v2`, damit gleichzeitig laufende ältere Worker ihre bisherigen Profile verwenden können. Der Ladezustand der Spielerakte wartet auf das vollständige Profil. Die RAM-Anzeige nennt die Datenquelle und zeigt belegten Speicher sowie das jeweilige Limit an.
 
-Im gepaarten HTTP-Vergleich auf dem RCON3-Host verwendeten beide Varianten denselben Snapshot mit 96 Spielern und 15.000 Logereignissen. Pro Serie wurden zwölf Abfragen auf einem frischen Daphne-Prozess ausgeführt. Nach 30 Sekunden Ruhe ergaben sich folgende zusätzliche Belegungen des anonymen Prozessspeichers.
-
-| Abfrage | Ausgangsstand in MiB | Kandidat in MiB |
-|---|---:|---:|
-| Spielerliste | 18,7–21,2 | 1,9 |
-| Detaillierte Spielerliste | 23,5–25,7 | 3,2–3,7 |
-| Kompakte Teamansicht | 3,3–3,9 | 3,2 |
-| Live-Logs | 2,5 | 2,4–2,5 |
-
-Nach 36 gemischten Abfragen und zwei Minuten Ruhe blieben 25,3 MiB im Ausgangsstand und 7,6 MiB im Kandidaten zusätzlich belegt. Die Schlussprüfung umfasste 84 Backend-Tests, neun Tests der Warnlogik, sechs Browserprüfungen und den Produktionsbuild.
-
-Nach dem produktiven Rollout wurden über 882,7 Sekunden 177 Speicherproben aufgezeichnet. Daphne lag vor dem Neustart bei 403,3 MiB PSS und am Ende bei 188,3 MiB. In den letzten fünf Minuten bewegte sich der Wert zwischen 187,5 und 188,3 MiB. Alle 203 beobachteten relevanten HTTP-Aufrufe lieferten Status 200. Die Live-Ansicht, Warnsymbole, nachgeladene Maßnahmenhistorie und getrennte Nachrichtenanzeige wurden mit einer regulären Browser-Anmeldung geprüft. Der Produktionsvergleich umfasst den Neustart und diesen Beobachtungszeitraum.
+Die Schlussprüfung umfasst Backend-Tests für Cache-Versionierung, Profilprojektion und Statistikgleichheit, Tests der Warnlogik sowie Browserprüfungen für das bedarfsgesteuerte Laden der Historie. Der Produktionsbuild und der normale Meldeweg über eine Spielerakte wurden geprüft.
