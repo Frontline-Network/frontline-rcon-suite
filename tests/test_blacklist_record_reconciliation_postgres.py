@@ -1,5 +1,8 @@
 """Individual record changes reconciled through the durable journal on PostgreSQL."""
+import json
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from sqlalchemy import select
@@ -26,6 +29,115 @@ def orders():
     return select(journal.BlacklistSyncDelivery).where(
         journal.BlacklistSyncDelivery.server_number == 3
     ).order_by(journal.BlacklistSyncDelivery.id)
+
+
+@pytest.mark.parametrize("temporary", [True, False])
+@pytest.mark.parametrize("game", [GameEnum.HLL_VIETNAM, GameEnum.HLL_WW2])
+@pytest.mark.parametrize("offset", [0, 1, -5])
+def test_end_ban_from_json_keeps_history_and_delivers_once(
+    database, existing_blacklist, receiver, monkeypatch, temporary, game, offset,
+):
+    from tests.test_blacklist_sync_api_postgres import invoke
+    from api import views
+
+    monkeypatch.setattr(views, "audit", Mock())
+    monkeypatch.setattr(views.RconServerSettingsUserConfig, "load_from_db",
+                        lambda: SimpleNamespace(broadcast_unbans=False))
+    record_id, _, _ = existing_blacklist
+    player_id = EOS if game == GameEnum.HLL_VIETNAM else "76561198000000000"
+    receiver.rcon.game_profile.game = game
+    with database.begin() as db:
+        record = setup_record(db, record_id, temporary=temporary)
+        record.player.player_id = player_id
+        actor = blacklist._blacklist_ban_actor(record)
+        stamp = record.created_at + timedelta(minutes=1)
+    expires = datetime.now(timezone.utc) - timedelta(minutes=1)
+    wire_expiry = expires.astimezone(timezone(timedelta(hours=offset))).isoformat()
+    if offset == 0:
+        wire_expiry = wire_expiry.replace("+00:00", "Z")
+    body = {"record_id": record_id, "expires_at": wire_expiry}
+    for _ in range(2):
+        response = invoke("edit_blacklist_record", "POST", {"api.can_change_blacklist_records"}, body)
+        assert response.status_code == 200
+        assert json.loads(response.content)["failed"] is False
+    with database() as db:
+        saved = db.get(BlacklistRecord, record_id)
+        assert saved.expires_at == expires
+        assert saved.reason == "old"
+        assert len(db.scalars(orders()).all()) == 1
+    ctl = receiver.rcon
+    reader = ctl.get_temp_bans if temporary else ctl.get_perma_bans
+    reader.return_value = [{"player_id": player_id, "by": actor, "ban_time": stamp.isoformat()}]
+    ctl.remove_temp_ban.return_value = ctl.remove_perma_ban.return_value = True
+    process = lambda: journal.process_one(3, receiver.dispatch, is_ready=lambda: True,
+                                          game=game, prepare=receiver._prepare_delivery)
+    assert process() == "done"
+    assert process() == "empty"
+    remove = ctl.remove_temp_ban if temporary else ctl.remove_perma_ban
+    remove.assert_called_once_with(player_id)
+    assert ctl.remove_temp_ban.call_count + ctl.remove_perma_ban.call_count == 1
+    ctl.temp_ban.assert_not_called()
+    ctl.perma_ban.assert_not_called()
+
+
+@pytest.mark.parametrize("change", ["extend", "permanent", "reason_only", "invalid"])
+def test_json_record_edits_preserve_deadline_semantics(database, existing_blacklist, monkeypatch, change):
+    from tests.test_blacklist_sync_api_postgres import invoke
+    from api import views
+
+    monkeypatch.setattr(views, "audit", Mock())
+    monkeypatch.setattr(views.RconServerSettingsUserConfig, "load_from_db",
+                        lambda: SimpleNamespace(broadcast_unbans=False))
+    record_id, _, other_list = existing_blacklist
+    with database.begin() as db:
+        record = setup_record(db, record_id, temporary=True)
+        original = record.expires_at
+        original_list = record.blacklist_id
+    expected = original
+    body = {"record_id": record_id, "reason": "edited"}
+    if change == "extend":
+        expected += timedelta(hours=2)
+        body["expires_at"] = expected.isoformat()
+    elif change == "permanent":
+        expected = body["expires_at"] = None
+    elif change == "invalid":
+        body.update(expires_at="invalid", blacklist_id=other_list)
+    response = invoke("edit_blacklist_record", "POST", {"api.can_change_blacklist_records"}, body)
+    assert response.status_code == (400 if change == "invalid" else 200)
+    assert json.loads(response.content)["failed"] is (change == "invalid")
+    with database() as db:
+        record = db.get(BlacklistRecord, record_id)
+        assert record.expires_at == expected
+        assert record.reason == ("old" if change == "invalid" else "edited")
+        assert record.blacklist_id == original_list
+        assert len(db.scalars(orders()).all()) == int(change != "invalid")
+
+
+@pytest.mark.parametrize("temporary", [True, False])
+def test_create_record_from_json_accepts_deadline_or_null(database, existing_blacklist, monkeypatch, temporary):
+    from tests.test_blacklist_sync_api_postgres import invoke
+    from api import views
+
+    monkeypatch.setattr(views, "audit", Mock())
+    monkeypatch.setattr(views.RconServerSettingsUserConfig, "load_from_db",
+                        lambda: SimpleNamespace(broadcast_unbans=False))
+    record_id, list_id, _ = existing_blacklist
+    with database.begin() as db:
+        original = setup_record(db, record_id)
+        player_id = original.player.player_id
+    expires = datetime.now(timezone.utc) + timedelta(days=2) if temporary else None
+    body = {"player_id": player_id, "blacklist_id": list_id, "reason": "new",
+            "expires_at": expires.isoformat() if expires else None}
+    response = invoke("add_blacklist_record", "POST", {"api.can_add_blacklist_records"}, body)
+    assert response.status_code == 200
+    payload = json.loads(response.content)
+    assert payload["failed"] is False
+    with database() as db:
+        added = db.get(BlacklistRecord, payload["result"]["id"])
+        assert added.expires_at == expires
+        assert added.reason == "new"
+        assert db.get(BlacklistRecord, record_id).expires_at is None
+        assert len(db.scalars(orders()).all()) == 1
 
 
 @pytest.mark.parametrize("temporary", [True, False])

@@ -20,6 +20,7 @@ from django_ratelimit.decorators import ratelimit
 from discord.utils import escape_markdown
 from rcon.api_commands import get_rcon_api
 from rcon.commands import HLLCommandFailedError
+from rcon.blacklist import InvalidBlacklistExpiration
 from rcon.connection import HLLServerError
 from rcon.discord import send_to_discord_audit
 from rcon.operational_health import rcon_latency_tracker
@@ -364,8 +365,8 @@ def expose_api_endpoint(
                 error = e.asdict()
             else:
                 error = str(e)
-        except InvalidVipExpiration as exc:
-            return api_response(command=command_name, arguments=arguments, failed=True,
+        except (InvalidVipExpiration, InvalidBlacklistExpiration) as exc:
+            return api_response(command=command_name, arguments=safe_response_data, failed=True,
                                 error=str(exc), status_code=400)
         except HLLCommandFailedError as e:
             failure = True
