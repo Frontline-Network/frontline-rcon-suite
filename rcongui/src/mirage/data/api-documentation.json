@@ -3036,6 +3036,10 @@
       "country": {
         "default": "None",
         "annotation": "str | None"
+      },
+      "compact": {
+        "default": "False",
+        "annotation": "<class 'bool'>"
       }
     },
     "return_type": null,
@@ -3049,8 +3053,8 @@
       "POST"
     ],
     "description_translations": {
-      "de": "Durchsucht gespeicherte Spielerakten mit Seitenaufteilung, Zeitraum, Namen, IDs, Blacklist-/Watchlist-Status und Markierungen. Die Ergebnisse sind nicht auf gerade verbundene Spieler beschränkt.",
-      "en": "Searches stored player records with pagination, time range, names, IDs, blacklist/watchlist status and flags. Results are not limited to connected players."
+      "de": "Durchsucht gespeicherte Spielerakten mit Seitenaufteilung, Zeitraum, Namen, IDs, Blacklist-/Watchlist-Status und Markierungen. Die Ergebnisse sind nicht auf gerade verbundene Spieler beschränkt. compact=true liefert eine Übersicht ohne vollständige Sitzungs- und Maßnahmenhistorien; standardmäßig bleiben diese enthalten.",
+      "en": "Searches stored player records with pagination, time range, names, IDs, blacklist/watchlist status and flags. Results are not limited to connected players. compact=true returns summaries without complete session and action histories; the default retains them."
     }
   },
   {

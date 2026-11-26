@@ -586,6 +586,7 @@ class RconAPI(Rcon):
         ignore_accent: bool = True,
         flags: str | list[str] | None = None,
         country: str | None = None,
+        compact: bool = False,
     ):
         try:
             with self.without_retries():
@@ -626,6 +627,7 @@ class RconAPI(Rcon):
             online_now_ids=online_now_ids,
             observed_at=observed_at,
             remote_observations=remote_observations,
+            compact=compact,
         )
 
     def flag_player(
