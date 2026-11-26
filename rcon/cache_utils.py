@@ -107,6 +107,7 @@ class RedisCached:
         cache_falsy=True,
         serializer=simplejson.dumps,
         deserializer=simplejson.loads,
+        cache_version: str | None = None,
     ):
         ttl_seconds = validate_ttl_seconds(ttl_seconds)
         if pool is None:
@@ -123,6 +124,7 @@ class RedisCached:
         self.ttl_seconds = ttl_seconds
         self.is_method = is_method
         self.cache_falsy = cache_falsy
+        self.cache_version = cache_version
 
     @staticmethod
     def clear_all_caches(pool) -> int:
@@ -135,11 +137,13 @@ class RedisCached:
 
     @property
     def key_prefix(self):
-        return f"{self.PREFIX}{self.function.__qualname__}"
+        prefix = f"{self.PREFIX}{self.function.__qualname__}"
+        return f"{prefix}:{self.cache_version}" if self.cache_version else prefix
 
     @property
     def epoch_key(self):
-        return f"cache_epoch:function:{self.function.__qualname__}"
+        key = f"cache_epoch:function:{self.function.__qualname__}"
+        return f"{key}:{self.cache_version}" if self.cache_version else key
 
     def key(self, *args, **kwargs):
         if self.is_method:
@@ -424,6 +428,7 @@ def ttl_cache(
     is_method=True,
     cache_falsy=True,
     function_cache_unavailable=None,
+    cache_version: str | None = None,
     **kwargs,
 ):
     ttl = validate_ttl_seconds(ttl, setting="ttl")
@@ -462,6 +467,7 @@ def ttl_cache(
             cache_falsy=cache_falsy,
             serializer=pickle.dumps,
             deserializer=pickle.loads,
+            cache_version=cache_version,
         )
 
         def wrapper(*args, **kwargs):

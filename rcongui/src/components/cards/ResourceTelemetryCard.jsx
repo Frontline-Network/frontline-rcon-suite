@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMemo } from "react";
 import { useSystemUsage } from "@/features/system-usage/SystemUsageProvider";
+import { memoryDisplay } from "@/features/system-usage/memoryDisplay";
 
 const metricDefinitions = [
   {
@@ -54,6 +55,8 @@ const ResourceTelemetryCard = () => {
   const theme = useTheme();
   const { data: system, isLoading, isError, isFetching, refetch } = useSystemUsage();
   const locale = i18n.resolvedLanguage || "de";
+  const ram = memoryDisplay(system?.ram_usage, t, locale);
+  const metricLabel = (key) => key === "ram" ? ram.label : t(`dashboard.resources.metrics.${key}`);
 
   const formatNumber = (value, maximumFractionDigits = 2) => new Intl.NumberFormat(locale, { maximumFractionDigits }).format(value);
   const formatDateTime = (value) => {
@@ -124,7 +127,7 @@ const ResourceTelemetryCard = () => {
     .map((warning) => {
       const metric = system?.[`${warning.metric}_usage`];
       return t("dashboard.resources.warningDetail", {
-        metric: t(`dashboard.resources.metrics.${warning.metric}`),
+        metric: metricLabel(warning.metric),
         percent: Number.isFinite(metric?.percent) ? formatNumber(metric.percent, 1) : t("common.unknown"),
         threshold: warning.threshold_percent,
       });
@@ -170,14 +173,14 @@ const ResourceTelemetryCard = () => {
                   <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
                     <Stack direction="row" alignItems="center" spacing={0.75}>
                       <MetricIcon fontSize="small" color="action" />
-                      <Typography variant="subtitle2">{t(`dashboard.resources.metrics.${key}`)}</Typography>
+                      <Typography variant="subtitle2">{metricLabel(key)}</Typography>
                     </Stack>
                     <Typography variant="h6">{percentage == null ? "—" : `${percentage} %`}</Typography>
                   </Stack>
                   <LinearProgress
                     variant="determinate"
                     value={available ? metric.percent : 0}
-                    aria-label={t(`dashboard.resources.metrics.${key}`)}
+                    aria-label={metricLabel(key)}
                     aria-valuetext={
                       available
                         ? t("dashboard.resources.percentUsed", {
@@ -193,7 +196,7 @@ const ResourceTelemetryCard = () => {
                     }}
                   />
                   <Typography variant="body2" sx={{ mt: 1 }}>
-                    {metricValue(metric, available)}
+                    {key === "ram" && ram.capacity ? ram.capacity : metricValue(metric, available)}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {t("dashboard.resources.source", {

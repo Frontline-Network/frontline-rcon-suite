@@ -16,7 +16,7 @@ import {
   getPlayerTier,
   getTierColors,
 } from "@/utils/lib";
-import { hasRecentWarnings } from "@/utils/player-warnings.mjs";
+import { countRecentWarnings, hasRecentWarnings } from "@/utils/player-warnings.mjs";
 import { SortableHeader, TextButton } from "@/components/table/styles";
 import RemoveRedEyeIcon from "@mui/icons-material/RemoveRedEye";
 import { usePlayerSidebar } from "@/hooks/usePlayerSidebar";
@@ -295,7 +295,7 @@ export const getColumns = (t, factionByTeam = {}) => [
       [
         row.is_vip,
         row.profile?.watchlist?.is_watched,
-        hasRecentWarnings(row.profile?.received_actions ?? []),
+        hasRecentWarnings(row.profile),
         row.activeBanStatus?.isActive,
       ].filter(Boolean).length,
     cell: ({ row }) => {
@@ -316,7 +316,7 @@ export const getColumns = (t, factionByTeam = {}) => [
           color: "primary.light",
         });
       }
-      if (hasRecentWarnings(row.original.profile?.received_actions ?? [])) {
+      if (hasRecentWarnings(row.original.profile)) {
         items.push({
           key: "warning",
           icon: <Warning sx={{ fontSize: "0.95rem" }} />,
@@ -724,9 +724,9 @@ export const getColumns = (t, factionByTeam = {}) => [
   {
     id: "warnings",
     header: SortableHeader("!", t("views.table.recentAction")),
-    accessorKey: "profile.received_actions",
+    accessorFn: (row) => countRecentWarnings(row.profile),
     cell: ({ row }) => {
-      return hasRecentWarnings(row.original.profile.received_actions) ? (
+      return hasRecentWarnings(row.original.profile) ? (
         <Warning
           sx={{
             color: (theme) =>

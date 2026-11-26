@@ -1,0 +1,4 @@
+# Optional pilot for installations using the standard Redis configuration file.
+services:
+  redis:
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--list-compress-depth", "128"]

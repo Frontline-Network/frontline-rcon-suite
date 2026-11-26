@@ -815,10 +815,6 @@ class PlayerProfileType(BasicPlayerProfileType):
     account: PlayerAccountType
 
 
-class LivePlayerActionType(TypedDict):
-    time: datetime.datetime
-
-
 class LivePlayerSoldierType(TypedDict):
     level: int
     platform: Optional[str]
@@ -831,7 +827,7 @@ class LivePlayerProfileType(TypedDict):
     player_id: str
     sessions_count: int
     current_playtime_seconds: int
-    received_actions: list[LivePlayerActionType]
+    recent_warning_count: int
     blacklists: list[BlacklistRecordWithBlacklistType]
     is_blacklisted: bool
     flags: list[PlayerFlagType]

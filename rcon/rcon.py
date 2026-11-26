@@ -319,7 +319,7 @@ class Rcon(ServerCtl):
 
     # TODO
     # When returns value from the cache it is always {}
-    @ttl_cache(ttl=5)
+    @ttl_cache(ttl=5, cache_version="live-profiles-v2")
     def get_players(self, compact=False) -> list[GetPlayersType]:
         compact = strtobool(compact)
         player_ids = {
@@ -421,7 +421,7 @@ class Rcon(ServerCtl):
             )
             return None
 
-    @ttl_cache(ttl=DETAILED_PLAYERS_CACHE_SECONDS, cache_falsy=False)
+    @ttl_cache(ttl=DETAILED_PLAYERS_CACHE_SECONDS, cache_falsy=False, cache_version="live-profiles-v2")
     def get_detailed_players(self, compact=False) -> GetDetailedPlayers:
         compact = strtobool(compact)
         try:
@@ -436,7 +436,7 @@ class Rcon(ServerCtl):
             datetime.now(timezone.utc).timestamp() - current_map_start
         )
 
-        players = self.get_players(compact=True) if compact else self.get_players()
+        players = self.get_players(compact=compact)
         fail_count = 0
         players_by_id: dict[str, GetDetailedPlayer] = {}
 
@@ -475,15 +475,11 @@ class Rcon(ServerCtl):
             "fail_count": fail_count,
         }
 
-    @ttl_cache(ttl=2, cache_falsy=False)
+    @ttl_cache(ttl=2, cache_falsy=False, cache_version="live-profiles-v2")
     def get_team_view(self, compact=False):
         compact = strtobool(compact)
         teams = {}
-        detailed_players = (
-            self.get_detailed_players(compact=True)
-            if compact
-            else self.get_detailed_players()
-        )
+        detailed_players = self.get_detailed_players(compact=compact)
         players_by_id = detailed_players["players"]
         fail_count = detailed_players["fail_count"]
         commander_key = object()

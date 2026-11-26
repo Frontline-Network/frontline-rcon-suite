@@ -139,6 +139,60 @@ def test_empty_live_profile_request_does_not_open_a_database_session(monkeypatch
     assert get_live_profiles([]) == []
 
 
+def test_live_profiles_return_warning_counts_without_loading_action_history(live_profile_database):
+    engine, sessions = live_profile_database
+    now = datetime.utcnow()
+    with sessions.begin() as sess:
+        player = PlayerID(player_id="warning-summary")
+        sess.add(player)
+        sess.flush()
+        rows = [
+            ("MESSAGE", "Admin", now),
+            ("MESSAGE", None, now),
+            ("PUNISH", "Campaign: Admin", now),
+            ("KICK", "AUTOMOD", now),
+            ("MESSAGE", "Admin", now - timedelta(hours=25)),
+            ("", "Admin", now),
+        ]
+        rows.extend(("MESSAGE", sender, now) for sender in
+                    ("Campaign: Welcome", "VIP lifecycle: expiry", "VIP lifecycle test: expiry")
+                    for _ in range(100))
+        sess.add_all(PlayersAction(player_id_id=player.id, action_type=kind,
+                                   by=sender, time=instant, reason="history payload")
+                     for kind, sender, instant in rows)
+    statements = []
+    def record(_conn, _cursor, sql, *_args):
+        statements.append(sql)
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        profile = get_live_profiles(["warning-summary"])[0]
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+    assert profile["recent_warning_count"] == 4
+    assert "received_actions" not in profile
+    action_queries = [sql.lower() for sql in statements if "players_actions" in sql]
+    assert len(action_queries) == 1
+    assert "count(" in action_queries[0] and "group by" in action_queries[0]
+    assert "players_actions.reason" not in action_queries[0]
+
+
+@pytest.mark.parametrize("method", ["get_players", "get_detailed_players", "get_team_view"])
+def test_api_live_profiles_are_compact_by_default_and_allow_explicit_history(monkeypatch, method):
+    from unittest.mock import Mock
+    from rcon.rcon import Rcon
+    monkeypatch.setattr("rcon.rcon.get_rcon", lambda: object.__new__(Rcon))
+    from rcon.api_commands import RconAPI
+
+    delegated = Mock(return_value={"profile": "sentinel"})
+    monkeypatch.setattr(Rcon, method, delegated)
+    api = object.__new__(RconAPI)
+    assert getattr(api, method)() == {"profile": "sentinel"}
+    delegated.assert_called_once_with(compact=True)
+    delegated.reset_mock()
+    getattr(api, method)(compact="false")
+    delegated.assert_called_once_with(compact="false")
+
+
 def test_live_stats_queries_only_metadata_and_latest_local_session(live_profile_database):
     engine, sessions = live_profile_database
 
@@ -229,17 +283,20 @@ def live_profile_database(monkeypatch):
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    for model in (
-        PlayerID,
-        PlayerFlag,
-        WatchList,
-        PlayerSoldier,
-        PlayerSession,
-        PlayersAction,
-        Blacklist,
-        BlacklistRecord,
-    ):
-        model.__table__.create(engine)
+    # The original migration permits historical action authors to be NULL.
+    with monkeypatch.context() as schema:
+        schema.setattr(PlayersAction.__table__.c.by, "nullable", True)
+        for model in (
+            PlayerID,
+            PlayerFlag,
+            WatchList,
+            PlayerSoldier,
+            PlayerSession,
+            PlayersAction,
+            Blacklist,
+            BlacklistRecord,
+        ):
+            model.__table__.create(engine)
 
     sessions = sessionmaker(engine, expire_on_commit=False)
 

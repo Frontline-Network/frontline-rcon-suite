@@ -891,6 +891,9 @@ def live_stats_loop(stop_event=None):
             except Exception:
                 logger.exception("Failed to compute live game stats")
 
+        # Both readers are finished. Release decoded log pages before sleeping.
+        del log_history
+
         # Both refresh jobs normally run only every 15 seconds.  Polling ten
         # times per second between runs needlessly wakes every CRCON instance
         # and becomes noticeable on hosts with many gameservers.  Sleep until

@@ -179,6 +179,35 @@ def test_method_cache_reuses_identical_arguments_and_isolates_variants():
     assert function.call_count == 2
 
 
+def test_profile_cache_version_isolates_older_workers_and_supports_invalidation():
+    from fakeredis import FakeStrictRedis
+
+    red = FakeStrictRedis()
+    legacy_func = mock.Mock(return_value={"received_actions": [{"time": "legacy"}]})
+    current_func = mock.Mock(return_value={"recent_warning_count": 2})
+    for func in (legacy_func, current_func):
+        func.__name__ = "get_players"
+        func.__qualname__ = "Rcon.get_players"
+    common = dict(pool=None, red=red, ttl_seconds=5, is_method=True,
+                  serializer=pickle.dumps, deserializer=pickle.loads)
+    legacy = RedisCached(function=legacy_func, **common)
+    current = RedisCached(function=current_func, cache_version="live-profiles-v2", **common)
+    owner = object()
+    with mock.patch.object(legacy, "_release_lock"), mock.patch.object(current, "_release_lock"):
+        assert legacy(owner) == {"received_actions": [{"time": "legacy"}]}
+        assert current(owner) == {"recent_warning_count": 2}
+        assert current(owner) == {"recent_warning_count": 2}
+        current_func.assert_called_once()
+        current.clear_all()
+        assert legacy(owner) == {"received_actions": [{"time": "legacy"}]}
+        legacy_func.assert_called_once()
+        assert current(owner) == {"recent_warning_count": 2}
+        assert current_func.call_count == 2
+    assert legacy.key_prefix == "cached_Rcon.get_players"
+    assert current.key_prefix != legacy.key_prefix
+    assert current.epoch_key != legacy.epoch_key
+
+
 def test_mem_cache_used(monkeypatch):
     monkeypatch.setenv("DEBUG", "True")
     # This is kind of janky but cachetools returns a decorated function not a class instance

@@ -5037,6 +5037,9 @@ const en = {
       metrics: { cpu: "CPU", ram: "RAM", disk: "SSD" },
       usedTotal: "{{used}} / {{total}} {{unit}} used",
       percentUsed: "{{percent}} percent used",
+      containerRam: "Backend RAM",
+      hostRam: "Host RAM",
+      memoryCapacity: "{{used}} of {{total}} used",
       source: "Source: {{source}}",
       sources: {
         cgroup_v2: "Container (cgroup v2)",

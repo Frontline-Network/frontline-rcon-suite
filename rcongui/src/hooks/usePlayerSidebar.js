@@ -146,7 +146,7 @@ export const PlayerSidebarProvider = ({ children }) => {
   };
 
   const player = useMemo(() => {
-    if (!open || !playerId) return null;
+    if (!open || !playerId || !profile) return null;
 
     const getOnlinePlayer = (id) =>
       onlinePlayers.find((p) => p.player_id === id);
@@ -166,7 +166,7 @@ export const PlayerSidebarProvider = ({ children }) => {
       aPlayer = getPlayerWithOnlineStatus(
         {
           ...onlinePlayer,
-          profile: profile ?? onlinePlayer.profile,
+          profile,
         },
         true
       );
@@ -183,7 +183,7 @@ export const PlayerSidebarProvider = ({ children }) => {
       aPlayer.is_banned = true;
     }
 
-    aPlayer.vip = aPlayer.profile.vips.find(
+    aPlayer.vip = aPlayer.profile.vips?.find(
       (v) => v.server_number === serverStatus?.server_number
     );
     if (
@@ -205,7 +205,7 @@ export const PlayerSidebarProvider = ({ children }) => {
     }
 
     aPlayer.player_id = aPlayer.player_id ?? aPlayer.profile.player_id;
-    aPlayer.name = aPlayer.name ?? aPlayer.profile.names[0]?.name;
+    aPlayer.name = aPlayer.name ?? aPlayer.profile.names?.[0]?.name;
 
     return aPlayer;
   }, [

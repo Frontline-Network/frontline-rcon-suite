@@ -41,6 +41,8 @@ from rcon.types import (
     BlacklistWithRecordsType,
     GameServerBanType,
     GameEnum,
+    GetDetailedPlayers,
+    GetPlayersType,
     MessageTemplateCategory,
     MessageTemplateType,
     ParsedLogsType,
@@ -165,6 +167,18 @@ class RconAPI(Rcon):
 
     def __init__(self, *args, pool_size: bool | None = None, **kwargs):
         super().__init__(*args, pool_size=pool_size, **kwargs)
+
+    def get_players(self, compact=True) -> list[GetPlayersType]:
+        """Return compact live profiles. Use compact=false for complete history."""
+        return super().get_players(compact=compact)
+
+    def get_detailed_players(self, compact=True) -> GetDetailedPlayers:
+        """Return compact live player data and failed-query counts."""
+        return super().get_detailed_players(compact=compact)
+
+    def get_team_view(self, compact=True):
+        """Return teams with live profiles. Load full history on player selection."""
+        return super().get_team_view(compact=compact)
 
     def get_available_weapons(self) -> dict[str, Any]:
         """Return the weapon identifiers known by the active game profile.
