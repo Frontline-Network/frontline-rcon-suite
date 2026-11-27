@@ -77,9 +77,9 @@ test("only service RAM is displayed; 10 GiB raw charge and all file cache stay h
   const history = dialog.getByTestId("rcon-memory-history");
   await expect(history).toBeVisible();
   await expect(history).toHaveAttribute("aria-label", /GiB/);
-  await expect(history).toHaveAttribute("aria-label", /Dienstverbund/);
+  await expect(history).toHaveAttribute("aria-label", /Dienst-RAM/);
   await expect(history).not.toHaveAttribute("aria-label", /10,4 GiB|8,72 GiB/);
-  await expect(history).toContainText("Dienstverbund gesamt");
+  await expect(history).toContainText("Dienst-RAM gesamt");
   await expectNoHorizontalPageOverflow(page);
   await dialog.getByRole("button", { name: "Schließen", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
