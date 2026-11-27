@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from contextlib import nullcontext
 from unittest.mock import Mock
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 from rcon import player_language as languages, player_messages as messages, player_message_catalog as catalog
 from rcon import voice_language as voice
@@ -22,6 +22,9 @@ def database(monkeypatch):
     for cls in (MessageTemplate,PlayerMessageTranslation,PlayerMessageLocalizationAudit,
                 voice.VoiceLanguagePreference,voice.VoiceVerifiedIdentity,voice.VoiceTranslationCache):
         cls.__table__.create(engine)
+    with engine.begin() as connection:
+        connection.execute(text('CREATE TABLE steam_id_64 (id INTEGER PRIMARY KEY, steam_id_64 TEXT, steam_id TEXT)'))
+        connection.execute(text('CREATE TABLE steam_info (id INTEGER PRIMARY KEY, playersteamid_id INTEGER, profile JSON, country TEXT, updated TIMESTAMP)'))
     @contextmanager
     def session():
         with Session(engine) as sess:

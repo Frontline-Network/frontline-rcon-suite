@@ -31,6 +31,14 @@ def profile_in_session(sess, *, player_id=None, discord_id=None):
     ).order_by(storage.VoiceLanguagePreference.explicit.desc(),
                storage.VoiceLanguagePreference.updated.desc(),
                storage.VoiceLanguagePreference.identity).limit(1))
+    if row is None:
+        from rcon.user_config.player_language import PlayerLanguageUserConfig
+        if PlayerLanguageUserConfig.load_from_db().enabled:
+            from rcon.player_country_language import country_hint
+            game_id = next((v[5:] for v in ids if v.startswith('game:')), None)
+            hint = country_hint(sess, game_id)
+            if hint:
+                return hint
     return {"language": row.language if row else storage.DEFAULT,
             "explicit": bool(row.explicit) if row else False,
             "source": ("selected" if row.explicit else "detected") if row else "fallback",
