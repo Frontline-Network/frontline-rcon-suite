@@ -885,13 +885,13 @@ directory, without a Docker socket or access to host processes. Collection is
 bounded and independent of browser polling. Installation and recovery are
 documented in [RCON memory telemetry](operations/rcon-memory-telemetry.md).
 
-Container memory charges include file cache. The display separates inactive file
-cache and the remaining working set so a database backup warming the filesystem
-cache is not mistaken for an application memory leak. A total assembled from
-multiple container limits has no useful percentage, so the combined RCON value
-uses absolute MiB/GiB and an absolute history. The existing backend limit remains
-a separately labelled detail. Unknown or stale service samples are never replaced
-by the backend value under a total-RCON label.
+The primary value is dedicated instance service RAM, excluding all disk-backed
+file cache. Shared service RAM is separate; the details include the combined
+service RAM. Cache and raw charges are not displayed, including in tooltips or
+history. Shared memory remains included. Missing cache counters make the derived
+metric unavailable rather than substituting a raw charge. Absolute MiB/GiB and
+derived history avoid misleading percentages assembled from unrelated limits.
+The original raw API fields remain compatible for existing consumers.
 
 After the bounded profile/cache refresh work, Supervisor cleanup, Redis list
 compression, and durable webhook reconnection, use this component view to choose

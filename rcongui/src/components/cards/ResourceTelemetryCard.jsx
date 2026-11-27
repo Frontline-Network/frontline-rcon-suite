@@ -13,7 +13,6 @@ import {
   Grid2 as Grid,
   LinearProgress,
   Stack,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import {
@@ -30,8 +29,6 @@ import { useMemo } from "react";
 import { useSystemUsage } from "@/features/system-usage/SystemUsageProvider";
 import {
   formatMemorySize,
-  memoryBytes,
-  memoryDisplay,
   memoryHistoryDisplay,
   rconMemoryDisplay,
 } from "@/features/system-usage/memoryDisplay";
@@ -101,32 +98,29 @@ const ResourceTelemetryCard = ({ embedded = false }) => {
   const ram = rconMemoryDisplay(system?.rcon_ram_usage, t, locale, {
     stale: isStale,
   });
-  const backend = memoryDisplay(system?.ram_usage, t, locale);
-  const backendAvailable =
-    ["cgroup_v1", "cgroup_v2"].includes(system?.ram_usage?.source) &&
-    system?.ram_usage?.available !== false &&
-    memoryBytes(system.ram_usage) != null;
-  const backendValue = backendAvailable
-    ? backend.capacity ||
-      formatMemorySize(memoryBytes(system.ram_usage), locale)
-    : null;
   const warnings = (system?.warnings || []).filter(
-    (warning) => warning.metric !== "ram" || backendAvailable
+    (warning) => warning.metric !== "ram"
   );
+  const visibleStatus =
+    ["warning", "critical"].includes(system?.status) &&
+    system?.warnings?.length &&
+    warnings.length === 0
+      ? "ok"
+      : system?.status;
   const baseState = isLoading
     ? "loading"
     : isError && !system
     ? "unavailable"
     : isStale
     ? "stale"
-    : system?.status || "unavailable";
+    : visibleStatus || "unavailable";
   const state =
     (baseState === "ok" && !ram.available) ||
     (baseState === "unavailable" && ram.available)
       ? "partial"
       : baseState;
   const metricLabel = (key) =>
-    key === "ram" ? backend.label : t(`dashboard.resources.metrics.${key}`);
+    key === "ram" ? ram.label : t(`dashboard.resources.metrics.${key}`);
   const warningText = warnings
     .map((warning) => {
       const metric = system?.[`${warning.metric}_usage`];
@@ -279,8 +273,8 @@ const ResourceTelemetryCard = ({ embedded = false }) => {
                   }}
                 >
                   <Stack
-                    direction="row"
-                    alignItems="center"
+                    direction={key === "ram" ? "column" : "row"}
+                    alignItems={key === "ram" ? "flex-start" : "center"}
                     justifyContent="space-between"
                     spacing={1}
                   >
@@ -306,28 +300,6 @@ const ResourceTelemetryCard = ({ embedded = false }) => {
                         >
                           {ram.unavailableText}
                         </Typography>
-                      )}
-                      {ram.workingSet && (
-                        <Typography variant="body2" sx={{ mt: 1 }}>
-                          {t("dashboard.resources.workingSetMemory", {
-                            used: ram.workingSet,
-                          })}
-                        </Typography>
-                      )}
-                      {ram.reclaimable && (
-                        <Tooltip
-                          title={t("dashboard.resources.inactiveFileCacheHint")}
-                        >
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block", mt: 0.5 }}
-                          >
-                            {t("dashboard.resources.inactiveFileCache", {
-                              used: ram.reclaimable,
-                            })}
-                          </Typography>
-                        </Tooltip>
                       )}
                     </>
                   ) : (
@@ -379,6 +351,36 @@ const ResourceTelemetryCard = ({ embedded = false }) => {
             );
           })}
         </Grid>
+
+        <Box
+          sx={{
+            mt: 1.5,
+            p: 1.5,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 1,
+          }}
+        >
+          <Typography variant="body2" data-testid="shared-memory-metric">
+            {t("dashboard.resources.sharedMemory")}:{" "}
+            <strong>{ram.shared || "—"}</strong>
+          </Typography>
+          <Typography
+            variant="body2"
+            data-testid="service-group-memory-metric"
+            sx={{ mt: 0.5 }}
+          >
+            {t("dashboard.resources.serviceGroupMemory")}:{" "}
+            <strong>{ram.serviceValue || "—"}</strong>
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", mt: 0.5 }}
+          >
+            {t("dashboard.resources.sharedMemoryExplanation")}
+          </Typography>
+        </Box>
 
         <Accordion
           disableGutters
@@ -452,7 +454,10 @@ const ResourceTelemetryCard = ({ embedded = false }) => {
                             variant="body2"
                             sx={{ whiteSpace: "nowrap" }}
                           >
-                            {formatMemorySize(item.used_bytes, locale)}
+                            {formatMemorySize(
+                              item.service_used_bytes,
+                              locale
+                            ) || "—"}
                           </Typography>
                         </Stack>
                       ))}
@@ -461,16 +466,6 @@ const ResourceTelemetryCard = ({ embedded = false }) => {
               </>
             ) : (
               <Typography variant="body2">{ram.unavailableText}</Typography>
-            )}
-            {backendValue && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", mt: 1.5 }}
-                data-testid="backend-memory-detail"
-              >
-                {t("dashboard.resources.backendMemoryDetail")}: {backendValue}
-              </Typography>
             )}
           </AccordionDetails>
         </Accordion>
@@ -537,8 +532,15 @@ const ResourceTelemetryCard = ({ embedded = false }) => {
           >
             <LineChart
               aria-hidden="true"
-              height={160}
-              margin={{ left: 65, right: 12, top: 25, bottom: 24 }}
+              height={225}
+              margin={{ left: 65, right: 12, top: 80, bottom: 24 }}
+              slotProps={{
+                legend: {
+                  direction: "column",
+                  position: { vertical: "top", horizontal: "left" },
+                  labelStyle: { fontSize: 11 },
+                },
+              }}
               xAxis={xAxis}
               yAxis={[
                 {
@@ -550,18 +552,29 @@ const ResourceTelemetryCard = ({ embedded = false }) => {
               series={[
                 {
                   label: ram.label,
+                  color: theme.palette.primary.main,
+                  data: ramHistory.dedicated,
+                },
+                {
+                  label: t("dashboard.resources.sharedMemory"),
+                  color: theme.palette.info.main,
+                  data: ramHistory.shared,
+                },
+                {
+                  label: t("dashboard.resources.serviceGroupMemory"),
                   color: theme.palette.success.main,
                   data: ramHistory.data,
-                  curve: "linear",
-                  showMark:
-                    ramHistory.data.filter((value) => value != null).length <
-                    10,
-                  valueFormatter: (value) =>
-                    value == null
-                      ? t("common.unknown")
-                      : `${formatNumber(value, 2)} ${ramHistory.unit}`,
                 },
-              ]}
+              ].map((series) => ({
+                ...series,
+                curve: "linear",
+                showMark:
+                  ramHistory.data.filter((value) => value != null).length < 10,
+                valueFormatter: (value) =>
+                  value == null
+                    ? t("common.unknown")
+                    : `${formatNumber(value, 2)} ${ramHistory.unit}`,
+              }))}
               grid={{ horizontal: true }}
               skipAnimation
             />

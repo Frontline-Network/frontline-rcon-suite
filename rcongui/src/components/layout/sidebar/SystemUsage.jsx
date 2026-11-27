@@ -48,20 +48,12 @@ const SystemUsage = () => {
             {t("dashboard.resources.sharedMemory")}: {ram.shared || "—"}
           </Typography>
           <Typography variant="caption">
+            {t("dashboard.resources.serviceGroupMemory")}:{" "}
+            {ram.serviceValue || "—"}
+          </Typography>
+          <Typography variant="caption">
             {t("dashboard.resources.sharedMemoryExplanation")}
           </Typography>
-          {ram.workingSet && (
-            <Typography variant="caption">
-              {t("dashboard.resources.workingSetMemory", {
-                used: ram.workingSet,
-              })}
-            </Typography>
-          )}
-          {ram.reclaimable && (
-            <Typography variant="caption">
-              {t("dashboard.resources.inactiveFileCacheHint")}
-            </Typography>
-          )}
           {ram.components.map((item) => (
             <Typography key={item.service} variant="caption">
               {t("dashboard.resources.componentMemory", {
@@ -69,7 +61,7 @@ const SystemUsage = () => {
                   `dashboard.resources.componentNames.${item.service}`,
                   { defaultValue: item.service }
                 ),
-                used: formatMemorySize(item.used_bytes, locale),
+                used: formatMemorySize(item.service_used_bytes, locale) || "—",
               })}
             </Typography>
           ))}
@@ -152,6 +144,7 @@ const SystemUsage = () => {
               }}
             >
               <Stack
+                data-testid="sidebar-instance-memory"
                 direction="row"
                 alignItems="center"
                 justifyContent="space-between"
@@ -165,18 +158,14 @@ const SystemUsage = () => {
                   {isLoading ? t("common.loading") : ram.value || "—"}
                 </Typography>
               </Stack>
-              {ram.reclaimable && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  data-testid="sidebar-rcon-file-cache"
-                  sx={{ display: "block", ml: 2.5, lineHeight: 1.4 }}
-                >
-                  {t("dashboard.resources.inactiveFileCache", {
-                    used: ram.reclaimable,
-                  })}
-                </Typography>
-              )}
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                data-testid="sidebar-shared-memory"
+                sx={{ display: "block", mt: 0.5, lineHeight: 1.4 }}
+              >
+                {t("dashboard.resources.sharedMemory")}: {ram.shared || "—"}
+              </Typography>
             </ButtonBase>
           </Tooltip>
           {percentageRow(percentages[1])}

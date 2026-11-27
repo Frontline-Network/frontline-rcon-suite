@@ -215,7 +215,7 @@ class MemoryCollector:
 
     def _memory(self, container, deadline):
         if not container["running"]:
-            return 0, None, 0
+            return 0, None, 0, 0
         pid = container["pid"]
         if isinstance(pid, bool) or not isinstance(pid, int) or not 1 <= pid <= 2**31 - 1:
             raise CollectorError("invalid_container_pid")
@@ -232,18 +232,32 @@ class MemoryCollector:
         values = {}
         for line in self._file(directory, "memory.stat").splitlines():
             fields = line.split()
-            if len(fields) == 2 and fields[0] in ("inactive_file", "total_inactive_file"):
+            if len(fields) == 2 and fields[0] in (
+                "inactive_file", "total_inactive_file", "file", "shmem",
+                "cache", "total_cache", "total_shmem",
+            ):
                 if fields[0] in values:
                     raise CollectorError("duplicate_memory_stat")
                 values[fields[0]] = self._number(fields[1])
         key = "total_inactive_file" if version == 1 and "total_inactive_file" in values else "inactive_file"
         if key not in values:
             raise CollectorError("inactive_file_unavailable")
+        # `file` includes tmpfs/shared memory. Only disk-backed file pages
+        # belong to the separate cache figure: keep shmem in service RAM.
+        # Both counters must be known; absent historical fields are not zero.
+        file_cache = None
+        pairs = (("file", "shmem"),) if version == 2 else (
+            ("total_cache", "total_shmem"), ("cache", "shmem"),
+        )
+        for file_key, shmem_key in pairs:
+            if file_key in values and shmem_key in values:
+                file_cache = min(used, max(0, values[file_key] - values[shmem_key]))
+                break
         # Recheck after reading counters: a PID reused by a different container
         # or a moved cgroup cannot inherit the first container's attribution.
         if self.read_text(membership_path, 16384) != membership:
             raise CollectorError("container_identity_changed")
-        return used, limit, min(values[key], used)
+        return used, limit, min(values[key], used), file_cache
 
     def collect(self, config):
         config = parse_config(json.dumps(config))
@@ -257,7 +271,7 @@ class MemoryCollector:
         seen = set()
         for component in config["components"]:
             record = {"service": component["service"], "used_bytes": None,
-                      "limit_bytes": None, "reclaimable_bytes": None}
+                      "limit_bytes": None, "reclaimable_bytes": None, "file_cache_bytes": None}
             selected = [c for c in containers if c["project"] == component["project"]
                         and c["compose_service"] == component["compose_service"]]
             try:
@@ -275,9 +289,11 @@ class MemoryCollector:
                 used = sum(value[0] for value in readings)
                 reclaimable = sum(value[2] for value in readings)
                 limit = sum(running_limits) if running_limits and None not in running_limits else None
+                file_cache = sum(value[3] for value in readings) if all(value[3] is not None for value in readings) else None
                 if any(value is not None and value > MAX_COUNTER for value in (used, reclaimable, limit)):
                     raise CollectorError("aggregate_memory_counter_too_large")
-                record.update(used_bytes=used, reclaimable_bytes=reclaimable, limit_bytes=limit)
+                record.update(used_bytes=used, reclaimable_bytes=reclaimable,
+                              limit_bytes=limit, file_cache_bytes=file_cache)
             except (CollectorError, OSError, ValueError, UnicodeError):
                 result["complete"] = False
             result[component["category"] + "_components"].append(record)

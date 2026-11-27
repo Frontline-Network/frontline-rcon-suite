@@ -21,42 +21,65 @@ async function openSystem(page, options = {}) {
   return page.getByTestId("sidebar-rcon-memory");
 }
 
-test("RCON total and reclaimable cache are visible; details and absolute history load on demand", async ({
+test("only service RAM is displayed; 10 GiB raw charge and all file cache stay hidden", async ({
   page,
 }) => {
   const errors = collectRuntimeErrors(page);
   const memory = await openSystem(page);
-  await expect(memory).toContainText("RCON-RAM");
-  await expect(memory).toContainText("1,5 GiB");
+  const instance = memory.getByTestId("sidebar-instance-memory");
+  await expect(instance).toContainText("Instanz-RAM");
+  await expect(instance).toContainText("598 MiB");
+  await expect(instance).not.toContainText(/GiB|Dateicache/);
+  await expect(memory.getByTestId("sidebar-shared-memory")).toBeVisible();
+  await expect(memory.getByTestId("sidebar-shared-memory")).toContainText(
+    "1,1 GiB"
+  );
   await expect(memory).not.toContainText("%");
   await expect(memory.getByRole("progressbar")).toHaveCount(0);
-  await expect(memory.getByTestId("sidebar-rcon-file-cache")).toBeVisible();
-  await expect(memory.getByTestId("sidebar-rcon-file-cache")).toContainText(
-    "512 MiB"
-  );
+  await expect(memory.getByTestId("sidebar-rcon-file-cache")).toHaveCount(0);
+  await expect(memory).not.toContainText(/10,4 GiB|8,72 GiB|7 GiB|Dateicache/);
+  await memory.hover();
+  const tooltip = page.getByRole("tooltip");
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).not.toContainText(/10,4 GiB|8,72 GiB|7 GiB|Dateicache/);
   await memory.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   const ram = dialog.getByTestId("rcon-ram-metric");
-  await expect(ram).toContainText("1,5 GiB");
-  await expect(ram).toContainText("1 GiB");
-  await expect(ram).toContainText("512 MiB");
+  await expect(ram).toContainText("598 MiB");
+  await expect(ram).not.toContainText(/GiB|Dateicache/);
+  await expect(dialog.getByTestId("shared-memory-metric")).toContainText(
+    "1,1 GiB"
+  );
+  await expect(dialog.getByTestId("service-group-memory-metric")).toContainText(
+    "1,68 GiB"
+  );
+  await expect(dialog.getByTestId("service-group-file-cache")).toHaveCount(0);
+  await expect(dialog.getByTestId("memory-charge-metric")).toHaveCount(0);
+  await expect(dialog).not.toContainText(
+    /10,4 GiB|8,72 GiB|7 GiB|Dateicache|Backend-Belegung/
+  );
   await expect(ram).not.toContainText("%");
   await expect(ram.getByRole("progressbar")).toHaveCount(0);
   await dialog
     .getByRole("button", { name: "Speicher aufschlüsseln", exact: true })
     .click();
   const breakdown = dialog.getByTestId("rcon-memory-breakdown");
-  await expect(breakdown).toContainText("Eigene Dienste: 640 MiB");
-  await expect(breakdown).toContainText("Gemeinsam genutzte Dienste: 896 MiB");
+  await expect(breakdown).toContainText("Eigene Dienste: 598 MiB");
+  await expect(breakdown).toContainText("Gemeinsam genutzte Dienste: 1,1 GiB");
   await expect(breakdown).toContainText("Datenbank");
-  await expect(breakdown).toContainText("600 MiB");
-  await expect(breakdown.getByTestId("backend-memory-detail")).toContainText(
-    "256 MiB von 1 GiB"
+  await expect(breakdown).toContainText("830,4 MiB");
+  await expect(breakdown).toContainText("185 MiB");
+  await expect(breakdown.getByTestId("backend-memory-detail")).toHaveCount(0);
+  await expect(dialog).not.toContainText(
+    /10,4 GiB|8,72 GiB|7 GiB|Dateicache|256 MiB von/
   );
   const history = dialog.getByTestId("rcon-memory-history");
   await expect(history).toBeVisible();
   await expect(history).toHaveAttribute("aria-label", /GiB/);
+  await expect(history).toHaveAttribute("aria-label", /Dienstverbund/);
+  await expect(history).not.toHaveAttribute("aria-label", /10,4 GiB|8,72 GiB/);
+  await expect(history).toContainText("Dienstverbund gesamt");
   await expectNoHorizontalPageOverflow(page);
   await dialog.getByRole("button", { name: "Schließen", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -75,7 +98,9 @@ for (const mode of [
   }) => {
     const memory = await openSystem(page, { query: { demo_resources: mode } });
     await expect(memory).toContainText("—");
-    await expect(memory).not.toContainText(/1,5 GiB|32 GiB|64 GiB|256 MiB/);
+    await expect(memory).not.toContainText(
+      /598 MiB|10,4 GiB|32 GiB|64 GiB|256 MiB/
+    );
     await expect(memory.getByTestId("sidebar-rcon-file-cache")).toHaveCount(0);
     await memory.click();
     const dialog = page.getByRole("dialog");
@@ -96,8 +121,8 @@ for (const mode of [
 }
 
 for (const [language, label, breakdown] of [
-  ["en", "RCON RAM", "Show memory breakdown"],
-  ["fr", "RAM RCON", "Afficher le détail de la mémoire"],
+  ["en", "Instance RAM", "Show memory breakdown"],
+  ["fr", "RAM de l'instance", "Afficher le détail de la mémoire"],
 ]) {
   test(`memory details are translated into ${language}`, async ({ page }) => {
     const memory = await openSystem(page, { language });
@@ -107,13 +132,13 @@ for (const [language, label, breakdown] of [
     await expect(dialog.getByTestId("rcon-ram-metric")).toContainText(label);
     await dialog.getByRole("button", { name: breakdown, exact: true }).click();
     await expect(dialog.getByTestId("rcon-memory-breakdown")).toContainText(
-      "640 MiB"
+      "598 MiB"
     );
     await expect(dialog).not.toContainText("dashboard.resources.");
   });
 }
 
-test("backend pressure warnings remain explicitly labeled Backend-RAM", async ({
+test("raw backend pressure does not surface as service RAM pressure", async ({
   page,
 }) => {
   const memory = await openSystem(page, {
@@ -121,8 +146,36 @@ test("backend pressure warnings remain explicitly labeled Backend-RAM", async ({
   });
   await memory.click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("alert").first()).toContainText("Backend-RAM");
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
+  await expect(dialog).not.toContainText(/Backend-RAM|86 %|Dateicache/);
   await expect(dialog.getByTestId("rcon-ram-metric")).not.toContainText("%");
+});
+
+test("missing service measurements never substitute raw charge or old raw history", async ({
+  page,
+}) => {
+  const memory = await openSystem(page, {
+    query: { demo_resources: "cache_unknown" },
+  });
+  await expect(memory.getByTestId("sidebar-instance-memory")).toContainText(
+    "—"
+  );
+  await expect(memory.getByTestId("sidebar-shared-memory")).toContainText("—");
+  await expect(memory).not.toContainText(
+    /598 MiB|10,4 GiB|8,72 GiB|7 GiB|Dateicache/
+  );
+  await memory.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByTestId("rcon-ram-metric")).toContainText(
+    "nicht verfügbar"
+  );
+  await expect(dialog.getByTestId("rcon-memory-history")).toHaveCount(0);
+  await expect(dialog.getByTestId("service-group-memory-metric")).toContainText(
+    "—"
+  );
+  await expect(dialog).not.toContainText(
+    /10,4 GiB|8,72 GiB|7 GiB|Dateicache|256 MiB von/
+  );
 });
 
 test("fresh RCON telemetry survives unavailable local CPU and backend metrics", async ({
@@ -131,14 +184,12 @@ test("fresh RCON telemetry survives unavailable local CPU and backend metrics", 
   const memory = await openSystem(page, {
     query: { demo_resources: "local_unavailable" },
   });
-  await expect(memory).toContainText("1,5 GiB");
-  await expect(memory.getByTestId("sidebar-rcon-file-cache")).toContainText(
-    "512 MiB"
-  );
+  await expect(memory).toContainText("598 MiB");
+  await expect(memory.getByTestId("sidebar-rcon-file-cache")).toHaveCount(0);
   await memory.click();
   await expect(
     page.getByRole("dialog").getByTestId("rcon-ram-metric")
-  ).toContainText("1,5 GiB");
+  ).toContainText("598 MiB");
   await expect(page.getByTestId("backend-memory-detail")).toHaveCount(0);
 });
 

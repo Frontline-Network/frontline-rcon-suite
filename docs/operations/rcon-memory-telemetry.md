@@ -1,18 +1,19 @@
 # RCON container memory telemetry
 
-The system sidebar shows the sum of the configured RCON containers, rather than
-presenting the API backend's cgroup limit as the complete RCON footprint. Its
-details show dedicated and shared services separately. A shared service is counted
-once in full, not assigned an estimated fraction. Totals for different RCON
-instances must therefore not be added together when they include the same shared
-services.
+The system sidebar shows RAM of the instance's dedicated RCON services. Shared
+services are displayed separately, and the details also show their combined
+service RAM. Shared services are counted once in full, not assigned an estimated
+per-instance fraction. Totals for different RCON instances must therefore not be
+added together when they include the same shared services.
 
-The main value is the complete container memory charge (`memory.current` on
-cgroup v2), including file cache. Inactive file cache is reported separately when
-available. This keeps the measurement consistent with the previous backend RAM
-metric. There is no total percentage or synthetic sum of container limits:
-individual limits can overlap, be unlimited, or exceed host capacity. The
-backend's own usage and limit remain available as a separately labelled detail.
+Service RAM excludes all disk-backed file cache, including active cache. On
+cgroup v2 it is `memory.current - clamp(file - shmem, 0, memory.current)`; shared
+memory remains included. On cgroup v1 matching hierarchical cache/shmem counters
+are used, or matching local counters. Missing cache counters mean service RAM is
+unknown, never a fallback to the full charge. File cache and raw charges are not
+shown in the sidebar, tooltips, details, or history. The original full-charge API
+fields remain compatible. There is no total percentage or synthetic sum of
+container limits, which can overlap or exceed host capacity.
 
 ## Host collector
 
@@ -94,7 +95,11 @@ interval and one-hour history. Missing, incomplete, malformed, oversized, stale
 (more than 60 seconds old), or wrong-instance snapshots are unavailable, never a
 zero or the backend value labelled as the complete RCON sum. The existing
 `ram_usage` API field remains backwards-compatible; the additive
-`rcon_ram_usage` field contains the complete configured container set.
+`rcon_ram_usage` field contains the complete configured container set. Its
+`service_ram_available`, `service_used_bytes`, `dedicated_service_used_bytes`,
+and `shared_service_used_bytes` fields drive the display. New derived history
+fields are used instead of the legacy raw-charge history. The collector retains
+`file_cache_bytes` internally for this calculation; it is not displayed.
 
 ## Update and recovery
 

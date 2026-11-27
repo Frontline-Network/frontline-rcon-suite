@@ -28,6 +28,8 @@ def _safe_metric(metric: dict[str, Any] | None) -> dict[str, Any]:
 def _safe_system_usage(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     snapshot = snapshot or {}
     history = snapshot.get("history") or []
+    rcon_ram = snapshot.get("rcon_ram_usage") or {}
+    service_bytes = rcon_ram.get("service_used_bytes")
     return {
         "status": snapshot.get("status", "unavailable"),
         "sampled_at": snapshot.get("sampled_at"),
@@ -48,21 +50,25 @@ def _safe_system_usage(snapshot: dict[str, Any] | None) -> dict[str, Any]:
             "cpu": _safe_metric(snapshot.get("cpu_usage")),
             "ram": _safe_metric(snapshot.get("ram_usage")),
             "rcon_ram": {
-                **_safe_metric(snapshot.get("rcon_ram_usage")),
-                **{
-                    key: (snapshot.get("rcon_ram_usage") or {}).get(key)
-                    for key in (
-                        "used_bytes", "dedicated_used_bytes", "shared_used_bytes",
-                        "reclaimable_bytes", "working_set_bytes", "data_age_seconds",
-                    )
-                },
+                "available": rcon_ram.get("service_ram_available", False),
+                "used_bytes": service_bytes,
+                "used": service_bytes / 1024**3 if service_bytes is not None else None,
+                "unit": "GiB", "percent": None, "total": None,
+                "source": rcon_ram.get("source"),
+                "dedicated_used_bytes": rcon_ram.get("dedicated_service_used_bytes"),
+                "shared_used_bytes": rcon_ram.get("shared_service_used_bytes"),
+                "data_age_seconds": rcon_ram.get("data_age_seconds"),
             },
             "disk": _safe_metric(snapshot.get("disk_usage")),
         },
         "history": [
             {
                 key: entry.get(key)
-                for key in ("sampled_at", "cpu_percent", "ram_percent", "rcon_ram_used_bytes", "disk_percent", "status")
+                for key in (
+                    "sampled_at", "cpu_percent", "ram_percent", "disk_percent", "status",
+                    "rcon_service_ram_used_bytes", "rcon_dedicated_ram_used_bytes",
+                    "rcon_shared_ram_used_bytes",
+                )
             }
             for entry in history
             if isinstance(entry, dict)

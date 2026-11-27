@@ -50,7 +50,8 @@ def environment(tmp_path):
     return SimpleNamespace(proc=proc, groups=groups)
 
 
-def install_group(env, record, *, used=1000, limit="2000", inactive=300, version=2):
+def install_group(env, record, *, used=1000, limit="2000", inactive=300, version=2,
+                  file_bytes=500, shmem_bytes=100):
     pid = env.proc / str(record["pid"])
     pid.mkdir(parents=True)
     if version == 2:
@@ -58,13 +59,13 @@ def install_group(env, record, *, used=1000, limit="2000", inactive=300, version
         group = env.groups / relative.lstrip("/")
         membership = "0::" + relative + "\n"
         filenames = {"memory.current": str(used), "memory.max": str(limit),
-                     "memory.stat": "anon 100\ninactive_file " + str(inactive) + "\n"}
+                     "memory.stat": f"anon 100\ninactive_file {inactive}\nfile {file_bytes}\nshmem {shmem_bytes}\n"}
     else:
         relative = "/docker/" + record["id"]
         group = env.groups / "memory" / relative.lstrip("/")
         membership = "8:memory:" + relative + "\n"
         filenames = {"memory.usage_in_bytes": str(used), "memory.limit_in_bytes": str(limit),
-                     "memory.stat": "inactive_file 1\ntotal_inactive_file " + str(inactive) + "\n"}
+                     "memory.stat": f"inactive_file 1\ntotal_inactive_file {inactive}\ntotal_cache {file_bytes}\ntotal_shmem {shmem_bytes}\n"}
     group.mkdir(parents=True)
     (pid / "cgroup").write_text(membership)
     for name, value in filenames.items():
@@ -85,7 +86,7 @@ def test_v2_reports_full_current_including_reclaimable_file_cache(environment):
     assert result == {"schema_version": 1, "server_number": 3, "complete": True,
         "sampled_at": "2026-11-27T18:00:00Z", "shared_components": [],
         "dedicated_components": [{"service": "backend", "used_bytes": 1000,
-                                  "limit_bytes": 2000, "reclaimable_bytes": 300}]}
+                                  "limit_bytes": 2000, "reclaimable_bytes": 300, "file_cache_bytes": 400}]}
     assert len(docker.commands) == 2
     assert all(".Config.Env" not in str(command) for command, _ in docker.commands)
 
@@ -103,7 +104,7 @@ def test_explicit_selectors_exclude_other_tenants_and_sum_replicas(environment):
         component(), component("redis", "redis", "shared")))
     assert result["complete"] is True
     assert result["dedicated_components"][0] == {
-        "service": "backend", "used_bytes": 300, "limit_bytes": 3000, "reclaimable_bytes": 30}
+        "service": "backend", "used_bytes": 300, "limit_bytes": 3000, "reclaimable_bytes": 30, "file_cache_bytes": 300}
     assert result["shared_components"][0]["used_bytes"] == 400
     assert result["shared_components"][0]["limit_bytes"] is None
 
@@ -112,7 +113,7 @@ def test_stopped_containers_are_zero_without_reading_a_pid(environment):
     result = sampler(environment, Docker([container(running=False, pid=0)])).collect(config())
     assert result["complete"] is True
     assert result["dedicated_components"][0] == {
-        "service": "backend", "used_bytes": 0, "limit_bytes": None, "reclaimable_bytes": 0}
+        "service": "backend", "used_bytes": 0, "limit_bytes": None, "reclaimable_bytes": 0, "file_cache_bytes": 0}
 
 
 def test_stopped_replica_does_not_remove_a_running_replicas_limit(environment):
@@ -130,7 +131,7 @@ def test_v1_uses_hierarchical_inactive_and_detects_unlimited_memory(environment,
     result = sampler(environment, Docker([c])).collect(config())
     assert result["complete"] is True
     assert result["dedicated_components"][0] == {
-        "service": "backend", "used_bytes": 500, "limit_bytes": expected, "reclaimable_bytes": 200}
+        "service": "backend", "used_bytes": 500, "limit_bytes": expected, "reclaimable_bytes": 200, "file_cache_bytes": 400}
 
 
 def test_hybrid_host_can_use_the_v1_memory_controller(environment):
@@ -159,6 +160,65 @@ def test_reclaimable_memory_never_exceeds_current(environment):
     assert result["dedicated_components"][0]["reclaimable_bytes"] == 1000
 
 
+def test_disk_cache_includes_hot_pages_but_keeps_shared_memory_in_service_ram(environment):
+    c = container()
+    install_group(environment, c, used=1000, inactive=20, file_bytes=800, shmem_bytes=300)
+    result = sampler(environment, Docker([c])).collect(config())
+    item = result["dedicated_components"][0]
+    assert result["complete"] is True
+    assert item["used_bytes"] == 1000
+    assert item["reclaimable_bytes"] == 20
+    assert item["file_cache_bytes"] == 500
+    assert item["used_bytes"] - item["file_cache_bytes"] == 500
+
+
+@pytest.mark.parametrize("version,stat_text,expected", [
+    (2, "inactive_file 20\nfile 800\n", None),
+    (2, "inactive_file 20\nshmem 300\n", None),
+    (2, "inactive_file 20\n", None),
+    (2, "inactive_file 20\nfile 50\nshmem 100\n", 0),
+    (2, "inactive_file 20\nfile 5000\nshmem 100\n", 1000),
+    (1, "total_inactive_file 20\ntotal_cache 800\ntotal_shmem 300\ncache 50\nshmem 10\n", 500),
+    (1, "total_inactive_file 20\ncache 800\nshmem 300\n", 500),
+    (1, "total_inactive_file 20\ntotal_cache 800\nshmem 300\n", None),
+    (1, "total_inactive_file 20\ncache 800\n", None),
+    (1, "total_inactive_file 20\n", None),
+])
+def test_file_cache_requires_a_known_matching_pair_of_counters(environment, version, stat_text, expected):
+    c = container()
+    group = install_group(environment, c, version=version)
+    (group / "memory.stat").write_text(stat_text)
+    result = sampler(environment, Docker([c])).collect(config())
+    assert result["complete"] is True
+    assert result["dedicated_components"][0]["file_cache_bytes"] == expected
+
+
+@pytest.mark.parametrize("version,field", [(2, "file"), (2, "shmem"), (1, "total_cache"), (1, "total_shmem")])
+def test_invalid_file_cache_counter_cannot_produce_a_fabricated_service_ram(environment, version, field):
+    c = container()
+    group = install_group(environment, c, version=version)
+    text = (group / "memory.stat").read_text()
+    text = "\n".join(line if not line.startswith(field + " ") else field + " -1" for line in text.splitlines())
+    (group / "memory.stat").write_text(text)
+    result = sampler(environment, Docker([c])).collect(config())
+    assert result["complete"] is False
+    assert result["dedicated_components"][0]["file_cache_bytes"] is None
+
+
+@pytest.mark.parametrize("missing", [False, True])
+def test_replica_disk_cache_is_summed_only_when_every_replica_is_known(environment, missing):
+    a, b = container(), container("b", pid=102)
+    install_group(environment, a, file_bytes=500, shmem_bytes=100)
+    group = install_group(environment, b, file_bytes=700, shmem_bytes=200)
+    if missing:
+        (group / "memory.stat").write_text("inactive_file 300\nfile 700\n")
+    result = sampler(environment, Docker([a, b])).collect(config())
+    assert result["complete"] is True
+    item = result["dedicated_components"][0]
+    assert item["used_bytes"] == 2000
+    assert item["file_cache_bytes"] == (None if missing else 900)
+
+
 def test_replica_totals_cannot_exceed_the_backend_reader_integer_bound(environment):
     a, b = container(), container("b", pid=102)
     for c in (a, b):
@@ -175,7 +235,7 @@ def test_missing_required_selector_is_unknown_and_keeps_all_configured_entries(e
     assert result["complete"] is False
     assert result["dedicated_components"][0]["used_bytes"] == 1000
     assert result["shared_components"] == [{"service": "redis", "used_bytes": None,
-                                             "limit_bytes": None, "reclaimable_bytes": None}]
+                                             "limit_bytes": None, "reclaimable_bytes": None, "file_cache_bytes": None}]
 
 
 def test_missing_counter_file_is_not_zero_or_host_memory(environment):

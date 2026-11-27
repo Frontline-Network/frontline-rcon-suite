@@ -20,6 +20,9 @@ def test_support_diagnostics_allowlists_aggregate_fields_and_omits_sensitive_dat
                 "available": True, "used_bytes": 1234,
                 "dedicated_used_bytes": 1000, "shared_used_bytes": 234,
                 "reclaimable_bytes": 100, "working_set_bytes": 1134,
+                "service_ram_available": True, "service_used_bytes": 1034,
+                "dedicated_service_used_bytes": 900, "shared_service_used_bytes": 134,
+                "file_cache_bytes": 200,
                 "source": "rcon_services", "percent": None,
                 "components": [{"service": "private-hostname", "token": "private-token"}],
                 "path": "/private-resource-metrics",
@@ -46,9 +49,12 @@ def test_support_diagnostics_allowlists_aggregate_fields_and_omits_sensitive_dat
     assert "private-hostname" not in rendered
     assert "private-token" not in rendered
     metric = package["system_usage"]["metrics"]["rcon_ram"]
-    assert metric["used_bytes"] == 1234
-    assert metric["shared_used_bytes"] == 234
-    assert metric["reclaimable_bytes"] == 100
+    assert metric["used_bytes"] == 1034
+    assert metric["shared_used_bytes"] == 134
+    assert metric["available"] is True
+    assert "file_cache_bytes" not in metric
+    assert "working_set_bytes" not in metric
+    assert "reclaimable_bytes" not in metric
     assert metric["percent"] is None
 
 
