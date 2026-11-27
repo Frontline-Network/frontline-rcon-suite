@@ -2,9 +2,13 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, Mock
 
+from fakeredis import FakeStrictRedis
 import orjson
 import httpx
 import pytest
+import redis
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
 
 from rcon.webhook_service import (
     WebhookQueueKeyCache,
@@ -31,7 +35,38 @@ from rcon.webhook_service import (
     record_bucket_lock_wait,
     set_bucket_data,
 )
-from rcon import webhook_service
+from rcon import webhook_outbox as outbox, webhook_service
+
+
+@pytest.fixture(autouse=True)
+def outbox_database(monkeypatch, tmp_path):
+    engine = create_engine("sqlite:///" + str(tmp_path / "webhook-service.sqlite"),
+                           connect_args={"check_same_thread": False})
+    outbox.WebhookOutboxQueue.__table__.create(engine)
+    outbox.WebhookOutboxDelivery.__table__.create(engine)
+    maker = sessionmaker(bind=engine, expire_on_commit=False)
+    monkeypatch.setattr(outbox, "get_session_maker", lambda: maker)
+    monkeypatch.setattr(webhook_service, "get_server_number", lambda: "1")
+    monkeypatch.setattr(webhook_service, "WH_MAX_QUEUE_LENGTH", 150)
+    monkeypatch.setattr(webhook_service, "WH_MAX_MESSAGE_AGE_SECS", 3600)
+    monkeypatch.setattr(webhook_service, "_next_wakeup_attempt_at", 0.0)
+    # These are SQL delivery/metadata unit tests. Native Lua handoff is covered
+    # by test_webhook_legacy and the real-Redis durable-delivery integration run.
+    monkeypatch.setattr(webhook_service, "_import_legacy_queue", lambda *a, **kw: 0)
+    monkeypatch.setattr(webhook_service, "_import_legacy_dead_letters", lambda *a, **kw: 0)
+    webhook_service._RATE_LIMIT_BUCKETS.clear()
+    monkeypatch.setattr(webhook_service, "_SHARED_LOCK", None)
+    try:
+        yield maker
+    finally:
+        webhook_service._RATE_LIMIT_BUCKETS.clear()
+        engine.dispose()
+
+
+def _stored_rows(maker):
+    with maker() as session:
+        return list(session.scalars(select(outbox.WebhookOutboxDelivery).order_by(
+            outbox.WebhookOutboxDelivery.id)))
 
 
 def _message(message_type=WebhookMessageType.AUDIT):
@@ -71,8 +106,8 @@ def test_delivery_failure_logs_do_not_expose_webhook_payload(monkeypatch, caplog
         **_message().payload, "url": "https://example.invalid/" + secret,
         "webhook_token": secret, "content": secret,
     }})
-    red = Mock()
-    red.lpop.return_value = orjson.dumps(message.model_dump_json())
+    red = FakeStrictRedis()
+    enqueue_message(message, red=red)
     wh = SimpleNamespace(webhook_id="123", url="https://example.invalid/" + secret,
                          execute=AsyncMock())
     if failure == "transport":
@@ -80,12 +115,11 @@ def test_delivery_failure_logs_do_not_expose_webhook_payload(monkeypatch, caplog
     else:
         wh.execute.return_value = SimpleNamespace(status_code=failure, headers={"secret": secret})
     monkeypatch.setattr(webhook_service, "construct_webhook", lambda **_: wh)
-    monkeypatch.setattr(webhook_service, "move_to_dead_letter", Mock())
     with caplog.at_level(logging.DEBUG, logger=webhook_service.__name__):
         asyncio.run(dequeue_message(red=red, client=Mock(), queue_id="whs:1:discord:audit:123",
                                     bucket_data=None, lock=asyncio.Lock()))
     assert secret not in caplog.text
-    webhook_service.move_to_dead_letter.assert_called_once()
+    assert outbox.summary() == {"review": 1}
 
 
 def test_global_rate_limit_does_not_log_untrusted_response(monkeypatch, caplog):
@@ -94,8 +128,8 @@ def test_global_rate_limit_does_not_log_untrusted_response(monkeypatch, caplog):
 
     secret = "fake-response-secret"
     message = _message()
-    red = Mock()
-    red.lpop.return_value = orjson.dumps(message.model_dump_json())
+    red = FakeStrictRedis()
+    enqueue_message(message, red=red)
     response = SimpleNamespace(
         status_code=429,
         headers={"x-ratelimit-bucket": "", "x-ratelimit-remaining": "0", "x-ratelimit-reset-after": "1"},
@@ -110,6 +144,7 @@ def test_global_rate_limit_does_not_log_untrusted_response(monkeypatch, caplog):
                                     bucket_data=None, lock=asyncio.Lock()))
     assert secret not in caplog.text
     webhook_service.set_global_rate_limit_reset_after.assert_called_once()
+    assert outbox.summary() == {"queued": 1}
 
 
 def test_queue_registry_is_installation_wide():
@@ -163,8 +198,11 @@ def test_uncontended_bucket_lock_wait_does_not_write_metrics():
     red.pipeline.assert_not_called()
 
 
-def test_webhook_404_without_message_id_marks_error_and_purges_webhook_queue():
-    red = Mock()
+def test_webhook_404_without_message_id_marks_error_and_retains_queued_payloads(outbox_database):
+    red = FakeStrictRedis()
+    queued = enqueue_message(_message(), red=red)
+    legacy = orjson.dumps(_message().model_dump_json())
+    red.rpush("whs:1:discord:audit:123", legacy)
 
     handle_webhook_not_found(
         red=red,
@@ -174,18 +212,19 @@ def test_webhook_404_without_message_id_marks_error_and_purges_webhook_queue():
         webhook_id="123",
     )
 
-    red.set.assert_not_called()
-    red.lrange.assert_not_called()
-    red.delete.assert_called_once_with("whs:1:discord:audit:123")
-    red.srem.assert_called_once_with(
-        get_queue_registry_key(), "whs:1:discord:audit:123"
-    )
-    red.hset.assert_called_once()
+    assert red.lrange("whs:1:discord:audit:123", 0, -1) == [legacy]
+    assert outbox.lookup(queued)["status"] == "queued"
+    assert _stored_rows(outbox_database)[0].payload
+    assert webhook_service.get_webhook_error(red, "123", WebhookType.DISCORD)["http_404"] is True
 
 
-def test_webhook_404_with_message_id_marks_edit_and_clears_related_queue_items():
-    red = Mock()
-    red.lrange.return_value = []
+def test_webhook_404_with_message_id_marks_edit_without_deleting_related_payloads(outbox_database):
+    red = FakeStrictRedis()
+    message = _message(WebhookMessageType.SCOREBOARD)
+    message.payload["message_id"] = "456"
+    queued = enqueue_message(message, red=red)
+    legacy = orjson.dumps(message.model_dump_json())
+    red.rpush("whs:1:discord:scoreboard:123", legacy)
 
     handle_webhook_not_found(
         red=red,
@@ -195,45 +234,73 @@ def test_webhook_404_with_message_id_marks_edit_and_clears_related_queue_items()
         webhook_id="123",
     )
 
-    red.set.assert_called_once()
-    red.lrange.assert_called_once_with("whs:1:discord:scoreboard:123", 0, -1)
-    red.delete.assert_not_called()
-    red.srem.assert_not_called()
-    red.hset.assert_called_once()
+    assert webhook_service.get_message_edit_404_failure("456", red=red) is True
+    assert red.lrange("whs:1:discord:scoreboard:123", 0, -1) == [legacy]
+    assert outbox.lookup(queued)["status"] == "queued"
+    assert _stored_rows(outbox_database)[0].payload
+    assert webhook_service.get_webhook_error(red, "123", WebhookType.DISCORD)["http_404"] is True
 
 
-def test_enqueue_registers_persistent_queue():
+def test_enqueue_persists_payload_before_indexing_only_a_bounded_wakeup(outbox_database):
     red = Mock()
     pipe = red.pipeline.return_value
 
-    enqueue_message(_message(), red=red)
+    delivery_id = enqueue_message(_message(), red=red)
 
-    pipe.rpush.assert_called_once()
-    pipe.sadd.assert_called_once_with(
-        get_queue_registry_key(),
-        "__initialized__",
-        "whs:1:discord:audit:123",
-    )
+    pipe.rpush.assert_called_once_with(webhook_service.OUTBOX_WAKEUPS_KEY, delivery_id)
+    pipe.ltrim.assert_called_once_with(webhook_service.OUTBOX_WAKEUPS_KEY, -150, -1)
+    pipe.sadd.assert_not_called()
     pipe.execute.assert_called_once_with()
+    stored = _stored_rows(outbox_database)
+    assert len(stored) == 1 and stored[0].message_id == delivery_id and stored[0].status == "queued"
+    assert webhook_service.unpack_message(stored[0].payload).payload == _message().payload
 
 
-def test_enqueue_registers_transient_queue():
+def test_wakeup_circuit_preserves_sql_messages_without_repeated_redis_attempts(monkeypatch, outbox_database):
+    from types import SimpleNamespace
+
+    clock = [100.0]
+    monkeypatch.setattr(webhook_service, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    red = Mock()
+    pipe = red.pipeline.return_value
+    pipe.execute.side_effect = redis.exceptions.ConnectionError("synthetic Redis interruption")
+    enqueue_message(_message(), red=red)
+    for _ in range(100):
+        enqueue_message(_message(), red=red)
+    assert red.pipeline.call_count == 1
+    assert outbox.summary() == {"queued": 101}
+    assert all(row.payload for row in _stored_rows(outbox_database))
+
+    clock[0] += 1.1
+    pipe.execute.side_effect = None
+    recovered = enqueue_message(_message(), red=red)
+    assert red.pipeline.call_count == 2
+    pipe.rpush.assert_called_with(webhook_service.OUTBOX_WAKEUPS_KEY, recovered)
+    assert outbox.summary() == {"queued": 102}
+    assert webhook_service._next_wakeup_attempt_at == 0.0
+
+
+def test_transient_updates_are_durable_and_coalesce_only_unsent_state(outbox_database):
     red = Mock()
     pipe = red.pipeline.return_value
 
-    enqueue_transient_message(
+    first = enqueue_transient_message(
         _message(WebhookMessageType.SCOREBOARD),
         message_group_key="game",
         red=red,
     )
 
-    pipe.set.assert_called_once()
-    pipe.sadd.assert_called_once_with(
-        get_queue_registry_key(),
-        "__initialized__",
-        "whs:1:transient_identifier:discord:scoreboard:123:game",
-    )
-    pipe.execute.assert_called_once_with()
+    latest = _message(WebhookMessageType.SCOREBOARD)
+    latest.payload["content"] = "latest scoreboard state"
+    second = enqueue_transient_message(latest, message_group_key="game", red=red)
+    pipe.set.assert_not_called()
+    pipe.sadd.assert_not_called()
+    assert pipe.rpush.call_count == 2 and pipe.execute.call_count == 2
+    assert first != second
+    assert outbox.summary() == {"superseded": 1, "queued": 1}
+    claim = outbox.claim("whs:1:transient_identifier:discord:scoreboard:123:game")
+    assert claim and claim.id == second
+    assert webhook_service.unpack_message(claim.payload).payload["content"] == "latest scoreboard state"
 
 
 def test_webhook_queue_key_cache_reuses_discovery_within_refresh_interval():
@@ -275,9 +342,10 @@ def test_webhook_queue_key_cache_filters_queues_deleted_between_scans():
     red.srem.assert_called_once()
 
 
-def test_dequeue_lpop_race_is_counted_without_json_error():
-    red = Mock()
-    red.lpop.return_value = None
+def test_empty_durable_queue_does_not_construct_or_parse_a_message(monkeypatch):
+    red = FakeStrictRedis()
+    construct = Mock()
+    monkeypatch.setattr(webhook_service, "construct_webhook", construct)
 
     asyncio.run(
         dequeue_message(
@@ -289,7 +357,14 @@ def test_dequeue_lpop_race_is_counted_without_json_error():
         )
     )
 
-    red.incr.assert_called_once_with(EMPTY_DEQUEUE_COUNT)
+    construct.assert_not_called()
+    assert outbox.summary() == {}
+
+
+def test_legacy_empty_dequeue_metric_remains_available():
+    red = FakeStrictRedis()
+    webhook_service.record_empty_dequeue(red, "whs:1:discord:audit:123")
+    assert int(red.get(EMPTY_DEQUEUE_COUNT)) == 1
 
 
 def test_webhook_registry_imports_legacy_queues_once():
@@ -324,6 +399,50 @@ def test_empty_webhook_registry_only_scans_during_initial_migration():
     red.sadd.assert_called_once()
 
 
+def test_wakeup_lpop_and_legacy_discovery_never_consume_the_hint_namespace():
+    red = FakeStrictRedis()
+    first = enqueue_message(_message(), red=red)
+    assert red.lpop(webhook_service.OUTBOX_WAKEUPS_KEY) == first.encode()
+    second = enqueue_message(_message(), red=red)
+    red.rpush(DEAD_LETTER_QUEUE, b"retained synthetic archive entry")
+    registry = get_queue_registry_key()
+    # An unfinished older discovery pass may have registered reserved keys.
+    # Its scan/metadata cleanup must leave the hints/archive untouched.
+    red.sadd(registry, webhook_service.OUTBOX_WAKEUPS_KEY,
+             DEAD_LETTER_QUEUE, registry, "unrelated:queue")
+    cache = WebhookQueueKeyCache(red=red, refresh_interval_secs=1.0)
+
+    assert cache.get_not_empty(now=10.0) == []
+    assert webhook_service.OUTBOX_WAKEUPS_KEY not in webhook_service.get_all_queue_keys(red=red)
+    assert red.lrange(webhook_service.OUTBOX_WAKEUPS_KEY, 0, -1) == [second.encode()]
+    assert red.lrange(DEAD_LETTER_QUEUE, 0, -1) == [b"retained synthetic archive entry"]
+    assert red.smembers(registry) == {b"__initialized__"}
+    assert outbox.summary() == {"queued": 2}
+    assert outbox.list_review() == []
+
+
+def test_partial_registry_discovers_unregistered_legacy_queues_before_initializing(monkeypatch):
+    red = FakeStrictRedis()
+    first, second = "whs:1:discord:audit:123", "whs:2:discord:audit:456"
+    red.rpush(first, b"first synthetic report")
+    red.rpush(second, b"second synthetic report")
+    red.sadd(get_queue_registry_key(), first)
+    scan = Mock(wraps=red.scan_iter)
+    monkeypatch.setattr(red, "scan_iter", scan)
+    cache = WebhookQueueKeyCache(red=red, refresh_interval_secs=1.0)
+
+    assert cache.get_not_empty(now=10.0) == [first, second]
+    assert cache.get_not_empty(now=11.0) == [first, second]
+    assert red.smembers(get_queue_registry_key()) == {
+        b"__initialized__", first.encode(), second.encode()}
+    assert red.lrange(first, 0, -1) == [b"first synthetic report"]
+    assert red.lrange(second, 0, -1) == [b"second synthetic report"]
+    scan.assert_any_call(match="whs:*", _type="list")
+    scan.assert_any_call(match="whs:*", _type="string")
+    assert scan.call_count == 2
+    assert outbox.summary() == {}
+
+
 def test_dead_letter_list_is_redacted_for_operator_views():
     message = _message()
     entry = DeadLetterWebhookMessage(
@@ -332,75 +451,69 @@ def test_dead_letter_list_is_redacted_for_operator_views():
         source_queue_id="whs:1:discord:audit:123",
         reason="retry_limit_reached",
     )
-    red = Mock()
-    red.lrange.return_value = [entry.model_dump_json()]
+    red = FakeStrictRedis()
+    outbox.enqueue(entry.source_queue_id, message.model_dump_json().encode(),
+                   message.server_number, public_id=entry.id, initial_status="review",
+                   reason=entry.reason, created_at=entry.failed_at,
+                   message_type=str(message.message_type), webhook_type=str(message.webhook_type))
 
     entries = get_dead_letter_messages(red=red)
 
-    assert entries == [
-        {
-            "id": "failed-delivery",
-            "server_number": 1,
-            "webhook_type": WebhookType.DISCORD,
-            "message_type": WebhookMessageType.AUDIT,
-            "retry_attempts": 0,
-            "reason": "retry_limit_reached",
-            "failed_at": entry.failed_at,
-        }
-    ]
+    assert len(entries) == 1
+    for key, expected in {
+        "id": entry.id, "server_number": 1, "webhook_type": WebhookType.DISCORD,
+        "message_type": WebhookMessageType.AUDIT, "retry_attempts": 0,
+        "reason": "retry_limit_reached", "status": "review",
+    }.items():
+        assert entries[0][key] == expected
+    assert entries[0]["failed_at"]
     assert "payload" not in entries[0]
     assert "token" not in str(entries[0])
+    assert outbox.summary() == {"review": 1}
+    assert red.llen(DEAD_LETTER_QUEUE) == 0
 
 
-def test_dead_letter_is_bounded_and_expires():
-    red = Mock()
-    pipe = red.pipeline.return_value
-
-    status = move_to_dead_letter(
-        message=_message(),
-        queue_id="whs:1:discord:audit:123",
-        reason="transport_error",
-        red=red,
-    )
-
-    assert status["reason"] == "transport_error"
-    assert pipe.lpush.call_args.args[0] == DEAD_LETTER_QUEUE
-    pipe.ltrim.assert_called_once()
-    pipe.expire.assert_called_once()
-    pipe.execute.assert_called_once_with()
+def test_review_archive_keeps_more_than_the_old_capacity_and_does_not_expire(outbox_database):
+    red = FakeStrictRedis()
+    for _ in range(501):
+        status = move_to_dead_letter(message=_message(), queue_id="whs:1:discord:audit:123",
+                                     reason="transport_error", red=red)
+        assert status["reason"] == "transport_error"
+    assert outbox.summary() == {"review": 501}
+    assert len(get_dead_letter_messages(red=red, limit=1000)) == 501
+    assert outbox.cleanup_sent(now=datetime.now(timezone.utc) + timedelta(days=60)) == 0
+    assert all(row.payload for row in _stored_rows(outbox_database))
+    assert red.exists(DEAD_LETTER_QUEUE) == 0
 
 
-def test_dead_letter_retry_removes_entry_before_requeueing():
-    entry = DeadLetterWebhookMessage(
-        id="retry-me",
-        message=_message(),
-        source_queue_id="whs:1:discord:audit:123",
-        reason="transport_error",
-    )
-    red = Mock()
-    raw_entry = entry.model_dump_json()
-    red.lrange.return_value = [raw_entry]
-    red.lrem.return_value = 1
-    pipe = red.pipeline.return_value
+def test_dead_letter_retry_is_atomic_and_preserves_payload_on_storage_failure(monkeypatch, outbox_database):
+    red = FakeStrictRedis()
+    status = move_to_dead_letter(message=_message(), queue_id="whs:1:discord:audit:123",
+                                 reason="transport_error", red=red)
+    original = outbox.retry_review
+    monkeypatch.setattr(outbox, "retry_review", Mock(side_effect=outbox.OutboxStorageError("synthetic outage")))
+    with pytest.raises(outbox.OutboxStorageError):
+        retry_dead_letter_message(status["id"], red=red)
+    assert outbox.summary() == {"review": 1}
+    assert _stored_rows(outbox_database)[0].payload
+    monkeypatch.setattr(outbox, "retry_review", original)
+    assert retry_dead_letter_message(status["id"], red=red) is True
+    assert retry_dead_letter_message(status["id"], red=red) is False
+    stored = _stored_rows(outbox_database)
+    assert len(stored) == 1 and stored[0].message_id == status["id"] and stored[0].status == "queued"
+    assert stored[0].payload
+    assert red.lrange(webhook_service.OUTBOX_WAKEUPS_KEY, 0, -1) == [status["id"].encode()]
 
-    assert retry_dead_letter_message("retry-me", red=red) is True
-    red.lrem.assert_called_once_with(DEAD_LETTER_QUEUE, 1, raw_entry)
-    assert pipe.rpush.call_args.args[0] == "whs:1:discord:audit:123"
-    assert pipe.sadd.call_args.args[0] == get_queue_registry_key()
-    pipe.execute.assert_called_once_with()
 
-
-def test_expired_message_moves_to_dead_letter_without_contacting_discord(monkeypatch):
+def test_old_accepted_message_is_retained_for_review_and_can_be_explicitly_retried(monkeypatch, outbox_database):
+    from types import SimpleNamespace
     message = _message().model_copy(
         update={"sent_at": datetime.now(tz=timezone.utc) - timedelta(hours=2)}
     )
-    red = Mock()
-    pipe = red.pipeline.return_value
-    # Persistent webhook queues keep the Pydantic JSON string as a Redis JSON
-    # value, matching ``enqueue_message``.
-    red.lpop.return_value = orjson.dumps(message.model_dump_json())
-    construct = Mock()
-    monkeypatch.setattr("rcon.webhook_service.construct_webhook", construct)
+    red = FakeStrictRedis()
+    enqueue_message(message, red=red)
+    wh = SimpleNamespace(webhook_id="123", execute=AsyncMock(return_value=httpx.Response(204)))
+    monkeypatch.setattr("rcon.webhook_service.construct_webhook", lambda **_: wh)
 
     asyncio.run(
         dequeue_message(
@@ -412,6 +525,12 @@ def test_expired_message_moves_to_dead_letter_without_contacting_discord(monkeyp
         )
     )
 
-    construct.assert_not_called()
-    assert pipe.lpush.call_args.args[0] == DEAD_LETTER_QUEUE
-    pipe.execute.assert_called_once_with()
+    wh.execute.assert_not_awaited()
+    assert outbox.summary() == {"review": 1}
+    stored = _stored_rows(outbox_database)
+    assert stored[0].payload and stored[0].reason == "message_expired"
+    assert retry_dead_letter_message(stored[0].message_id, red=red) is True
+    asyncio.run(dequeue_message(red=red, client=Mock(), queue_id="whs:1:discord:audit:123",
+                                bucket_data=None, lock=asyncio.Lock()))
+    wh.execute.assert_awaited_once()
+    assert outbox.summary() == {"sent": 1}

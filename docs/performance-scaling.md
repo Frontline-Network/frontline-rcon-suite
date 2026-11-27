@@ -828,3 +828,49 @@ Updating only the HTTP backend does not update that separate running process.
 Validate a rollout with identical statistics inputs and repeated load/idle
 cycles; a decrease immediately after restarting a process is not itself evidence
 of a sustained memory improvement.
+
+## Durable webhook backlog and Redis reconnection
+
+Webhook producers commit their payload to the SQL outbox before returning an
+accepted delivery ID. Database admission failures are reported to the caller;
+Redis unavailability cannot revoke an already committed admission. Redis stores
+only a bounded list of UUID wakeup hints (`HLL_WH_MAX_QUEUE_LENGTH`, default
+150). Losing or expiring a hint is harmless because the worker also discovers
+ready SQL queues every second. An unavailable Redis gets a producer-side retry
+cooldown and a worker-side exponential backoff, rather than repeated blocking
+attempts for every queued message or a busy event loop.
+
+The worker permits eight delivery tasks and serializes each queue. HTTP calls
+have a 20-second deadline; SQL ownership is renewed at send start for 120
+seconds. A successful HTTP result is committed to SQL before optional Redis
+rate-limit bookkeeping. A crashed claim before sending can be recovered. A
+timeout, interrupted send, or crash after HTTP started leaves the payload in
+durable operator review. Discord does not provide a transaction spanning the
+HTTP request and the SQL acknowledgement: an unknown result must be checked
+before an operator retries it, since the original may already have arrived.
+
+Review payloads have no automatic expiry or capacity-based deletion. The
+existing message-age policy moves stale reports to review instead of sending
+old reports automatically. An explicit operator retry supplies a fresh retry
+budget and permits that retained old report to be sent. Confirmed deliveries
+release their payload immediately; their metadata can be cleaned in bounded
+batches after 30 days. Legacy deduplication tombstones remain protected until
+their source acknowledgement is known. Scoreboard snapshots retain explicit
+latest-wins coalescing; an old Redis snapshot cannot supersede a newer native
+SQL snapshot.
+
+For an upgrade, stop the old destructive webhook consumer before activating
+the new one. Apply the additive outbox migration, start the new consumer, and
+update every active producer image. Legacy list heads remain in Redis with a
+stable occurrence token until their SQL admission commits. An interrupted
+import reuses that token, while identical legitimate messages have separate
+tokens. Old error-archive entries are also imported before their Redis copies
+are acknowledged. Queue resets retain work for review, including large legacy
+backlogs that are archived through bounded background passes.
+
+An old consumer cannot drain SQL work. A rollback must retain a compatible
+consumer or pause delivery while accepted work remains stored. The migration
+downgrade refuses to drop retained payloads or unacknowledged legacy imports.
+Test an upgrade and its recovery using real isolated PostgreSQL and Redis,
+including a stopped consumer, more than 150 messages, Redis restart, claim
+expiry, uncertain HTTP results, concurrent consumers, and legacy import failure.

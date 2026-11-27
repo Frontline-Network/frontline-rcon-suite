@@ -1,7 +1,9 @@
 import asyncio
+import hashlib
 import math
 import os
 import random
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -19,15 +21,10 @@ from discord_webhook import AsyncDiscordWebhook, DiscordWebhookDict
 from pydantic import BaseModel, Field
 
 from rcon.cache_utils import construct_redis_url, get_redis_client
+from rcon import webhook_legacy, webhook_outbox
 from rcon.utils import get_server_number
 
 logger = getLogger(__name__)
-
-# TODO: we can't expire redis list items; but we could maybe use
-# a sorted set in the future so we can expire individual items
-# to prevent indefinite growth without a max length,
-# right now the lists are trimmed
-# when adding new elements to prevent indefinite growth
 
 # TODO: Support editing existing messages; this can only add
 # new ones, so we can't use it for scorebot yet
@@ -36,6 +33,15 @@ TRANSIENT_IDENTIFIER = "transient_identifier"
 TRANSIENT_IDENTIFIER_BYTES = b"transient_identifier"
 
 PREFIX = "whs"
+OUTBOX_WAKEUPS_KEY = "whs_outbox:wakeups"
+OUTBOX_POLL_SECONDS = 1.0
+DELIVERY_TIMEOUT_SECONDS = 20.0
+DELIVERY_LEASE_SECONDS = 120
+MAX_DELIVERY_TASKS = 8
+LEGACY_IMPORT_BATCH = 20
+_next_wakeup_warning_at = 0.0
+_next_wakeup_attempt_at = 0.0
+_wakeup_lock = threading.Lock()
 BUCKET_ID = f"{PREFIX}"
 WH_ID_TO_RATE_LIMIT_BUCKET = f"{PREFIX}:wh_id_rl_bucket"
 BUCKET_RL = f"{PREFIX}:rl"
@@ -80,12 +86,8 @@ except (ValueError, TypeError):
     BUCKET_RL_COUNT_RESET_SECS = 60 * 10
 
 
-# We trim the queues (redis list) after adding messages so we don't exceed this length
-# which is unlikely to happen in normal circumstances except the kill feed if turned on
-# which will rapidly accumulate messages faster than we can send them to Discord
-# If we trim from the left; we lose messages that we're retrying but are older, if we
-# trim from the right; we lose newer messages
-# We choose to trim from the left in the interest of losing older (less relevant?) messages
+# This bounds Redis UUID wakeup hints, not accepted message payloads. SQL owns
+# the complete backlog while a consumer or Redis is unavailable.
 try:
     WH_MAX_QUEUE_LENGTH = int(os.getenv("HLL_WH_MAX_QUEUE_LENGTH"))
 except (ValueError, TypeError):
@@ -110,9 +112,8 @@ QUEUE_REGISTRY_SENTINEL = "__initialized__"
 EMPTY_DEQUEUE_COUNT = f"{PREFIX}:metrics:empty_dequeues"
 DEAD_LETTER_QUEUE = f"{PREFIX}:dead_letter"
 
-# A webhook should not keep a worker busy forever when Discord or the target
-# endpoint is unavailable.  Failed payloads remain available to an operator in
-# the dead-letter queue, but that queue is bounded and expires by itself.
+# Retained SQL review entries do not expire. The legacy archive constants only
+# describe old Redis data during upgrade; accepted new payloads are never trimmed.
 try:
     WH_MAX_RETRY_ATTEMPTS = int(os.getenv("HLL_WH_MAX_RETRY_ATTEMPTS", 5))
 except (ValueError, TypeError):
@@ -164,18 +165,6 @@ def get_message_edit_404_failure(
     return red.get(f"{prefix}:{message_id}") == b"1"
 
 
-def clear_queue_by_message_id(red: redis.StrictRedis, queue_id: str, message_id: str):
-    """Delete all messages from a queue that have message_id
-
-    This allows us to remove all queued edits to a message ID that no longer exists
-    """
-
-    # Traverse the list and identify all the values that contain message_id
-    # and then LREM them
-    for raw_message in red.lrange(queue_id, 0, -1):
-        message = unpack_message(raw_message=raw_message)
-        if message_id == message.payload["message_id"]:
-            red.lrem(queue_id, 0, raw_message)
 
 
 def handle_webhook_not_found(
@@ -185,24 +174,10 @@ def handle_webhook_not_found(
     webhook_type: "WebhookType",
     webhook_id: str,
 ) -> None:
-    """Record a Discord 404 and discard work that cannot succeed.
-
-    A 404 for an edit identifies a missing Discord message, so only queued edits
-    for that message are removed. A 404 without a message ID identifies a
-    deleted webhook; every remaining item in that webhook's queue would fail in
-    the same way and must be discarded at once.
-    """
+    """Record a Discord 404; accepted payloads remain in the SQL review archive."""
     message_id = payload.get("message_id")
     if message_id:
         set_message_edit_404_failure(red=red, message_id=message_id)
-        clear_queue_by_message_id(
-            red=red,
-            queue_id=queue_id,
-            message_id=message_id,
-        )
-    else:
-        red.delete(queue_id)
-        red.srem(get_queue_registry_key(), queue_id)
 
     set_webhook_error(
         red=red,
@@ -305,7 +280,7 @@ class TransientMessageStatus(TypedDict):
 class DeadLetterStatus(TypedDict):
     """Redacted operator-facing state for a failed webhook delivery.
 
-    The actual message remains in Redis so it can be retried, but its payload
+    The actual message remains in SQL so it can be retried, but its payload
     may contain a Discord webhook token and must never be returned by the API.
     """
 
@@ -319,7 +294,7 @@ class DeadLetterStatus(TypedDict):
 
 
 class WebhookMessage(BaseModel):
-    """Format for enqueing messages into Redis for the webhook service"""
+    """Accepted webhook payload stored durably before a delivery is scheduled."""
 
     server_number: int = Field(description="The server that generated this message")
     discardable: bool = Field(
@@ -638,54 +613,59 @@ def enqueue_transient_message(
     use `enqueue_message` for messages that should be stored in a queue so they are
     # all (attempted but not guaranteed) to be sent to the remote service (Discord, etc.)
     """
-    logger.debug("Enqueuing transient webhook message")
-
-    # Allows easier usage for enqueing from different services/sections of CRCON
-    if red is None:
-        url = construct_redis_url(db_number=0)
-        red = get_redis_client(redis_url=url, decode_responses=False, global_pool=True)
-
-    # Scoreboard messages are inherently temporary since they change often;
-    # there is no point in retaining old messages
-    # So instead of using a list as a message queue; save the payload at
-    # a unique key for this message group key (e.g. header/gamestate, map rotation, player stats)
-    # overwriting anything that was there before so only the most recently queued
-    # update is used
+    if not isinstance(message, WebhookMessage):
+        raise ValueError("Expected a WebhookMessage")
     key = f"{prefix}:{get_server_number()}:{transient_identifier}:{message.webhook_type}:{message.message_type}:{message.payload['webhook_id']}:{message_group_key}"
-    pipe = red.pipeline()
-    pipe.set(key, orjson.dumps(message.model_dump_json()), ex=ttl)
-    pipe.sadd(get_queue_registry_key(prefix=prefix), QUEUE_REGISTRY_SENTINEL, key)
-    pipe.execute()
+    delivery_id = webhook_outbox.enqueue(
+        key, message.model_dump_json().encode(), message.server_number,
+        coalesce=True, message_type=str(message.message_type),
+        webhook_type=str(message.webhook_type), created_at=message.sent_at,
+        initial_attempts=message.retry_attempts,
+    )
+    _wake_outbox(delivery_id, red)
+    return delivery_id
 
 
 def enqueue_message(
     message: WebhookMessage, red: redis.StrictRedis | None = None, prefix: str = PREFIX
 ):
-    """Accept a WebhookMessage and insert it in Redis
+    """Commit a WebhookMessage to SQL, then send an optional bounded Redis hint.
 
     Queues are independently tracked by the webhook ID (Discord snowflake)
     """
-    logger.debug("Enqueuing webhook message")
-
-    # Allows easier usage for enqueing from different services/sections of CRCON
-    if red is None:
-        url = construct_redis_url(db_number=0)
-        red = get_redis_client(redis_url=url, decode_responses=False, global_pool=True)
-
     if not isinstance(message, WebhookMessage):
-        raise ValueError(f"{message} must be a WebhookMessage instance")
-
-    # Because we use lists; each type of message gets its own queue so that we can
-    # more efficiently purge types of messages (for instance all kill log lines)
-    # without having to scan/decode every element in a list which might be thousands
-    # of elements long
+        raise ValueError("Expected a WebhookMessage")
     queue_id = f"{prefix}:{get_server_number()}:{message.webhook_type}:{message.message_type}:{message.payload['webhook_id']}"
-    pipe = red.pipeline()
-    pipe.rpush(queue_id, orjson.dumps(message.model_dump_json()))
-    pipe.sadd(
-        get_queue_registry_key(prefix=prefix), QUEUE_REGISTRY_SENTINEL, queue_id
+    delivery_id = webhook_outbox.enqueue(
+        queue_id, message.model_dump_json().encode(), message.server_number,
+        message_type=str(message.message_type), webhook_type=str(message.webhook_type),
+        created_at=message.sent_at, initial_attempts=message.retry_attempts,
     )
-    pipe.execute()
+    _wake_outbox(delivery_id, red)
+    return delivery_id
+
+
+def _wake_outbox(delivery_id: str, red=None) -> None:
+    """Wakeups are bounded hints; the committed SQL row is authoritative."""
+    global _next_wakeup_warning_at, _next_wakeup_attempt_at
+    if time.monotonic() < _next_wakeup_attempt_at or not _wakeup_lock.acquire(blocking=False):
+        return
+    try:
+        if red is None:
+            red = get_redis_client(redis_url=construct_redis_url(0), decode_responses=False, global_pool=True)
+        pipe = red.pipeline()
+        pipe.rpush(OUTBOX_WAKEUPS_KEY, delivery_id)
+        pipe.ltrim(OUTBOX_WAKEUPS_KEY, -max(1, WH_MAX_QUEUE_LENGTH), -1)
+        pipe.expire(OUTBOX_WAKEUPS_KEY, 300)
+        pipe.execute()
+        _next_wakeup_attempt_at = 0.0
+    except (redis.exceptions.RedisError, OSError, ValueError):
+        _next_wakeup_attempt_at = time.monotonic() + 1.0
+        if time.monotonic() >= _next_wakeup_warning_at:
+            _next_wakeup_warning_at = time.monotonic() + 30
+            logger.warning("Redis wakeup unavailable; webhook remains in the durable outbox")
+    finally:
+        _wakeup_lock.release()
 
 
 def construct_webhook(
@@ -701,8 +681,9 @@ def construct_webhook(
 
 
 def unpack_message(raw_message: bytes) -> WebhookMessage:
-    message = WebhookMessage.model_validate_json(orjson.loads(raw_message))
-    return message
+    value = orjson.loads(raw_message)
+    return (WebhookMessage.model_validate_json(value) if isinstance(value, str)
+            else WebhookMessage.model_validate(value))
 
 
 def _message_age_seconds(message: WebhookMessage) -> float:
@@ -725,85 +706,42 @@ def _dead_letter_status(entry: DeadLetterWebhookMessage) -> DeadLetterStatus:
     }
 
 
-def move_to_dead_letter(
-    message: WebhookMessage,
-    queue_id: str,
-    reason: str,
-    red: redis.StrictRedis | None = None,
-) -> DeadLetterStatus:
-    """Persist one failed delivery without leaking its webhook token in logs/UI."""
-    if red is None:
-        red = get_redis_client(decode_responses=False, global_pool=True)
-
-    entry = DeadLetterWebhookMessage(
-        message=message,
-        source_queue_id=queue_id,
-        reason=reason,
+def move_to_dead_letter(message, queue_id, reason, red=None) -> DeadLetterStatus:
+    """Retain failures durably; archive capacity never discards accepted messages."""
+    entry = DeadLetterWebhookMessage(message=message, source_queue_id=queue_id, reason=reason)
+    webhook_outbox.enqueue(
+        queue_id, message.model_dump_json().encode(), message.server_number,
+        public_id=entry.id, initial_status="review", reason=reason,
+        created_at=entry.failed_at, message_type=str(message.message_type),
+        webhook_type=str(message.webhook_type), initial_attempts=message.retry_attempts,
     )
-    pipe = red.pipeline()
-    pipe.lpush(DEAD_LETTER_QUEUE, entry.model_dump_json())
-    pipe.ltrim(DEAD_LETTER_QUEUE, 0, WH_DEAD_LETTER_MAX_LENGTH - 1)
-    pipe.expire(DEAD_LETTER_QUEUE, WH_DEAD_LETTER_TTL_SECS)
-    pipe.execute()
-    logger.warning(
-        "Moved webhook delivery to dead-letter queue: server=%s type=%s reason=%s",
-        message.server_number,
-        message.message_type,
-        reason,
-    )
+    logger.warning("Webhook delivery retained for operator review")
     return _dead_letter_status(entry)
 
 
-def get_dead_letter_messages(
-    red: redis.StrictRedis | None = None,
-    limit: int = 100,
-) -> list[DeadLetterStatus]:
-    """List redacted failed deliveries, newest first, for authorised operators."""
+def get_dead_letter_messages(red=None, limit=100) -> list[DeadLetterStatus]:
     if red is None:
         red = get_redis_client(decode_responses=False, global_pool=True)
-    limit = max(1, min(limit, WH_DEAD_LETTER_MAX_LENGTH))
-    entries: list[DeadLetterStatus] = []
-    for raw_entry in red.lrange(DEAD_LETTER_QUEUE, 0, limit - 1):  # type: ignore
-        try:
-            entries.append(_dead_letter_status(DeadLetterWebhookMessage.model_validate_json(raw_entry)))
-        except pydantic.ValidationError:
-            logger.warning("Ignoring invalid dead-letter webhook entry")
-    return entries
+    try:
+        _import_legacy_dead_letters(red, limit=min(500, max(1, limit)))
+    except redis.exceptions.RedisError:
+        logger.warning("Legacy webhook archive unavailable; showing durable review records")
+    return webhook_outbox.list_review(limit=max(1, min(limit, 1000)))
 
 
-def _restore_dead_letter_entry(entry: DeadLetterWebhookMessage, red: redis.StrictRedis) -> None:
-    """Place an operator-approved retry back into the appropriate live queue."""
-    message = entry.message.model_copy(update={"retry_attempts": 0, "sent_at": datetime.now(tz=timezone.utc)})
-    if TRANSIENT_IDENTIFIER in entry.source_queue_id:
-        parts = _split_transient_message_key(queue_id=entry.source_queue_id)
-        if parts is None:
-            raise ValueError("Invalid transient webhook queue")
-        enqueue_transient_message(message=message, message_group_key=parts.message_group_key, red=red)
-        return
-    enqueue_message(message=message, red=red)
-
-
-def retry_dead_letter_message(
-    dead_letter_id: str,
-    red: redis.StrictRedis | None = None,
-) -> bool:
-    """Retry exactly one retained message, returning False when it has expired."""
+def retry_dead_letter_message(dead_letter_id: str, red=None) -> bool:
+    """An operator retry atomically requeues the same retained SQL message."""
     if red is None:
         red = get_redis_client(decode_responses=False, global_pool=True)
-
-    for raw_entry in red.lrange(DEAD_LETTER_QUEUE, 0, -1):  # type: ignore
+    if webhook_outbox.lookup(dead_letter_id) is None:
         try:
-            entry = DeadLetterWebhookMessage.model_validate_json(raw_entry)
-        except pydantic.ValidationError:
-            continue
-        if entry.id != dead_letter_id:
-            continue
-        # Remove first so an immediate worker cannot deliver the same payload twice.
-        if not red.lrem(DEAD_LETTER_QUEUE, 1, raw_entry):  # type: ignore
-            return False
-        _restore_dead_letter_entry(entry=entry, red=red)
-        return True
-    return False
+            _import_legacy_dead_letters(red, limit=500)
+        except redis.exceptions.RedisError:
+            logger.warning("Legacy webhook archive unavailable")
+    accepted = webhook_outbox.retry_review(dead_letter_id)
+    if accepted:
+        _wake_outbox(dead_letter_id, red)
+    return accepted
 
 
 def record_empty_dequeue(red: redis.StrictRedis, queue_id: str) -> None:
@@ -824,298 +762,285 @@ def get_empty_dequeue_count(red: redis.StrictRedis) -> int:
         return 0
 
 
+def _persist_legacy_payload(queue_id: str, raw: bytes, occurrence: str, *, transient=False):
+    """Keep exact bytes for idempotent import, including malformed payloads."""
+    try:
+        message = unpack_message(raw)
+    except (ValueError, TypeError, pydantic.ValidationError):
+        return webhook_outbox.enqueue(
+            queue_id, raw, dedupe_key=occurrence, legacy=True,
+            initial_status="review", reason="invalid_legacy_payload",
+        )
+    return webhook_outbox.enqueue(
+        queue_id, raw, message.server_number, dedupe_key=occurrence, legacy=True,
+        coalesce=transient, message_type=str(message.message_type),
+        webhook_type=str(message.webhook_type), created_at=message.sent_at,
+        initial_attempts=message.retry_attempts,
+    )
+
+
+def _clear_legacy_reset_if_empty(red, queue_id):
+    generation = webhook_outbox.get_legacy_review_generation(queue_id)
+    if (generation is not None and not red.exists(queue_id)
+            and not red.exists(webhook_legacy.stage_key(queue_id))):
+        webhook_outbox.clear_legacy_review(queue_id, expected_generation=generation)
+
+
+def _import_legacy_queue(red, queue_id: str, *, limit=LEGACY_IMPORT_BATCH) -> int:
+    """The old Redis payload stays in place until SQL has committed."""
+    if TRANSIENT_IDENTIFIER in queue_id and red.type(queue_id) in (b"string", "string"):
+        raw = red.get(queue_id)
+        if raw is None:
+            return 0
+        if isinstance(raw, str):
+            raw = raw.encode("utf-8")
+        occurrence = "transient:" + hashlib.sha256(queue_id.encode() + b"\0" + raw).hexdigest()
+        delivery_id = _persist_legacy_payload(queue_id, raw, occurrence, transient=True)
+        removed = red.eval(
+            "if redis.call('GET',KEYS[1]) == ARGV[1] then "
+            "redis.call('DEL',KEYS[1]); redis.call('SREM',KEYS[2],KEYS[1]); return 1 end; return 0",
+            2, queue_id, get_queue_registry_key(), raw,
+        )
+        if removed:
+            webhook_outbox.acknowledge_source(delivery_id)
+            _clear_legacy_reset_if_empty(red, queue_id)
+        return int(bool(removed))
+    imported = 0
+    for _ in range(limit):
+        stage = webhook_legacy.stage_next(red, queue_id)
+        if stage is None:
+            break
+        delivery_id = _persist_legacy_payload(
+            queue_id, stage.raw, "legacy:" + stage.token,
+            transient=TRANSIENT_IDENTIFIER in queue_id,
+        )
+        if not webhook_legacy.ack_stage(red, queue_id, stage.token):
+            logger.warning("Legacy webhook head changed; retained stage requires review")
+            break
+        webhook_outbox.acknowledge_source(delivery_id)
+        imported += 1
+    if imported:
+        _clear_legacy_reset_if_empty(red, queue_id)
+    return imported
+
+
+def _import_legacy_dead_letters(red, *, limit=LEGACY_IMPORT_BATCH):
+    """Archive entries become durable before their expiring Redis copy is removed."""
+    for _ in range(limit):
+        stage = webhook_legacy.stage_next(red, DEAD_LETTER_QUEUE)
+        if stage is None:
+            break
+        raw = stage.raw
+        try:
+            document = orjson.loads(raw)
+            if (not isinstance(document, dict) or not document.get("id")
+                    or "failed_at" not in document
+                    or not isinstance(document.get("message"), dict)
+                    or "sent_at" not in document["message"]):
+                raise ValueError("Legacy archive lacks stable identity or time")
+            entry = DeadLetterWebhookMessage.model_validate_json(raw)
+            delivery_id = webhook_outbox.enqueue(
+                entry.source_queue_id, entry.message.model_dump_json().encode(),
+                entry.message.server_number, public_id=entry.id,
+                dedupe_key="legacy-deadletter:" + entry.id, legacy=True,
+                initial_status="review", reason=entry.reason,
+                created_at=entry.failed_at, message_type=str(entry.message.message_type),
+                webhook_type=str(entry.message.webhook_type), initial_attempts=entry.message.retry_attempts,
+            )
+        except (ValueError, TypeError, pydantic.ValidationError):
+            # Invalid archival bytes are still preserved and visible.
+            occurrence = "legacy-archive:" + stage.token
+            delivery_id = webhook_outbox.enqueue(
+                "whs:unknown:unknown:unknown:archive", raw,
+                dedupe_key=occurrence, legacy=True, initial_status="review",
+                reason="invalid_legacy_archive",
+            )
+        removed = webhook_legacy.ack_stage(red, DEAD_LETTER_QUEUE, stage.token)
+        if not removed:
+            break
+        webhook_outbox.acknowledge_source(delivery_id)
+
+
+def _best_effort_redis(function, *args, **kwargs):
+    try:
+        return function(*args, **kwargs)
+    except redis.exceptions.RedisError:
+        logger.warning("Optional webhook Redis metadata update unavailable")
+        return None
+
+
+def _response_bucket(response, previous):
+    """Discord error responses and successful responses may omit rate headers."""
+    data = previous.model_copy()
+    headers = response.headers
+    if headers.get(X_RATELIMIT_BUCKET):
+        data.id = headers[X_RATELIMIT_BUCKET]
+    try:
+        remaining = int(headers[X_RATELIMIT_REMAINING])
+        if remaining >= 0:
+            data.remaining_requests = remaining
+    except (KeyError, ValueError, TypeError):
+        pass
+    try:
+        reset = float(headers[X_RATELIMIT_RESET_AFTER])
+        if math.isfinite(reset) and 0 <= reset <= 86400:
+            data.reset_after_secs = math.ceil(reset)
+            data.reset_timestamp = math.ceil(datetime.now(timezone.utc).timestamp() + reset)
+    except (KeyError, ValueError, TypeError):
+        pass
+    return data
+
+
+def _retry_delay(response, bucket):
+    try:
+        body = response.json()
+        delay = float(body.get("retry_after"))
+        if math.isfinite(delay) and 0 <= delay <= 86400:
+            return max(0.1, delay)
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return max(1.0, float(bucket.reset_after_secs or DEFAULT_GLOBAL_RETRY_AFTER_SECS))
+
+
 async def dequeue_message(
-    red: redis.StrictRedis,
-    client: httpx.AsyncClient,
-    queue_id: str,
-    bucket_data: DiscordRateLimitData | None,
-    lock: asyncio.Lock,
+    red: redis.StrictRedis, client: httpx.AsyncClient, queue_id: str,
+    bucket_data: DiscordRateLimitData | None, lock: asyncio.Lock,
 ):
-    """Parse a dequeued message from redis, validate and send to Discord, requeuing if needed"""
-
-    if bucket_data is None:
-        bucket_data = DiscordRateLimitData()
-
-    async def _dequeue_message(
-        red: redis.StrictRedis,
-        client: httpx.AsyncClient,
-        queue_id: str,
-        bucket_data: DiscordRateLimitData,
-        lock: asyncio.Lock,
-    ):
-        logger.debug("Dequeueing from %s", queue_id)
-
-        # Transient messages are stored as key/value pairs and not a list
-        if TRANSIENT_IDENTIFIER in queue_id:
-            # Old style messages may still be in the redis queue and we can't GET those
-            try:
-                raw_message: bytes | None = red.getdel(queue_id)  # type: ignore
-                # If we don't get a message at all; return
-                if raw_message is None:
-                    return
-            except redis.exceptions.ResponseError:
-                # If we don't remove this; it will be stuck in the queue and block it forever
-                # until the redis cache is otherwise cleared
-                logger.warning(f"Discarding wrong message type: {queue_id}")
-                red.lpop(queue_id)
-                return
-        else:
-            raw_message: bytes | None = red.lpop(queue_id)  # type: ignore
-
-        # Another worker may consume the final list item after discovery but
-        # before this LPOP.  That is an expected Redis race, not malformed JSON.
-        if raw_message is None:
-            record_empty_dequeue(red=red, queue_id=queue_id)
-            return
-
-        try:
-            message = unpack_message(raw_message=raw_message)
-        except orjson.JSONDecodeError:
-            logger.error("Discarding malformed webhook message from queue %s", queue_id)
-            return
-
-        if _message_age_seconds(message) >= WH_MAX_MESSAGE_AGE_SECS:
-            move_to_dead_letter(
-                message=message,
-                queue_id=queue_id,
-                reason="message_expired",
-                red=red,
-            )
-            return
-
-        wh = construct_webhook(
-            payload=message.payload, webhook_type=message.webhook_type
-        )
-
-        try:
-            if message.edit:
-                res: httpx.Response = await wh.edit(client=client)
-            else:
-                res = await wh.execute(client=client)  # type: ignore
-        except httpx.HTTPError:
-            move_to_dead_letter(
-                message=message,
-                queue_id=queue_id,
-                reason="transport_error",
-                red=red,
-            )
-            logger.error("Webhook delivery failed with a transport error")
-            return
-
-        # If a webhook ID is incorrect it will return 401 which we already handle
-        # but if a message ID doesn't exist it will return 404 and not have rate
-        # limit headers
-        # Technically we could make this fixable and re-enqueue the messages but
-        # the only thing we do edits for are the scoreboard and those messages
-        # are inherently transient; so we will set the error status for the webhook ID
-        # and drop the message
-        if res.status_code == 404:
-            message_id = message.payload.get("message_id")
-            if message_id:
-                logger.error(
-                    "Received HTTP 404 from webhook ID %s for message ID %s; "
-                    "purging queued edits for that message",
-                    message.payload.get("webhook_id"),
-                    message_id,
-                )
-            else:
-                logger.error(
-                    "Received HTTP 404 from webhook ID %s; purging its queue",
-                    message.payload.get("webhook_id"),
-                )
-            handle_webhook_not_found(
-                red=red,
-                queue_id=queue_id,
-                payload=message.payload,
-                webhook_type=message.webhook_type,
-                webhook_id=wh.webhook_id,
-            )
-            move_to_dead_letter(
-                message=message,
-                queue_id=queue_id,
-                reason="not_found",
-                red=red,
-            )
-
-            return
-
-        # 400 is rather rare; but if someone has misconfigured a URL
-        # e.g. a URL that looks like this https://discord.com/api/webhooks/.../...
-        # it will occur
-        if res.status_code == 400:
-            logger.error("Webhook %s returned HTTP 400; check its configuration", wh.webhook_id)
-            move_to_dead_letter(
-                message=message,
-                queue_id=queue_id,
-                reason="invalid_request",
-                red=red,
-            )
-            return
-
-        # We handle these status codes below; we want an error message if
-        # we encounter an unknown status code so we can update this appropriately
-        if not (200 <= res.status_code < 300) and res.status_code not in (401, 403, 429):
-            logger.error(
-                "Webhook %s returned unexpected HTTP %s",
-                wh.webhook_id,
-                res.status_code,
-            )
-            move_to_dead_letter(
-                message=message,
-                queue_id=queue_id,
-                reason=f"http_{res.status_code}",
-                red=red,
-            )
-            return
-
-        bucket_data.webhook_type = message.webhook_type
-        bucket_data.id = res.headers[X_RATELIMIT_BUCKET]
-        bucket_data.remaining_requests = int(res.headers[X_RATELIMIT_REMAINING])
-        bucket_data.reset_after_secs = int(res.headers[X_RATELIMIT_RESET_AFTER])
-        bucket_data.reset_timestamp = math.ceil(
-            datetime.now().timestamp() + bucket_data.reset_after_secs
-        )
-
-        if bucket_data.id:
-            # A later webhook can resolve to the same Discord bucket.  Always
-            # replace the discovery/shared lock with the registry's canonical
-            # lock, rather than allocating a second lock for that bucket.
-            lock = get_or_create_bucket_lock(bucket_id=bucket_data.id)
-            logger.debug("Using rate-limit lock %s for %s", lock, queue_id)
-
-        if res.status_code == 429:
-            bucket_data.rate_limited = True
-            update_bucket_rate_limit(
-                red=red, bucket_id=bucket_data.id, webhook_type=message.webhook_type
-            )
-            body = res.json()
-            if body.get("global"):
-                # We're globally rate limited, parse out the relevant data and set it
-                # This can get stepped on in multiple tasks because it isn't locked
-                try:
-                    retry_after_secs = float(body.get("retry_after"))
-                except (TypeError, ValueError):
-                    retry_after_secs = DEFAULT_GLOBAL_RETRY_AFTER_SECS
-                    logger.error(
-                        "Unable to parse retry_after; falling back to %s seconds",
-                        retry_after_secs,
-                    )
-                logger.warning(
-                    "Your IP is currently globally rate limited by discord: Retrying after %s",
-                    datetime.now() + timedelta(seconds=retry_after_secs),
-                )
-                set_global_rate_limit_reset_after(
-                    red=red,
-                    limit=(
-                        datetime.now() + timedelta(seconds=math.ceil(retry_after_secs))
-                    ).timestamp(),
-                )
-
-            logger.warning(
-                "Rate limited HTTP %s for %s %s resets after %s",
-                res.status_code,
-                wh.webhook_id,
-                message.webhook_type,
-                datetime.fromtimestamp(bucket_data.reset_timestamp),
-            )
-
-            if message.retry_attempts >= WH_MAX_RETRY_ATTEMPTS:
-                move_to_dead_letter(
-                    message=message,
-                    queue_id=queue_id,
-                    reason="retry_limit_reached",
-                    red=red,
-                )
-            elif not message.discardable:
-                logger.info(
-                    "Re-enqueing webhook ID: %s due to rate limit",
-                    message.payload["webhook_id"],
-                )
-                message.retry_attempts += 1
-                pipe = red.pipeline()
-                pipe.lpush(queue_id, orjson.dumps(message.model_dump_json()))
-                pipe.ltrim(queue_id, 0, WH_MAX_QUEUE_LENGTH - 1)
-                pipe.execute()
-            else:
-                move_to_dead_letter(
-                    message=message,
-                    queue_id=queue_id,
-                    reason="discardable_rate_limited",
-                    red=red,
-                )
-        elif res.status_code == 401:
-            set_webhook_error(
-                red=red,
-                webhook_id=wh.webhook_id,
-                webhook_type=message.webhook_type,
-                auth_401=True,
-            )
-            logger.error(
-                "Webhook %s was rejected (unknown ID); check its configuration",
-                wh.webhook_id,
-            )
-            move_to_dead_letter(
-                message=message,
-                queue_id=queue_id,
-                reason="unauthorized",
-                red=red,
-            )
-        elif res.status_code == 403:
-            set_webhook_error(
-                red=red,
-                webhook_id=wh.webhook_id,
-                webhook_type=message.webhook_type,
-                auth_403=True,
-            )
-            logger.error(
-                "Webhook %s was rejected (invalid token); check its configuration",
-                wh.webhook_id,
-            )
-            move_to_dead_letter(
-                message=message,
-                queue_id=queue_id,
-                reason="forbidden",
-                red=red,
-            )
-        elif 200 <= res.status_code < 300:
-            bucket_data.rate_limited = False
-            clear_webhook_errors(
-                red=red,
-                webhook_id=wh.webhook_id,
-                webhook_type=message.webhook_type,
-            )
-        else:
-            logger.error(
-                "Webhook %s returned HTTP %s (edit=%s, discardable=%s)",
-                wh.webhook_id, res.status_code, message.edit, message.discardable,
-            )
-
-        set_bucket_data(red=red, bucket=bucket_data, lock=lock)
-        set_webhook_rate_limit_bucket(
-            red=red,
-            queue_id=queue_id,
-            bucket_id=bucket_data.id,
-        )
-
-    wait_started = time.monotonic() if lock.locked() else None
+    """Claim SQL work; HTTP confirmation precedes optional Redis bookkeeping."""
+    bucket_data = bucket_data or DiscordRateLimitData()
     async with lock:
-        if wait_started is not None and bucket_data.id:
-            record_bucket_lock_wait(
-                red=red,
-                bucket_id=bucket_data.id,
-                wait_seconds=time.monotonic() - wait_started,
+        # Mixed-version upgrades retain the old occurrence until the SQL commit.
+        await asyncio.to_thread(_import_legacy_queue, red, queue_id)
+        # Never overtake an older, not-yet-imported Redis head.
+        if red.exists(queue_id):
+            return False
+        claim = await asyncio.to_thread(
+            webhook_outbox.claim, queue_id, lease_seconds=DELIVERY_LEASE_SECONDS,
+        )
+        if claim is None:
+            return False
+        started = False
+        settled = False
+
+        async def finish(status, reason=None, retry_after_seconds=0):
+            nonlocal settled
+            committed = await asyncio.to_thread(
+                webhook_outbox.finish, claim.id, claim.token, status=status,
+                reason=reason, retry_after_seconds=retry_after_seconds,
             )
+            if not committed:
+                logger.warning("Webhook ownership changed; retained outcome requires review")
+            settled = True
+            return committed
+
         try:
-            await _dequeue_message(
-                red=red,
-                client=client,
-                queue_id=queue_id,
-                bucket_data=bucket_data,
-                lock=lock,
-            )
-            logger.debug("finished with %s", lock)
-        except pydantic.ValidationError:
-            logger.error("Invalid webhook delivery data")
+            try:
+                message = unpack_message(claim.payload)
+                if (_message_age_seconds(message) >= WH_MAX_MESSAGE_AGE_SECS
+                        and not claim.allow_expired):
+                    await finish("review", "message_expired")
+                    return True
+                wh = construct_webhook(payload=message.payload, webhook_type=message.webhook_type)
+                # The application owns retry accounting and the durable state.
+                wh.rate_limit_retry = False
+            except (ValueError, TypeError, pydantic.ValidationError):
+                await finish("review", "invalid_payload")
+                return True
+
+            # Read the current limit under the bucket lock, before sending.
+            now = datetime.now(timezone.utc).timestamp()
+            if is_globally_rate_limited(red):
+                reset = get_global_rate_limit_reset_after(red)
+                delay = max(0.1, min(86400.0, reset.timestamp() - now if reset else 0.1))
+                await finish("retry", "global_rate_limit", delay)
+                return True
+            if bucket_data.id:
+                bucket_data = get_rate_limit_bucket_data(red, bucket_data.id)
+                if (bucket_data.rate_limited and bucket_data.reset_timestamp
+                        and bucket_data.reset_timestamp + 1 > now):
+                    await finish("retry", "bucket_rate_limit",
+                                 min(86400.0, bucket_data.reset_timestamp + 1 - now))
+                    return True
+                if is_bucket_local_rate_limited(red, bucket_data.id, message.webhook_type):
+                    await finish("retry", "local_rate_limit", max(0.1, LOCAL_RL_RESET_AFTER))
+                    return True
+
+            if not await asyncio.to_thread(webhook_outbox.mark_sending, claim.id, claim.token):
+                settled = True
+                return True
+            started = True
+            try:
+                async with asyncio.timeout(DELIVERY_TIMEOUT_SECONDS):
+                    response = await (wh.edit(client=client) if message.edit else wh.execute(client=client))
+            except (httpx.HTTPError, TimeoutError):
+                await finish("review", "transport_outcome_unknown")
+                logger.warning("Webhook response unavailable; payload retained for review")
+                return True
+
+            status = response.status_code
+            # A later Redis failure must never turn an acknowledged POST into a retry.
+            if 200 <= status < 300:
+                await finish("sent")
+            elif status == 429:
+                delay = _retry_delay(response, bucket_data)
+                if claim.attempts + 1 >= WH_MAX_RETRY_ATTEMPTS:
+                    await finish("review", "retry_limit_reached")
+                else:
+                    await finish("retry", "rate_limited", delay)
+            else:
+                reasons = {400: "invalid_request", 401: "unauthorized",
+                           403: "forbidden", 404: "not_found"}
+                await finish("review", reasons.get(status, f"http_{status}"))
+
+            bucket = _response_bucket(response, bucket_data)
+            bucket.webhook_type = message.webhook_type
+            bucket.rate_limited = status == 429
+            if status == 429:
+                delay = _retry_delay(response, bucket)
+                bucket.reset_after_secs = math.ceil(delay)
+                bucket.reset_timestamp = math.ceil(datetime.now(timezone.utc).timestamp() + delay)
+                _best_effort_redis(update_bucket_rate_limit, red, bucket.id or "unknown", message.webhook_type)
+                try:
+                    global_limit = bool(response.json().get("global"))
+                except (ValueError, AttributeError):
+                    global_limit = False
+                if global_limit:
+                    _best_effort_redis(set_global_rate_limit_reset_after, red,
+                                      datetime.now(timezone.utc).timestamp() + delay)
+            elif status == 404:
+                _best_effort_redis(handle_webhook_not_found, red, queue_id, message.payload,
+                                  message.webhook_type, str(wh.webhook_id))
+            elif status in (401, 403):
+                _best_effort_redis(set_webhook_error, red, str(wh.webhook_id), message.webhook_type,
+                                  auth_401=status == 401, auth_403=status == 403)
+            elif 200 <= status < 300:
+                _best_effort_redis(clear_webhook_errors, red, str(wh.webhook_id), message.webhook_type)
+            if bucket.id:
+                canonical = get_or_create_bucket_lock(bucket.id)
+                _best_effort_redis(set_bucket_data, red, bucket, canonical)
+                _best_effort_redis(set_webhook_rate_limit_bucket, red=red, queue_id=queue_id, bucket_id=bucket.id)
+        except redis.exceptions.RedisError:
+            if not settled:
+                await finish("review" if started else "retry",
+                             "redis_interrupted_after_send" if started else "redis_unavailable",
+                             0 if started else 1)
+            raise
+        except asyncio.CancelledError:
+            if not settled:
+                await asyncio.shield(finish(
+                    "review" if started else "retry",
+                    "worker_stopped_after_send" if started else "worker_stopped",
+                ))
+            raise
+        except webhook_outbox.OutboxStorageError:
+            # Lease recovery retains the accepted payload if the DB is unavailable.
+            logger.error("Webhook outcome could not be committed; durable payload retained")
+            raise
+        except Exception:
+            if not settled:
+                await finish("review", "unexpected_delivery_error")
+            logger.error("Webhook delivery interrupted; payload retained for review")
+    return True
 
 
 def get_queue_registry_key(prefix: str = PREFIX) -> str:
@@ -1132,31 +1057,28 @@ def _decode_queue_ids(values) -> set[str]:
 
 
 def _registered_queue_keys(red: redis.StrictRedis, prefix: str = PREFIX) -> set[str]:
-    """Return registered queues, importing pre-registry keys once on upgrade."""
-
+    """Discover legacy payloads once; SQL wakeups and archives are separate."""
     registry_key = get_queue_registry_key(prefix=prefix)
-    registry_members = _decode_queue_ids(red.smembers(registry_key))
-    if QUEUE_REGISTRY_SENTINEL in registry_members:
-        return registry_members - {QUEUE_REGISTRY_SENTINEL}
-    if registry_members:
-        # A producer from this release may have registered a queue before the
-        # consumer performed its one-time legacy import. Preserve it while
-        # marking the registry as initialized.
-        red.sadd(registry_key, QUEUE_REGISTRY_SENTINEL)
-        return registry_members
-
-    # Existing installations can already contain queued messages when this
-    # version starts.  Discover those keys once, then all producers maintain
-    # the small registry directly and the hot path never needs another SCAN.
-    legacy_lists = _decode_queue_ids(red.scan_iter(match=f"{prefix}*", _type="list"))
-    legacy_transient = {
-        queue_id
-        for queue_id in _decode_queue_ids(
-            red.scan_iter(match=f"{prefix}*", _type="string")
-        )
-        if TRANSIENT_IDENTIFIER in queue_id
-    }
-    registered = legacy_lists | legacy_transient
+    members = _decode_queue_ids(red.smembers(registry_key))
+    reserved = {registry_key, DEAD_LETTER_QUEUE, OUTBOX_WAKEUPS_KEY}
+    def accepted(key):
+        return key.startswith(prefix + ":") and key not in reserved
+    registered = {key for key in members if accepted(key)}
+    invalid = members - registered - {QUEUE_REGISTRY_SENTINEL}
+    if invalid:
+        red.srem(registry_key, *invalid)
+    if QUEUE_REGISTRY_SENTINEL in members:
+        return registered
+    # Even a partially populated old registry must not hide another legacy
+    # queue. Complete the one-time import before writing its sentinel.
+    registered.update(
+        key for key in _decode_queue_ids(red.scan_iter(match=f"{prefix}:*", _type="list"))
+        if accepted(key)
+    )
+    registered.update(
+        key for key in _decode_queue_ids(red.scan_iter(match=f"{prefix}:*", _type="string"))
+        if accepted(key) and TRANSIENT_IDENTIFIER in key
+    )
     red.sadd(registry_key, QUEUE_REGISTRY_SENTINEL, *registered)
     return registered
 
@@ -1169,11 +1091,14 @@ def get_all_queue_keys(
     if red is None:
         red = get_redis_client(decode_responses=False, global_pool=True)
 
-    return sorted(
+    legacy = {
         queue_id
         for queue_id in _registered_queue_keys(red=red, prefix=prefix)
         if TRANSIENT_IDENTIFIER not in queue_id
-    )
+    }
+    durable = {key for key in webhook_outbox.queue_lengths()
+               if TRANSIENT_IDENTIFIER not in key and key.startswith(prefix + ":")}
+    return sorted(legacy | durable)
 
 
 def get_all_transient_message_keys(
@@ -1182,18 +1107,23 @@ def get_all_transient_message_keys(
     """Retrieve each registered transient key which acts as a queue ID."""
     if red is None:
         red = get_redis_client(decode_responses=False, global_pool=True)
-    return sorted(
+    legacy = {
         queue_id
         for queue_id in _registered_queue_keys(red=red, prefix=prefix)
         if TRANSIENT_IDENTIFIER in queue_id
-    )
+    }
+    durable = {key for key in webhook_outbox.queue_lengths()
+               if TRANSIENT_IDENTIFIER in key and key.startswith(prefix + ":")}
+    return sorted(legacy | durable)
 
 
 def get_all_queue_keys_and_lengths(
     red: redis.StrictRedis, prefix: str = PREFIX
 ) -> list[tuple[str, int]]:
     """Return each queue key and the number of elements in its queue"""
-    return [(queue_id, red.llen(queue_id)) for queue_id in get_all_queue_keys(red=red, prefix=prefix)]  # type: ignore
+    lengths = webhook_outbox.queue_lengths()
+    return [(queue_id, red.llen(queue_id) + lengths.get(queue_id, 0))
+            for queue_id in get_all_queue_keys(red=red, prefix=prefix)]
 
 
 def get_all_queue_keys_not_empty(
@@ -1201,7 +1131,7 @@ def get_all_queue_keys_not_empty(
 ) -> list[str]:
     """Scan for all the queues (identified by prefix)"""
     logger.debug("Getting all queue IDs with items from %s", PREFIX)
-    populated_queues = [queue_id for queue_id in get_all_queue_keys(red=red, prefix=prefix) if red.llen(queue_id) > 0]  # type: ignore
+    populated_queues = [queue_id for queue_id, count in get_all_queue_keys_and_lengths(red, prefix) if count > 0]
     populated_transient_messages = get_all_transient_message_keys(
         red=red, prefix=prefix
     )
@@ -1304,7 +1234,7 @@ def get_transient_message_overview(
 
 
 def get_queue_overview(
-    queue_id: str, red: redis.StrictRedis | None = None
+    queue_id: str, red: redis.StrictRedis | None = None, *, durable_length: int | None = None
 ) -> QueueStatus | None:
     """Return a summary of a queue if it exists"""
     parts = _split_queue_id(queue_id=queue_id)
@@ -1315,7 +1245,9 @@ def get_queue_overview(
     if red is None:
         red = get_redis_client(decode_responses=False, global_pool=True)
 
-    length: int = red.llen(queue_id)  # type: ignore
+    if durable_length is None:
+        durable_length = webhook_outbox.queue_lengths().get(queue_id, 0)
+    length = red.llen(queue_id) + durable_length
     bucket_data: DiscordRateLimitData | None = None
     bucket_id = get_webhook_rate_limit_bucket(red=red, queue_id=queue_id)
     if bucket_id:
@@ -1358,15 +1290,16 @@ def webhook_service_summary(red: redis.StrictRedis | None = None):
     data["global_rate_limit_reset_after"] = get_global_rate_limit_reset_after(red=red)
     data["empty_dequeues"] = get_empty_dequeue_count(red=red)
     data["dead_letters"] = get_dead_letter_messages(red=red, limit=20)
-    data["dead_letter_count"] = red.llen(DEAD_LETTER_QUEUE)  # type: ignore
-    data["dead_letter_ttl_seconds"] = max(0, red.ttl(DEAD_LETTER_QUEUE))  # type: ignore
+    data["dead_letter_count"] = webhook_outbox.count_review() + red.llen(DEAD_LETTER_QUEUE)
+    data["dead_letter_ttl_seconds"] = 0  # SQL review records have no automatic expiry.
 
     queue_ids = get_all_queue_keys(red=red)
     queues: defaultdict[int, dict[str, dict[str, list[QueueStatus]]]] = defaultdict(
         lambda: defaultdict(lambda: defaultdict(list))
     )
+    lengths = webhook_outbox.queue_lengths()
     for qid in queue_ids:
-        overview: QueueStatus | None = get_queue_overview(red=red, queue_id=qid)
+        overview: QueueStatus | None = get_queue_overview(red=red, queue_id=qid, durable_length=lengths.get(qid, 0))
         if overview:
             queues[overview["server_number"]][overview["webhook_type"]][
                 overview["message_type"]
@@ -1393,85 +1326,51 @@ def webhook_service_summary(red: redis.StrictRedis | None = None):
     return data
 
 
-def reset_all_queues_for_server_number(
-    server_number: int | str, red: redis.StrictRedis | None = None
-) -> int:
-    """Delete each queue associated with the specified server number"""
-    if red is None:
-        red = get_redis_client(decode_responses=False, global_pool=True)
-
-    queue_ids = get_all_queue_keys(red=red)
-    deleted: int = 0
-    for queue_id in queue_ids:
-        try:
-            parts = _split_queue_id(queue_id=queue_id)
-            # server numbers should be ints; but redis keys are strings
-            if parts and parts.server_number == str(server_number):
-                deleted += red.delete(queue_id)  # type: ignore
-        except ValueError:
-            logger.error("Unable to parse %s received an invalid key", queue_id)
-
-    return deleted
+def _retain_reset_queue(queue_id, red):
+    # Import in bounded batches before an explicit operator reset. Retained SQL
+    # messages become review records instead of disappearing from an expiring list.
+    retained = webhook_outbox.review_queue(queue_id, reason="operator_reset")
+    # The persistent marker makes every remaining legacy head review-only.
+    # A large backlog is archived by bounded worker passes after this call.
+    imported = _import_legacy_queue(red, queue_id)
+    remaining = red.exists(queue_id) or red.exists(webhook_legacy.stage_key(queue_id))
+    if not remaining:
+        _clear_legacy_reset_if_empty(red, queue_id)
+    return retained or imported or bool(remaining)
 
 
-def reset_webhook_queues(red: redis.StrictRedis | None = None) -> int:
-    """Delete each queue; unprocessed messages may be lost depending on timing"""
-    if red is None:
-        red = get_redis_client(decode_responses=False, global_pool=True)
-
-    keys = get_all_queue_keys(red=red)
-    return red.delete(*keys)  # type: ignore
-
-
-def reset_queue(queue_id: str, red: redis.StrictRedis | None = None) -> bool:
-    """Delete the specified queue; returning if it deleted any entries"""
-    if red is None:
-        red = get_redis_client(decode_responses=False, global_pool=True)
-
-    # TODO: this could cause conflicts in the future if we start supporting other webhooks
-    # than just discord; it's possible but unlikely that their queue IDs could conflict
-    # we could use the entire redis key instead of just the component pieces
-    return red.delete(queue_id) != 0  # type: ignore
-
-
-def reset_queue_type(
-    webhook_type: WebhookType | str, red: redis.StrictRedis | None = None
-) -> int:
-    """Delete each queue of wh_type (discord, etc.) returning the number of deleted queues"""
-    if red is None:
-        red = get_redis_client(decode_responses=False, global_pool=True)
-
-    if isinstance(webhook_type, str):
-        webhook_type = WebhookType(webhook_type)
-
-    queue_ids = get_all_queue_keys(red=red)
-    deleted: int = 0
-    for queue_id in queue_ids:
+def reset_all_queues_for_server_number(server_number, red=None) -> int:
+    red = red or get_redis_client(decode_responses=False, global_pool=True)
+    changed = 0
+    for queue_id in get_all_queue_keys(red):
         parts = _split_queue_id(queue_id)
-        if parts and parts.wh_type == webhook_type:
-            deleted += red.delete(queue_id)  # type: ignore
+        if parts and parts.server_number == str(server_number):
+            changed += bool(_retain_reset_queue(queue_id, red))
+    return changed
 
-    return deleted
+
+def reset_webhook_queues(red=None) -> int:
+    red = red or get_redis_client(decode_responses=False, global_pool=True)
+    return sum(bool(_retain_reset_queue(queue_id, red)) for queue_id in get_all_queue_keys(red))
 
 
-def reset_message_type(
-    message_type: WebhookMessageType | str, red: redis.StrictRedis | None = None
-) -> int:
-    """Delete each queue of wh_type (discord, etc.) returning the number of deleted queues"""
-    if red is None:
-        red = get_redis_client(decode_responses=False, global_pool=True)
+def reset_queue(queue_id: str, red=None) -> bool:
+    red = red or get_redis_client(decode_responses=False, global_pool=True)
+    return bool(_retain_reset_queue(queue_id, red))
 
-    if isinstance(message_type, str):
-        message_type = WebhookMessageType(message_type)
 
-    queue_ids = get_all_queue_keys(red=red)
-    deleted: int = 0
-    for queue_id in queue_ids:
-        parts = _split_queue_id(queue_id)
-        if parts and parts.msg_type == message_type:
-            deleted += red.delete(queue_id)  # type: ignore
+def reset_queue_type(webhook_type, red=None) -> int:
+    red = red or get_redis_client(decode_responses=False, global_pool=True)
+    webhook_type = WebhookType(webhook_type)
+    return sum(bool(_retain_reset_queue(qid, red)) for qid in get_all_queue_keys(red)
+               if (parts := _split_queue_id(qid)) and parts.wh_type == webhook_type)
 
-    return deleted
+
+def reset_message_type(message_type, red=None) -> int:
+    red = red or get_redis_client(decode_responses=False, global_pool=True)
+    message_type = WebhookMessageType(message_type)
+    return sum(bool(_retain_reset_queue(qid, red)) for qid in get_all_queue_keys(red)
+               if (parts := _split_queue_id(qid)) and parts.msg_type == message_type)
 
 
 def _split_queue_id(queue_id: str) -> QueueParts | None:
@@ -1508,135 +1407,104 @@ def _split_transient_message_key(queue_id: str) -> TransientMessageParts | None:
         return
 
 
-async def main():
+async def _wait_for_stop(stop_event, delay):
+    try:
+        await asyncio.wait_for(stop_event.wait(), timeout=max(0.01, delay))
+    except TimeoutError:
+        pass
 
-    # Essentially we want to connect to redis, monitor the set of queues of discord messages
-    # by webhook queue
-    # and (within the max concurrent process limit) block, get the next queue to process
-    # and dequeue a message off the queue (adding this queue to the end of the queue of queues)
-    # create a new process and pass it the data from the queue so it can construct/send the
-    # webhook
-    # this lets each webhook process 1 message at a time in order (unfair to webhooks that send infrequently)
 
-    # if the webhook is rate limited and it isn't an ephemeral message;
-    # re-queue the message (at the end of the queue so it is re-processed immediately-ish
-    # Also check for other errors like excessively long messages, anything that would block
-    # discord from accepting it and mitigate it if possible
-    # global rate limits, so forth
-
-    # if it is ephemeral and we're rate limited; we just drop the message no big deal
-
-    # Grab the top message off each queue and send them off
-
-    logger.info(f"Starting webhook service {HLL_WH_LOOP_SLEEP_TIME=}")
-    url = construct_redis_url()
-    red = get_redis_client(redis_url=url, decode_responses=False, global_pool=True)
-
-    client = httpx.AsyncClient()
-    lock: asyncio.Lock | None = None
-    continue_logged = False
-    queue_key_cache = WebhookQueueKeyCache(red=red)
-
-    # Create a file to use for the docker health check
+async def main(*, stop_event: asyncio.Event | None = None):
+    """Bound task/Redis memory and reconnect without discarding SQL work."""
     from pathlib import Path
-
-    path = Path("/code") / Path("webhook-service-healthy")
-    path.touch()
-
-    while True:
-        queue_ids = queue_key_cache.get_not_empty()
-
-        # Keep each message queue under its max, dropping the oldest messages first
-        for queue_id in queue_ids:
-            # Can't trim transient messages which are stored as simple KEY/VALUE pairs
-            if TRANSIENT_IDENTIFIER not in queue_id:
-                red.ltrim(queue_id, 0, WH_MAX_QUEUE_LENGTH - 1)
-
-        logger.debug("queue_ids=%s", queue_ids)
-        queue_id: str | None = get_next_queue_id(queue_ids=queue_ids)
-        logger.debug("queue_id=%s", queue_id)
-        bucket_data: DiscordRateLimitData | None = None
-
-        if queue_id:
-            bucket_id: str | None = get_webhook_rate_limit_bucket(
-                red=red, queue_id=queue_id
-            )
-            # If we don't know the rate limit bucket; use the shared one further below
-            if bucket_id:
-                bucket_data, lock = get_bucket_lock(red=red, bucket_id=bucket_id)
-                if lock and lock.locked():
-                    logger.debug("%s locked", lock)
-                    await asyncio.sleep(HLL_WH_LOOP_SLEEP_TIME)
-                    continue
-                ts = int(datetime.now(tz=timezone.utc).timestamp())
-
-                # Even with Discords headers, and using a local rate limit, I still have issues with
-                # hooks getting rate limited during testing, if we rate limit a bucket, pad it an extra
-                # second before re-using it to reduce the chance of further rate limits
-                if (
-                    is_globally_rate_limited(red=red)
-                    or (
-                        bucket_data.rate_limited
-                        and bucket_data.reset_timestamp is not None
-                        and ts <= bucket_data.reset_timestamp + 1
-                    )
-                    or is_bucket_local_rate_limited(
-                        red=red,
-                        bucket_id=bucket_id,
-                        webhook_type=bucket_data.webhook_type,
-                    )
-                ):
-                    if not continue_logged:
-                        logger.debug(
-                            "Skipping %s due to rate limit now=%s reset_after=%s",
-                            queue_id,
-                            ts,
-                            bucket_data.reset_timestamp,
-                        )
-                        continue_logged = True
-                    continue
-
-            continue_logged = False
-            logger.debug("Starting asyncio task for %s", queue_id)
-            if lock is None or lock == get_shared_lock():
-                logger.debug("using shared lock")
-                lock = get_shared_lock()
-                task = asyncio.create_task(
-                    dequeue_message(
-                        red=red,
-                        client=client,
-                        queue_id=queue_id,
-                        bucket_data=bucket_data,
-                        lock=lock,
-                    )
-                )
-                logger.debug("Waiting for %s", task)
-                await task
-            else:
-                logger.debug("using bucket lock")
-                task = asyncio.create_task(
-                    dequeue_message(
-                        red=red,
-                        client=client,
-                        queue_id=queue_id,
-                        bucket_data=bucket_data,
-                        lock=lock,
-                    )
-                )
-
-        # If we never await something we never allow any of the tasks to run
-        # but sleeping a specific amount of time can prevent queues from emptying
-        # faster than CRCON can fill them up
-        # however sleeping `0` seconds  gives the event loop an opportunity for
-        # tasks to run; this does cause CPU usage to increase because this loop
-        # runs far more often; we've limited the CPU usage by default to 1 core in
-        # the webhook service definition in `docker-compose-common-components.yaml`
-        # https://docs.python.org/3/library/asyncio-task.html#sleeping
-        await asyncio.sleep(
-            HLL_WH_LOOP_SLEEP_TIME if queue_id else HLL_WH_IDLE_SLEEP_TIME
-        )
+    stop_event = stop_event or asyncio.Event()
+    red = get_redis_client(redis_url=construct_redis_url(0), decode_responses=False, global_pool=True)
+    queue_cache = WebhookQueueKeyCache(red=red)
+    tasks: dict[asyncio.Task, str] = {}
+    task_locks: dict[asyncio.Task, int] = {}
+    ready: set[str] = set()
+    next_poll = 0.0
+    next_cleanup = 0.0
+    backoff = 0.1
+    Path(os.getenv("HLL_WH_HEALTH_PATH", "/code/webhook-service-healthy")).touch()
+    logger.info("Starting durable webhook delivery service")
+    async with httpx.AsyncClient(timeout=DELIVERY_TIMEOUT_SECONDS) as client:
+        try:
+            while not stop_event.is_set():
+                try:
+                    # Observe every task exception; no detached delivery tasks.
+                    for task in tuple(tasks):
+                        if task.done():
+                            queue_id = tasks.pop(task)
+                            task_locks.pop(task)
+                            if task.result():
+                                ready.add(queue_id)
+                    now = time.monotonic()
+                    hints = red.lpop(OUTBOX_WAKEUPS_KEY, max(1, WH_MAX_QUEUE_LENGTH))
+                    if hints:
+                        next_poll = 0
+                    if now >= next_poll:
+                        await asyncio.to_thread(_import_legacy_dead_letters, red)
+                        legacy = set(queue_cache.get_not_empty(now))
+                        legacy.update(webhook_legacy.staged_queues(red, limit=100))
+                        legacy.discard(DEAD_LETTER_QUEUE)
+                        for queue_id in sorted(legacy)[:100]:
+                            await asyncio.to_thread(_import_legacy_queue, red, queue_id)
+                        ready.update(await asyncio.to_thread(webhook_outbox.pending_queues, limit=100))
+                        next_poll = now + OUTBOX_POLL_SECONDS
+                    if now >= next_cleanup:
+                        await asyncio.to_thread(webhook_outbox.cleanup_sent)
+                        next_cleanup = now + 60
+                    active_queues = set(tasks.values())
+                    candidates = list(ready - active_queues)
+                    random.shuffle(candidates)
+                    for queue_id in candidates:
+                        if len(tasks) >= MAX_DELIVERY_TASKS:
+                            break
+                        bucket_id = get_webhook_rate_limit_bucket(red, queue_id)
+                        if bucket_id:
+                            bucket, lock = get_bucket_lock(red, bucket_id)
+                        else:
+                            bucket, lock = DiscordRateLimitData(), get_shared_lock()
+                        if lock.locked() or id(lock) in task_locks.values():
+                            continue
+                        task = asyncio.create_task(dequeue_message(
+                            red=red, client=client, queue_id=queue_id,
+                            bucket_data=bucket, lock=lock,
+                        ))
+                        tasks[task] = queue_id
+                        task_locks[task] = id(lock)
+                        ready.discard(queue_id)
+                    backoff = 0.1
+                    # Rate-limited/empty queues always yield; no hot continue loop.
+                    await _wait_for_stop(stop_event, min(1.0, max(0.01, HLL_WH_IDLE_SLEEP_TIME)))
+                except redis.exceptions.RedisError:
+                    queue_cache.next_refresh_at = 0
+                    next_poll = 0
+                    ready.clear()
+                    logger.warning("Redis connection interrupted; durable webhooks wait for reconnect")
+                    await _wait_for_stop(stop_event, backoff)
+                    backoff = min(5.0, backoff * 2)
+                except webhook_outbox.OutboxStorageError:
+                    next_poll = 0
+                    ready.clear()
+                    logger.error("Webhook outbox unavailable; accepted work remains retained")
+                    await _wait_for_stop(stop_event, backoff)
+                    backoff = min(5.0, backoff * 2)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    logger.error("Webhook worker iteration interrupted; accepted work remains retained")
+                    await _wait_for_stop(stop_event, backoff)
+                    backoff = min(5.0, backoff * 2)
+        finally:
+            # A known HTTP response gets a chance to commit its acknowledgement.
+            # Each HTTP operation has its own timeout shorter than the SQL lease.
+            if tasks:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                if any(isinstance(result, BaseException) for result in results):
+                    logger.warning("Webhook shutdown retained unfinished outcomes for recovery")
 
 
 if __name__ == "__main__":
-    # main()
     asyncio.run(main())
