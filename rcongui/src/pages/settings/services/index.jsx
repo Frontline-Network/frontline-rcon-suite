@@ -631,7 +631,7 @@ const Services = () => {
                 >
                   <Typography variant="body2">
                     {entry.server_number} · {entry.message_type} ·{" "}
-                    {entry.reason} · {dayjs(entry.failed_at).format("LLL")}
+                    {entry.reason} · {dayjs(entry.created_at ?? entry.failed_at).format("LLL")}
                   </Typography>
                   <Button
                     size="small"

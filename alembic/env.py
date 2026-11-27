@@ -10,6 +10,7 @@ from rcon.barricade_scan_journal import BarricadeScanDelivery, BarricadeScanInte
 from rcon.live_map.models import TacticalBlock, TacticalReview, TacticalSettings
 from rcon.population_models import PopulationSample, SeedingSession
 from rcon import voice_language, voice_player_store  # register tables for schema comparison
+from rcon import webhook_outbox  # register durable webhook tables
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
