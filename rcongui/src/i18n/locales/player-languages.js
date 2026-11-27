@@ -1,4 +1,7 @@
+import { workbenchDE, workbenchEN, workbenchFR } from './player-language-workbench.js';
+
 export const playerLanguagesDe = {
+  ...workbenchDE,
   steam_country: "Aus dem Steam-Profilland abgeleitet (vorläufig)",
   title: "Spielersprachen und Übersetzungen", subtitle: "Eine Sprachpräferenz für Chat, Discord und gezielte Spielernachrichten.",
   enabled: "Empfängersprache für Moderation, Automods und Autobalancer verwenden", disabledHint: "Der Versand nutzt weiterhin die bisherigen Moduleinstellungen. Vorschauen zeigen die mehrsprachige Variante.",
@@ -16,6 +19,7 @@ export const playerLanguagesDe = {
   audit: "Letzte übersetzte Nachrichten", editProfile: "Sprache eines Spielers ändern", previewUnavailable: "Versandvorschau konnte nicht geladen werden.",
 };
 export const playerLanguagesEn = {
+  ...workbenchEN,
   steam_country: "Suggested from the Steam profile country",
   title: "Player languages and translations", subtitle: "One language preference for chat, Discord and targeted player messages.",
   enabled: "Use recipient language for moderation, automods and autobalancing", disabledHint: "Delivery still uses the existing module settings. Previews show the multilingual variant.",
@@ -33,6 +37,7 @@ export const playerLanguagesEn = {
   audit: "Recent translated messages", editProfile: "Change a player's language", previewUnavailable: "Could not load the delivery preview.",
 };
 export const playerLanguagesFr = {
+  ...workbenchFR,
   steam_country: "Déduit du pays du profil Steam (provisoire)",
   title: "Langues des joueurs et traductions", subtitle: "Une préférence linguistique pour le chat, Discord et les messages individuels.",
   enabled: "Utiliser la langue du destinataire pour la modération, les règles automatiques et l’équilibrage", disabledHint: "L’envoi utilise encore les réglages existants des modules. Les aperçus montrent la version multilingue.",

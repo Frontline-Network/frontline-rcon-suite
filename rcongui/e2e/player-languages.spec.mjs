@@ -47,13 +47,16 @@ test("translations save and a selected player language drives a message-free pre
   await expect(page.getByText("Gespeichert", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Neu laden", exact: true }).click();
   await expect(page.getByLabel("Übersetzung · en", { exact: true })).toHaveValue("Please respect our squad rules.");
-  await page.getByLabel("Spieler-ID", { exact: true }).first().fill("00020000000000000000000000000001");
+  await page.getByRole("tab", { name: "Spielersprachen", exact: true }).click();
+  await page.getByLabel("Spieler-ID für das Sprachprofil", { exact: true }).fill("00020000000000000000000000000001");
   await page.getByRole("button", { name: "Sprachprofil öffnen", exact: true }).click();
   const profile = page.getByTestId("player-language-profile");
   await profile.getByRole("combobox", { name: /^Spielersprache/ }).click();
   await page.getByRole("option", { name: "English", exact: true }).click();
   await profile.getByRole("button", { name: "Sprache speichern", exact: true }).click();
   await expect(profile.getByText("Ausdrücklich gewählt", { exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Vorlagen übersetzen", exact: true }).click();
+  await page.getByLabel("Spieler-ID für die Vorschau", { exact: true }).fill("00020000000000000000000000000001");
   await page.getByRole("button", { name: "Versandvorschau", exact: true }).click();
   await expect(page.getByTestId("localized-preview")).toContainText("Please respect our squad rules.");
   expect(commands.some(command => /\/(?:kick|punish|temp_ban|perma_ban|message_player)$/.test(command))).toBe(false);
@@ -62,7 +65,7 @@ test("translations save and a selected player language drives a message-free pre
 test("a placeholder mismatch is visible and cannot silently overwrite a translation", async ({ page }) => {
   await openDemoPage(page, "/settings/player-languages");
   await page.getByRole("combobox", { name: /^Vorlage/ }).click();
-  await page.getByRole("option", { name: "automod.no_leader.warning", exact: true }).click();
+  await page.getByRole("option", { name: /^Squad ohne Führung · Warnung/ }).click();
   await page.getByRole("tab", { name: "English", exact: true }).click();
   await page.getByLabel("Übersetzung · en", { exact: true }).fill("A placeholder is missing.");
   await page.getByRole("button", { name: "Übersetzungen speichern", exact: true }).click();
@@ -74,7 +77,7 @@ test("switching templates protects an unsaved translation", async ({ page }) => 
   await openDemoPage(page, "/settings/player-languages");
   await page.getByLabel("Übersetzung · de", { exact: true }).fill("Nicht gespeicherte Änderung");
   await page.getByRole("combobox", { name: /^Vorlage/ }).click();
-  await page.getByRole("option", { name: "autobalancer.disabled", exact: true }).click();
+  await page.getByRole("option", { name: /^Autobalancer ausgeschaltet/ }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("Nicht gespeicherte Übersetzungen");
   await dialog.getByRole("button", { name: "Zurück", exact: true }).click();
@@ -86,4 +89,43 @@ test("language management fits a console player's phone-sized viewport", async (
   await openDemoPage(page, "/settings/player-languages");
   await expect(page.getByRole("heading", { name: "Spielersprachen und Übersetzungen", exact: true })).toBeVisible();
   await expectNoHorizontalPageOverflow(page);
+});
+
+test('template search uses readable names and preserves the original binding when saved', async ({ page }) => {
+  await openDemoPage(page, '/settings/player-languages');
+  const picker = page.getByRole('combobox', { name: 'Vorlage suchen', exact: true });
+  await picker.fill('Squad');
+  await page.getByRole('option', { name: /^Squad ohne Führung · Warnung/ }).click();
+  await expect(page.getByRole('heading', { name: 'Squad ohne Führung · Warnung', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Originaltext', exact: true })).toHaveValue('Warning {player_name}: no squad leader.');
+  await page.getByLabel('Übersetzung · de', { exact: true }).fill('Bitte stelle einen Squadleader, {player_name}.');
+  const requestPromise = page.waitForRequest(request => request.url().includes('/set_player_message_translations') && request.method() === 'POST');
+  await page.getByRole('button', { name: 'Übersetzungen speichern', exact: true }).click();
+  expect((await requestPromise).postDataJSON().key).toBe('automod.no_leader.warning');
+});
+
+test('filtering to an empty translation status protects unsaved edits', async ({ page }) => {
+  await openDemoPage(page, '/settings/player-languages');
+  await page.getByLabel('Übersetzung · de', { exact: true }).fill('Ungespeicherter Text');
+  await page.getByRole('combobox', { name: /^Übersetzungsstand/ }).click();
+  await page.getByRole('option', { name: 'Sprachen ergänzen', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Zurück', exact: true }).click();
+  await expect(page.getByLabel('Übersetzung · de', { exact: true })).toHaveValue('Ungespeicherter Text');
+  await page.getByRole('combobox', { name: /^Übersetzungsstand/ }).click();
+  await page.getByRole('option', { name: 'Sprachen ergänzen', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Änderungen verwerfen', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Keine passenden Vorlagen gefunden' })).toBeVisible();
+});
+
+test('new moderation templates are created in a focused dialog', async ({ page }) => {
+  await openDemoPage(page, '/settings/player-languages');
+  await page.getByRole('button', { name: 'Neue Moderationsvorlage', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Neue Moderationsvorlage' });
+  await dialog.getByLabel('Titel', { exact: true }).fill('Kommunikation');
+  await dialog.getByLabel('Originaltext', { exact: true }).fill('Bitte melde dich im Squad-Voice.');
+  await dialog.getByRole('button', { name: 'Vorlage anlegen', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Kommunikation', exact: true })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'Fehlende Sprachen' })).toBeVisible();
 });

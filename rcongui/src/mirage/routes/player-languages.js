@@ -9,6 +9,15 @@ export function registerPlayerLanguages(server, ok) {
   const profile = id => profiles.get(id) || { language: "de+en", explicit: false, source: "fallback", updated: null, recent_messages: [] };
   const body = request => JSON.parse(request.requestBody || "{}");
   server.get("/get_player_message_catalog", () => ok({ enabled, templates: structuredClone(templates) }));
+  server.post("/add_message_template", (_, request) => {
+    const value = body(request);
+    const id = Math.max(...templates.filter(item => item.key.startsWith('manual:')).map(item => Number(item.key.split(':')[1])), 0) + 1;
+    templates.push({ key: 'manual:' + id, title: value.title, source: value.content,
+      group: 'moderation', action: value.category === 'MESSAGE' ? 'message' : 'reason',
+      defaults: {}, translations: {}, saved_translations: {}, revision: '1', needs_review: false,
+      source_hash: 'demo', placeholders: [...new Set([...value.content.matchAll(/\{([\w]+)\}/g)].map(match => match[1]))] });
+    return ok(id);
+  });
   server.post("/set_player_language_settings", (_, request) => { enabled = body(request).enabled; return ok(true); });
   server.post("/set_player_message_translations", (_, request) => {
     const payload = body(request), template = templates.find(item => item.key === payload.key);

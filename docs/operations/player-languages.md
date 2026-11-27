@@ -4,6 +4,14 @@ The first phase routes moderation messages/reasons, Automods and Autobalancer
 feedback by recipient. It adds no machine-translation request to an RCON action.
 The interface is at `/settings/player-languages`, also linked from Templates.
 
+The translation workspace shows localized rule and message names instead of
+internal binding keys. Search matches the displayed name and original text;
+area and translation-status filters narrow the list. Original and translation
+are displayed together on desktop and stacked on smaller screens. Empty source
+texts are marked unused. Player language profiles have their own tab, and new
+moderation templates open in a separate dialog. Changing a template or filter
+still protects unsaved translations; previews never send game commands.
+
 ## Preferences and identity
 
 PC players use `!lang`, `!lang de`, `!lang en` or `!lang fr` (alias `!language`).
