@@ -14,6 +14,8 @@ from rcon.models import Base
 from rcon.voice_language_text import BILINGUAL, BUILTIN, TEXT, VERSION, valid_templates
 
 DEFAULT = "de+en"
+# Keep the legacy bilingual mode selectable; an unknown player uses English.
+FALLBACK_LANGUAGE = "en"
 
 # Accept only known ISO 639-1 language identifiers plus the common additional
 # locale tags below. This bounds cache entries and prevents invented language
@@ -261,7 +263,7 @@ def render(sess, key, locale, *, target="", case=""):
     """Instant only: no network or model call in an RCON tick or Discord interaction."""
     if key not in TEXT:
         raise ValueError("Unknown voice message key")
-    locale = normalize_language(locale) or DEFAULT
+    locale = normalize_language(locale) or FALLBACK_LANGUAGE
     if locale in BUILTIN:
         template = TEXT[key][BUILTIN.index(locale)]
     else:

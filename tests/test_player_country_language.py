@@ -35,9 +35,9 @@ def test_linked_steam_country_is_used_for_eos_without_an_existing_preference(dat
 
 
 @pytest.mark.parametrize("country", ["CH","BE","CA",None,"private","ZZ"])
-def test_ambiguous_or_unavailable_country_keeps_bilingual_fallback(database,country):
+def test_ambiguous_or_unavailable_country_uses_english_fallback(database,country):
     cached_country(database,country)
-    assert languages.get_profile(EOS)["language"]=="de+en"
+    assert languages.get_profile(EOS)["language"]=="en"
 
 
 def test_manual_and_own_report_preferences_beat_country(database):
@@ -52,14 +52,14 @@ def test_manual_and_own_report_preferences_beat_country(database):
 
 def test_wrong_steam_profile_cannot_supply_an_eos_country(database):
     cached_country(database,"FR",returned_id="76561198000000002")
-    assert languages.get_profile(EOS)["language"]=="de+en"
+    assert languages.get_profile(EOS)["language"]=="en"
 
 
 def test_native_steam_country_and_disabled_routing(database,monkeypatch):
     cached_country(database,"DE",native=True)
     assert languages.get_profile(STEAM)["language"]=="de"
     monkeypatch.setattr(PlayerLanguageUserConfig,"load_from_db",classmethod(lambda cls:cls(enabled=False)))
-    assert languages.get_profile(STEAM)["language"]=="de+en"
+    assert languages.get_profile(STEAM)["language"]=="en"
 
 
 def test_new_missing_country_does_not_resurrect_an_older_country(database):
@@ -68,7 +68,7 @@ def test_new_missing_country_does_not_resurrect_an_older_country(database):
         session.execute(text('INSERT INTO steam_info VALUES (2,1,:profile,:country,:updated)'),
                         {"profile":json.dumps({"steamid":STEAM}),"country":"FR",
                          "updated":datetime.datetime(2026,11,27,14)})
-    assert languages.get_profile(EOS)["language"]=="de+en"
+    assert languages.get_profile(EOS)["language"]=="en"
 
 
 def test_eos_refresh_uses_steam_for_profile_but_preserves_native_ban_lookup(monkeypatch):

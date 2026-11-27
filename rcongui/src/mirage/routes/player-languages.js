@@ -6,7 +6,7 @@ export function registerPlayerLanguages(server, ok) {
     { key: "automod.no_leader.warning", group: "automod", action: "warning", source: "Warning {player_name}: no squad leader.", defaults: {}, translations: { de: "Achtung {player_name}: kein Squadleader.", en: "Warning {player_name}: no squad leader.", fr: "Attention {player_name} : aucun chef d’escouade." }, placeholders: ["player_name"] },
     { key: "autobalancer.disabled", group: "autobalancer", action: "message", source: "Der Autobalancer ist ausgeschaltet.", defaults: {}, translations: { de: "Der Autobalancer ist ausgeschaltet.", en: "Autobalancing is disabled.", fr: "L’équilibrage automatique est désactivé." }, placeholders: [] },
   ].map(item => ({ ...item, saved_translations: {}, revision: "1", needs_review: false, source_hash: "demo" }));
-  const profile = id => profiles.get(id) || { language: "de+en", explicit: false, source: "fallback", updated: null, recent_messages: [] };
+  const profile = id => profiles.get(id) || { language: "en", explicit: false, source: "fallback", updated: null, recent_messages: [] };
   const body = request => JSON.parse(request.requestBody || "{}");
   server.get("/get_player_message_catalog", () => ok({ enabled, templates: structuredClone(templates) }));
   server.post("/add_message_template", (_, request) => {
@@ -44,7 +44,10 @@ export function registerPlayerLanguages(server, ok) {
     const template = templates.find(item => payload.key ? item.key === payload.key : item.source === payload.text);
     const variants = payload.translations || template?.translations || {};
     const active = !!payload.key || enabled;
-    const text = active && template ? variants[p.language] || [...new Set([variants.de, variants.en].filter(Boolean))].join(" / ") || template.source : payload.text;
-    return ok({ ...p, text, original: template?.source || payload.text, template_key: active ? template?.key : null, delivered_language: active && template ? variants[p.language] ? p.language : "de+en" : "legacy" });
+    const bilingual = p.language === 'de+en';
+    const fallback = bilingual ? [...new Set([variants.de, variants.en].filter(Boolean))].join(' / ') : variants.en;
+    const text = active && template ? variants[p.language] || fallback || template.source : payload.text;
+    const fallbackLanguage = bilingual && variants.de && variants.en ? 'de+en' : variants.en ? 'en' : bilingual && variants.de ? 'de' : 'legacy';
+    return ok({ ...p, text, original: template?.source || payload.text, template_key: active ? template?.key : null, delivered_language: active && template ? variants[p.language] ? p.language : fallbackLanguage : 'legacy' });
   });
 }

@@ -43,7 +43,7 @@ def test_profile_edits_require_account_edit_permission_and_post(request_api):
     assert request_api('set_player_language','POST',payload).status_code==403
     assert request_api('set_player_language','POST',payload,authenticated=False).status_code==401
     assert request_api('set_player_language','GET',payload,['api.can_edit_player_account']).status_code==405
-    assert languages.get_profile(EOS)['language']=='de+en'
+    assert languages.get_profile(EOS)['language']=='en'
     response=request_api('set_player_language','POST',payload,['api.can_edit_player_account'])
     assert response.status_code==200 and json.loads(response.content)['result']['language']=='fr'
     assert request_api('get_player_language',values={'player_id':EOS}).status_code==403

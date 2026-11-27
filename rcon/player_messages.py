@@ -94,9 +94,12 @@ def render(key, source, *, player_id, variables=None, defaults=None, enabled=Non
         if language in formatted:
             selected = formatted[language]
             resolved = language
-        else:
+        elif language == "de+en":
             selected = " / ".join(dict.fromkeys(formatted[l] for l in ("de", "en") if l in formatted)) or original
             resolved = "de+en" if "de" in formatted and "en" in formatted else next((l for l in ("de", "en") if l in formatted), "legacy")
+        else:
+            selected = formatted.get("en", original)
+            resolved = "en" if "en" in formatted else "legacy"
         return LocalizedText(selected, original=original, key=key, language=resolved, variants=formatted)
     except Exception:
         # Language routing must not turn a working moderation command into an

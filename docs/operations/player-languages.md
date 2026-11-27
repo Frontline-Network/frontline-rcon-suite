@@ -28,7 +28,8 @@ Explicit choices beat report-language observations. If both are absent and
 recipient routing is enabled, a cached public Steam country can supply a
 provisional language default. The profile labels this source separately; it
 does not create an explicit preference. Multilingual countries such as CH, BE
-and CA retain the bilingual fallback. Missing translations still use DE/EN.
+and CA use the English fallback. An unknown player defaults to English without
+writing a preference row. Explicit bilingual choices remain readable and usable.
 Vietnam profile refreshes query the stored Steam ID and validate the response
 identity; game commands and ban lookups continue to use their existing IDs.
 No Steam request occurs during message rendering. A nickname, the reporter's
@@ -53,8 +54,9 @@ editor saves. Arbitrary free text is not silently machine-translated.
 
 Enable recipient routing explicitly after reviewing templates. The default is
 off for upgrades, retaining existing module behavior. With routing enabled, a
-known preference selects one variant. Unknown/unavailable variants use one
-combined DE/EN packet where available, otherwise preserved original content.
+known preference selects one variant. Unknown players and missing variants use
+English where available, otherwise preserved original content. An explicitly
+selected DE/EN preference still uses one combined bilingual packet.
 Autobalancer sends one packet; disabled routing retains its legacy configured
 pack behavior. A translation does not change an action, duration, eligibility,
 round/session check, warning counter, or existing delivery reservation.
