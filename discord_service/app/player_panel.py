@@ -694,7 +694,7 @@ def private_dm(user_id, body, nonce):
     if not client.settings.discord_bot_token:
         raise ValueError("Discord not configured")
     headers = {"Authorization": f"Bot {client.settings.discord_bot_token}"}
-    with client.client as http:
+    with client.http_client() as http:
         dm = http.post(
             "https://discord.com/api/v10/users/@me/channels",
             headers=headers,

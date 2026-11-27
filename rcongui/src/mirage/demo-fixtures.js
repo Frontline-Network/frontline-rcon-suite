@@ -857,7 +857,11 @@ const demoSystemUsageHistory = Array.from({ length: 12 }, (_, index) => ({
   sampled_at: new Date(now - (11 - index) * 15_000).toISOString(),
   cpu_percent: [11, 15, 17, 14, 19, 23, 21, 18, 16, 20, 17, 18][index],
   ram_percent: [42, 42, 43, 43, 44, 44, 45, 45, 45, 46, 46, 46][index],
-  rcon_ram_used_bytes: [1420, 1430, 1450, 1460, 1480, 1490, 1500, 1505, 1510, 1520, 1530, 1536][index] * 1024 ** 2,
+  rcon_ram_used_bytes: (665 + 9984 - (11 - index) * 10) * 1024 ** 2,
+  rcon_service_ram_used_bytes: 598 * 1024 ** 2 + 1.1 * 1024 ** 3,
+  rcon_dedicated_ram_used_bytes: 598 * 1024 ** 2,
+  rcon_shared_ram_used_bytes: 1.1 * 1024 ** 3,
+  rcon_file_cache_bytes: (10649 - 598 - (11 - index) * 10) * 1024 ** 2 - 1.1 * 1024 ** 3,
   disk_percent: 62,
   status: "ok",
 }));
@@ -894,25 +898,32 @@ export const demoSystemUsage = {
   rcon_ram_usage: {
     available: true,
     source: "rcon_services",
-    used_bytes: 1536 * 1024 ** 2,
-    used: 1.5,
+    used_bytes: (665 + 9984) * 1024 ** 2,
+    used: (665 + 9984) / 1024,
     unit: "GiB",
     total: null,
     percent: null,
-    dedicated_used_bytes: 640 * 1024 ** 2,
-    shared_used_bytes: 896 * 1024 ** 2,
-    reclaimable_bytes: 512 * 1024 ** 2,
-    working_set_bytes: 1024 ** 3,
+    dedicated_used_bytes: 690 * 1024 ** 2,
+    shared_used_bytes: 9959 * 1024 ** 2,
+    service_ram_available: true,
+    service_used_bytes: 598 * 1024 ** 2 + 1.1 * 1024 ** 3,
+    dedicated_service_used_bytes: 598 * 1024 ** 2,
+    shared_service_used_bytes: 1.1 * 1024 ** 3,
+    file_cache_bytes: (10649 - 598) * 1024 ** 2 - 1.1 * 1024 ** 3,
+    dedicated_file_cache_bytes: 92 * 1024 ** 2,
+    shared_file_cache_bytes: 9959 * 1024 ** 2 - 1.1 * 1024 ** 3,
+    reclaimable_bytes: 7 * 1024 ** 3,
+    working_set_bytes: (665 + 9984 - 7168) * 1024 ** 2,
     sampled_at: new Date(now).toISOString(),
     data_age_seconds: 0,
     components: [
-      { service: "backend", scope: "dedicated", used_bytes: 256 * 1024 ** 2, limit_bytes: 1024 ** 3 },
-      { service: "supervisor", scope: "dedicated", used_bytes: 380 * 1024 ** 2, limit_bytes: 2 * 1024 ** 3 },
-      { service: "frontend", scope: "dedicated", used_bytes: 4 * 1024 ** 2, limit_bytes: 128 * 1024 ** 2 },
-      { service: "redis", scope: "shared", used_bytes: 160 * 1024 ** 2, limit_bytes: null },
-      { service: "postgres", scope: "shared", used_bytes: 600 * 1024 ** 2, limit_bytes: null },
-      { service: "webhook", scope: "shared", used_bytes: 72 * 1024 ** 2, limit_bytes: 512 * 1024 ** 2 },
-      { service: "background_worker", scope: "shared", used_bytes: 64 * 1024 ** 2, limit_bytes: 512 * 1024 ** 2 },
+      { service: "backend", scope: "dedicated", used_bytes: 256 * 1024 ** 2, file_cache_bytes: 71 * 1024 ** 2, service_used_bytes: 185 * 1024 ** 2, limit_bytes: 1024 ** 3 },
+      { service: "supervisor", scope: "dedicated", used_bytes: 430 * 1024 ** 2, file_cache_bytes: 21 * 1024 ** 2, service_used_bytes: 409 * 1024 ** 2, limit_bytes: 2 * 1024 ** 3 },
+      { service: "frontend", scope: "dedicated", used_bytes: 4 * 1024 ** 2, file_cache_bytes: 0, service_used_bytes: 4 * 1024 ** 2, limit_bytes: 128 * 1024 ** 2 },
+      { service: "redis", scope: "shared", used_bytes: 160 * 1024 ** 2, file_cache_bytes: 0, service_used_bytes: 160 * 1024 ** 2, limit_bytes: null },
+      { service: "postgres", scope: "shared", used_bytes: 9663 * 1024 ** 2, file_cache_bytes: 9959 * 1024 ** 2 - 1.1 * 1024 ** 3, service_used_bytes: 1.1 * 1024 ** 3 - 296 * 1024 ** 2, limit_bytes: null },
+      { service: "webhook", scope: "shared", used_bytes: 72 * 1024 ** 2, file_cache_bytes: 0, service_used_bytes: 72 * 1024 ** 2, limit_bytes: 512 * 1024 ** 2 },
+      { service: "background_worker", scope: "shared", used_bytes: 64 * 1024 ** 2, file_cache_bytes: 0, service_used_bytes: 64 * 1024 ** 2, limit_bytes: 512 * 1024 ** 2 },
     ],
   },
   disk_usage: {
@@ -947,8 +958,11 @@ export const getDemoSystemUsage = () => {
     result.rcon_ram_usage.used_bytes += delta;
     result.rcon_ram_usage.used = result.rcon_ram_usage.used_bytes / 1024 ** 3;
     result.rcon_ram_usage.dedicated_used_bytes += delta;
+    result.rcon_ram_usage.service_used_bytes += delta;
+    result.rcon_ram_usage.dedicated_service_used_bytes += delta;
     result.rcon_ram_usage.working_set_bytes += delta;
     result.rcon_ram_usage.components.find((item) => item.service === "backend").used_bytes += delta;
+    result.rcon_ram_usage.components.find((item) => item.service === "backend").service_used_bytes += delta;
     result.ram_usage.severity = "warning";
     result.warnings = [
       {
@@ -1022,6 +1036,16 @@ export const getDemoSystemUsage = () => {
   }
 
   if (mode === "rcon_missing") delete result.rcon_ram_usage;
+
+  if (mode === "cache_unknown") {
+    result.rcon_ram_usage.service_ram_available = false;
+    for (const key of ["service_used_bytes", "dedicated_service_used_bytes", "shared_service_used_bytes", "file_cache_bytes", "dedicated_file_cache_bytes", "shared_file_cache_bytes"]) {
+      result.rcon_ram_usage[key] = null;
+    }
+    for (const sample of result.history) {
+      for (const key of ["rcon_service_ram_used_bytes", "rcon_dedicated_ram_used_bytes", "rcon_shared_ram_used_bytes", "rcon_file_cache_bytes"]) sample[key] = null;
+    }
+  }
 
   if (mode === "local_unavailable") {
     result.status = "unavailable";

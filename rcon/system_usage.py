@@ -228,6 +228,10 @@ def _rcon_memory_unavailable(
         percent=None, source="rcon_services", unit="GiB", reason=reason,
         used_bytes=None, total_bytes=None, dedicated_used_bytes=None,
         shared_used_bytes=None, reclaimable_bytes=None, working_set_bytes=None,
+        service_ram_available=False, service_used_bytes=None,
+        dedicated_service_used_bytes=None, shared_service_used_bytes=None,
+        file_cache_bytes=None, dedicated_file_cache_bytes=None,
+        shared_file_cache_bytes=None,
         components=[], sampled_at=sampled_at, data_age_seconds=age_seconds,
         accounting="cgroup_memory_current",
     )
@@ -321,6 +325,8 @@ def _collect_rcon_memory(now: datetime) -> dict[str, Any]:
     names: set[str] = set()
     components = []
     totals = {"dedicated": 0, "shared": 0}
+    file_cache_totals = {"dedicated": 0, "shared": 0}
+    file_cache_complete = True
     reclaimable = 0
     reclaimable_complete = True
     for scope, records in (("dedicated", dedicated), ("shared", shared)):
@@ -340,13 +346,22 @@ def _collect_rcon_memory(now: datetime) -> dict[str, Any]:
             cached = record.get("reclaimable_bytes")
             if cached is not None and (not _resource_bytes(cached) or cached > used):
                 return _rcon_memory_unavailable("invalid_component")
+            # Disk-backed file cache includes active and inactive pages. It is
+            # distinct from reclaimable/inactive_file; shmem stays service RAM.
+            file_cache = record.get("file_cache_bytes")
+            if file_cache is not None and (not _resource_bytes(file_cache) or file_cache > used):
+                return _rcon_memory_unavailable("invalid_component")
+            file_cache_complete &= file_cache is not None
+            file_cache_totals[scope] += file_cache or 0
             reclaimable_complete &= cached is not None
             reclaimable += cached or 0
             totals[scope] += used
             if sum(totals.values()) > RESOURCE_USAGE_MAX_VALUE:
                 return _rcon_memory_unavailable("invalid_component")
             components.append(dict(service=service, used_bytes=used, limit_bytes=limit,
-                                   reclaimable_bytes=cached, scope=scope))
+                                   reclaimable_bytes=cached, file_cache_bytes=file_cache,
+                                   service_used_bytes=used - file_cache if file_cache is not None else None,
+                                   scope=scope))
     total = sum(totals.values())
     return _metric(
         percent=None, available=True, source="rcon_services", unit="GiB",
@@ -355,6 +370,13 @@ def _collect_rcon_memory(now: datetime) -> dict[str, Any]:
         shared_used_bytes=totals["shared"], components=components,
         reclaimable_bytes=reclaimable if reclaimable_complete else None,
         working_set_bytes=total - reclaimable if reclaimable_complete else None,
+        service_ram_available=file_cache_complete,
+        service_used_bytes=total - sum(file_cache_totals.values()) if file_cache_complete else None,
+        dedicated_service_used_bytes=totals["dedicated"] - file_cache_totals["dedicated"] if file_cache_complete else None,
+        shared_service_used_bytes=totals["shared"] - file_cache_totals["shared"] if file_cache_complete else None,
+        file_cache_bytes=sum(file_cache_totals.values()) if file_cache_complete else None,
+        dedicated_file_cache_bytes=file_cache_totals["dedicated"] if file_cache_complete else None,
+        shared_file_cache_bytes=file_cache_totals["shared"] if file_cache_complete else None,
         sampled_at=timestamp.isoformat(), data_age_seconds=round(max(age, 0.0), 3),
         reason=None, accounting="cgroup_memory_current",
     )
@@ -609,6 +631,11 @@ class SystemUsageSampler:
             self._last_sample = sample
             self._last_raw = raw
             self._last_monotonic = monotonic_now
+            rcon_memory = sample.get("rcon_ram_usage") or {}
+            service_ram_available = (
+                rcon_memory.get("available") is True
+                and rcon_memory.get("service_ram_available") is True
+            )
             self._history.append(
                 {
                     "sampled_at": sample["sampled_at"],
@@ -618,6 +645,10 @@ class SystemUsageSampler:
                         sample["rcon_ram_usage"].get("used_bytes")
                         if (sample.get("rcon_ram_usage") or {}).get("available") is True else None
                     ),
+                    "rcon_service_ram_used_bytes": rcon_memory.get("service_used_bytes") if service_ram_available else None,
+                    "rcon_dedicated_ram_used_bytes": rcon_memory.get("dedicated_service_used_bytes") if service_ram_available else None,
+                    "rcon_shared_ram_used_bytes": rcon_memory.get("shared_service_used_bytes") if service_ram_available else None,
+                    "rcon_file_cache_bytes": rcon_memory.get("file_cache_bytes") if service_ram_available else None,
                     "disk_percent": sample["disk_usage"]["percent"],
                     "status": sample["status"],
                 }

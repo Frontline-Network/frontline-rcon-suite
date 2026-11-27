@@ -456,3 +456,172 @@ def test_installation_history_remains_bounded_and_records_missing_samples(monkey
     last = sampler.get_snapshot()
     assert len(last["history"]) == 2
     assert [h["rcon_ram_used_bytes"] for h in last["history"]] == [None, 6 * GIB]
+
+
+def snapshot_with_file_cache():
+    document = installation_snapshot()
+    for component, file_cache in zip(
+        document["dedicated_components"] + document["shared_components"],
+        [GIB // 4, GIB // 2, 0, 3 * GIB // 2],
+    ):
+        component["file_cache_bytes"] = file_cache
+    return document
+
+
+def assert_service_memory_unknown(metric):
+    assert metric["service_ram_available"] is False
+    for field in (
+        "service_used_bytes", "dedicated_service_used_bytes", "shared_service_used_bytes",
+        "file_cache_bytes", "dedicated_file_cache_bytes", "shared_file_cache_bytes",
+    ):
+        assert metric[field] is None
+
+
+def test_disk_cache_separates_dedicated_shared_service_ram_without_changing_raw(monkeypatch, tmp_path):
+    snapshot_file(monkeypatch, tmp_path, snapshot_with_file_cache())
+    sample = collect_snapshot()
+    result = sample["rcon_ram_usage"]
+    assert result["available"] is True and result["service_ram_available"] is True
+    assert result["used_bytes"] == 6 * GIB
+    assert result["service_used_bytes"] == 15 * GIB // 4
+    assert result["dedicated_service_used_bytes"] == 9 * GIB // 4
+    assert result["shared_service_used_bytes"] == 3 * GIB // 2
+    assert result["file_cache_bytes"] == 9 * GIB // 4
+    assert result["dedicated_file_cache_bytes"] == 3 * GIB // 4
+    assert result["shared_file_cache_bytes"] == 3 * GIB // 2
+    assert result["reclaimable_bytes"] == GIB
+    assert result["working_set_bytes"] == 5 * GIB
+    assert result["components"][0]["file_cache_bytes"] == GIB // 4
+    assert result["components"][0]["service_used_bytes"] == 3 * GIB // 4
+    assert sample["ram_usage"]["used_bytes"] == GIB // 2
+
+
+def test_active_disk_cache_is_excluded_but_shmem_remains_service_ram(monkeypatch, tmp_path):
+    # Example collector input: file=9 GiB (active+inactive), shmem=1 GiB.
+    # Only its disk-backed 8 GiB is subtracted, not shmem or merely inactive_file.
+    document = installation_snapshot()
+    document["dedicated_components"] = [{
+        "service": "backend_3", "used_bytes": 10 * GIB,
+        "limit_bytes": None, "reclaimable_bytes": GIB,
+        "file_cache_bytes": 8 * GIB,
+    }]
+    document["shared_components"] = []
+    snapshot_file(monkeypatch, tmp_path, document)
+    result = collect_snapshot()["rcon_ram_usage"]
+    assert result["service_used_bytes"] == 2 * GIB
+    assert result["file_cache_bytes"] == 8 * GIB
+    assert result["working_set_bytes"] == 9 * GIB
+    assert result["shared_service_used_bytes"] == result["shared_file_cache_bytes"] == 0
+
+
+@pytest.mark.parametrize("scope,index,explicit_null", [
+    ("dedicated_components", 0, False),
+    ("dedicated_components", 1, True),
+    ("shared_components", 0, False),
+    ("shared_components", 1, True),
+])
+def test_one_missing_cache_value_keeps_raw_valid_and_service_ram_unknown(monkeypatch, tmp_path, scope, index, explicit_null):
+    document = snapshot_with_file_cache()
+    if explicit_null:
+        document[scope][index]["file_cache_bytes"] = None
+    else:
+        document[scope][index].pop("file_cache_bytes")
+    snapshot_file(monkeypatch, tmp_path, document)
+    result = collect_snapshot()["rcon_ram_usage"]
+    assert result["available"] is True and result["used_bytes"] == 6 * GIB
+    assert_service_memory_unknown(result)
+    missing = next(item for item in result["components"] if item["service"] == document[scope][index]["service"])
+    assert missing["service_used_bytes"] is None
+
+
+@pytest.mark.parametrize("cache", [-1, True, False, 1.0, "0", 2 * GIB, 2**63])
+def test_invalid_disk_cache_counter_rejects_snapshot(monkeypatch, tmp_path, cache):
+    document = snapshot_with_file_cache()
+    document["dedicated_components"][0]["file_cache_bytes"] = cache
+    snapshot_file(monkeypatch, tmp_path, document)
+    result = collect_snapshot()["rcon_ram_usage"]
+    assert result["available"] is False and result["reason"] == "invalid_component"
+    assert_service_memory_unknown(result)
+
+
+def test_old_snapshot_with_only_inactive_cache_cannot_claim_service_ram(monkeypatch, tmp_path):
+    snapshot_file(monkeypatch, tmp_path, installation_snapshot())
+    result = collect_snapshot()["rcon_ram_usage"]
+    assert result["available"] is True and result["working_set_bytes"] == 5 * GIB
+    assert_service_memory_unknown(result)
+
+
+def test_known_zero_disk_cache_preserves_all_ram_and_known_stopped_zero(monkeypatch, tmp_path):
+    document = snapshot_with_file_cache()
+    for item in document["dedicated_components"] + document["shared_components"]:
+        item.update(file_cache_bytes=0)
+    document["dedicated_components"][0].update(used_bytes=0, reclaimable_bytes=0)
+    snapshot_file(monkeypatch, tmp_path, document)
+    result = collect_snapshot()["rcon_ram_usage"]
+    assert result["service_ram_available"] is True
+    assert result["service_used_bytes"] == result["used_bytes"] == 5 * GIB
+    assert result["file_cache_bytes"] == 0
+    assert result["components"][0]["service_used_bytes"] == 0
+
+
+def test_disk_cache_can_equal_charge_without_becoming_unavailable(monkeypatch, tmp_path):
+    document = snapshot_with_file_cache()
+    for item in document["dedicated_components"] + document["shared_components"]:
+        item["file_cache_bytes"] = item["used_bytes"]
+    snapshot_file(monkeypatch, tmp_path, document)
+    result = collect_snapshot()["rcon_ram_usage"]
+    assert result["service_ram_available"] is True
+    assert result["service_used_bytes"] == 0 and result["file_cache_bytes"] == 6 * GIB
+
+
+def test_disk_cache_breakdown_does_not_require_inactive_file_counter(monkeypatch, tmp_path):
+    document = snapshot_with_file_cache()
+    for item in document["dedicated_components"] + document["shared_components"]:
+        item.pop("reclaimable_bytes")
+    snapshot_file(monkeypatch, tmp_path, document)
+    result = collect_snapshot()["rcon_ram_usage"]
+    assert result["service_ram_available"] is True
+    assert result["service_used_bytes"] == 15 * GIB // 4
+    assert result["reclaimable_bytes"] is None and result["working_set_bytes"] is None
+
+
+def test_cached_snapshot_expiry_invalidates_all_derived_service_values(monkeypatch, tmp_path):
+    document = snapshot_with_file_cache()
+    document["sampled_at"] = (NOW - timedelta(seconds=59)).isoformat()
+    snapshot_file(monkeypatch, tmp_path, document)
+    monotonic_values = iter([0, 2])
+    now_values = iter([NOW, NOW + timedelta(seconds=2)])
+    sampler = SystemUsageSampler(
+        collector=lambda previous, *, sampled_at, monotonic_now: (collect_snapshot(now=sampled_at), {}),
+        monotonic=lambda: next(monotonic_values), now=lambda: next(now_values),
+    )
+    first = sampler.get_snapshot()
+    assert first["rcon_ram_usage"]["service_ram_available"] is True
+    stale = sampler.get_snapshot()
+    assert stale["cache_hit"] is True and stale["rcon_ram_usage"]["reason"] == "stale"
+    assert_service_memory_unknown(stale["rcon_ram_usage"])
+    assert stale["rcon_ram_usage"]["components"] == []
+
+
+def test_service_history_tracks_dedicated_shared_and_cache_with_unknown_gaps(monkeypatch, tmp_path):
+    snapshot_file(monkeypatch, tmp_path, snapshot_with_file_cache())
+    monotonic_values = iter([0, 15, 30])
+    now_values = iter([NOW, NOW + timedelta(seconds=15), NOW + timedelta(seconds=30)])
+    sampler = SystemUsageSampler(
+        max_history_samples=2,
+        collector=lambda previous, *, sampled_at, monotonic_now: (collect_snapshot(now=sampled_at), {}),
+        monotonic=lambda: next(monotonic_values), now=lambda: next(now_values),
+    )
+    first = sampler.get_snapshot()["history"][0]
+    assert first["rcon_service_ram_used_bytes"] == 15 * GIB // 4
+    assert first["rcon_dedicated_ram_used_bytes"] == 9 * GIB // 4
+    assert first["rcon_shared_ram_used_bytes"] == 3 * GIB // 2
+    assert first["rcon_file_cache_bytes"] == 9 * GIB // 4
+    snapshot_file(monkeypatch, tmp_path, installation_snapshot())
+    old = sampler.get_snapshot()["history"][-1]
+    assert old["rcon_ram_used_bytes"] == 6 * GIB
+    for field in ("rcon_service_ram_used_bytes", "rcon_dedicated_ram_used_bytes",
+                  "rcon_shared_ram_used_bytes", "rcon_file_cache_bytes"):
+        assert old[field] is None
+    snapshot_file(monkeypatch, tmp_path, snapshot_with_file_cache())
+    assert len(sampler.get_snapshot()["history"]) == 2
