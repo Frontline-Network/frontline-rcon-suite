@@ -16,8 +16,15 @@ website integration is outside this first-phase RCON interface.
 
 The historical `voice_language_preference` and `voice_verified_identity` tables
 remain authoritative: no preferences or verified links are copied or discarded.
-Explicit choices beat report-language observations. Country, nickname, the
-reporter's language and unverified platform IDs are never attributed to a target.
+Explicit choices beat report-language observations. If both are absent and
+recipient routing is enabled, a cached public Steam country can supply a
+provisional language default. The profile labels this source separately; it
+does not create an explicit preference. Multilingual countries such as CH, BE
+and CA retain the bilingual fallback. Missing translations still use DE/EN.
+Vietnam profile refreshes query the stored Steam ID and validate the response
+identity; game commands and ban lookups continue to use their existing IDs.
+No Steam request occurs during message rendering. A nickname, the reporter's
+language and an unverified Discord account are never attributed to a target.
 EOS spelling is canonicalized; old uppercase preferences/links remain readable.
 
 ## Templates and compatibility

@@ -355,12 +355,14 @@ def update_missing_old_steam_info_single_player(
     bans = None
     if (
         player.steaminfo is None
+        or player.steaminfo.updated is None
+        or player.steaminfo.profile is None
         or player.steaminfo
         and player.steaminfo.updated
         and (datetime.datetime.utcnow() - player.steaminfo.updated) >= age_limit
     ):
         # Fetch both the profile and bans
-        profile = fetch_steam_player_summary_player(player.player_id)
+        profile = _fetch_linked_player_summary(player)
         country_code = _get_player_country_code(profile)
         bans = fetch_steam_bans_player(player.player_id)
 
@@ -373,22 +375,38 @@ def update_missing_old_steam_info_single_player(
         or player.steaminfo.country is None
     ):
         # Fetch the profile if the profile or country code is missing
-        profile = fetch_steam_player_summary_player(player.player_id)
+        profile = _fetch_linked_player_summary(player)
         country_code = _get_player_country_code(profile)
 
     if player.steaminfo is None:
         steam_info = SteamInfo(
             profile=profile, country=country_code, bans=bans, player=player
         )
+        if profile or bans:
+            steam_info.updated = datetime.datetime.utcnow()
         sess.add(steam_info)
         player.steaminfo = steam_info
     else:
         if profile:
             player.steaminfo.profile = profile
-        if country_code:
             player.steaminfo.country = country_code
         if bans:
             player.steaminfo.bans = bans
+        if profile or bans:
+            player.steaminfo.updated = datetime.datetime.utcnow()
+
+
+def _fetch_linked_player_summary(player):
+    # Only the public profile lookup uses this association. Ban identity and
+    # every game-server command keep their existing native-ID paths.
+    from rcon.player_country_language import steam_account_id
+    identity = steam_account_id(player.player_id)
+    if identity is None and re.fullmatch(r"[0-9a-fA-F]{32}", str(player.player_id)):
+        identity = steam_account_id(getattr(player, "steam_id", None))
+    if identity is None:
+        return None
+    profile = fetch_steam_player_summary_player(identity)
+    return profile if isinstance(profile, dict) and profile.get("steamid") == identity else None
 
 
 def enrich_db_users(chunk_size=100, update_from_days_old=30):
