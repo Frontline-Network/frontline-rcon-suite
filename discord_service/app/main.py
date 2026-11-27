@@ -45,6 +45,7 @@ from .contracts import (
 )
 from .db import Base, engine, session_dependency, migrate_incident_language
 from .discord_client import DiscordClient, render_message
+from .discord_http import DiscordHTTPPoolMiddleware, discord_http_lifespan
 from .voice_translation import build_translation_router
 from . import player_panel
 from .models import (
@@ -62,7 +63,11 @@ from .report_reason_contract import ReportReasonRequest
 
 Base.metadata.create_all(engine)
 migrate_incident_language(engine)
-app = FastAPI(title="Frontline CRCON Discord Service", version="1.0.0")
+app = FastAPI(
+    title="Frontline CRCON Discord Service", version="1.0.0",
+    lifespan=discord_http_lifespan,
+)
+app.add_middleware(DiscordHTTPPoolMiddleware)
 _rate_windows: dict[str, tuple[float, int]] = {}
 _rate_lock = Lock()
 

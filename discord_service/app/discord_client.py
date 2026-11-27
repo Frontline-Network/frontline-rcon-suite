@@ -7,6 +7,7 @@ from datetime import datetime
 import httpx
 
 from .config import Settings, get_settings
+from .discord_http import discord_http_client
 from .contracts import IncidentEventEnvelope, ModerationAnalysis
 from .report_admin_display import case_fields
 from .report_card import TEXT as CARD_TEXT, summary as card_summary, voice_state
@@ -1235,15 +1236,19 @@ def render_message(
 class DiscordClient:
     def __init__(self, settings: Settings | None = None, client=None):
         self.settings = settings or get_settings()
-        self.client = client or httpx.Client(timeout=10)
+        self.client = client
+
+    def http_client(self):
+        return discord_http_client(self.client)
 
     def validate_channel(self, channel_id: str, guild_id: str) -> None:
         if self.settings.dry_run or not self.settings.discord_bot_token:
             return
-        response = self.client.get(
-            f"https://discord.com/api/v10/channels/{channel_id}",
-            headers={"Authorization": f"Bot {self.settings.discord_bot_token}"},
-        )
+        with self.http_client() as http:
+            response = http.get(
+                f"https://discord.com/api/v10/channels/{channel_id}",
+                headers={"Authorization": f"Bot {self.settings.discord_bot_token}"},
+            )
         response.raise_for_status()
         if str(response.json().get("guild_id") or "") != guild_id:
             raise ValueError("Discord channel does not belong to the selected guild")
@@ -1258,10 +1263,11 @@ class DiscordClient:
 
         if self.settings.dry_run or not self.settings.discord_bot_token:
             return self.guild_options("123")
-        response = self.client.get(
-            "https://discord.com/api/v10/users/@me/guilds",
-            headers={"Authorization": f"Bot {self.settings.discord_bot_token}"},
-        )
+        with self.http_client() as http:
+            response = http.get(
+                "https://discord.com/api/v10/users/@me/guilds",
+                headers={"Authorization": f"Bot {self.settings.discord_bot_token}"},
+            )
         response.raise_for_status()
         guilds = response.json()
         if not isinstance(guilds, list):
@@ -1293,15 +1299,16 @@ class DiscordClient:
                 "roles": [],
             }
         headers = {"Authorization": f"Bot {self.settings.discord_bot_token}"}
-        guild_response = self.client.get(
-            f"https://discord.com/api/v10/guilds/{guild_id}", headers=headers
-        )
-        channels_response = self.client.get(
-            f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers
-        )
-        roles_response = self.client.get(
-            f"https://discord.com/api/v10/guilds/{guild_id}/roles", headers=headers
-        )
+        with self.http_client() as http:
+            guild_response = http.get(
+                f"https://discord.com/api/v10/guilds/{guild_id}", headers=headers
+            )
+            channels_response = http.get(
+                f"https://discord.com/api/v10/guilds/{guild_id}/channels", headers=headers
+            )
+            roles_response = http.get(
+                f"https://discord.com/api/v10/guilds/{guild_id}/roles", headers=headers
+            )
         guild_response.raise_for_status()
         channels_response.raise_for_status()
         roles_response.raise_for_status()
@@ -1349,17 +1356,18 @@ class DiscordClient:
             )
             return identity
         headers = {"Authorization": f"Bot {self.settings.discord_bot_token}"}
-        if message_id:
-            response = self.client.patch(
-                f"https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}",
-                headers=headers,
-                json=payload,
-            )
-        else:
-            response = self.client.post(
-                f"https://discord.com/api/v10/channels/{channel_id}/messages",
-                headers=headers,
-                json=payload,
-            )
+        with self.http_client() as http:
+            if message_id:
+                response = http.patch(
+                    f"https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}",
+                    headers=headers,
+                    json=payload,
+                )
+            else:
+                response = http.post(
+                    f"https://discord.com/api/v10/channels/{channel_id}/messages",
+                    headers=headers,
+                    json=payload,
+                )
         response.raise_for_status()
         return str(response.json()["id"])
