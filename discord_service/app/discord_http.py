@@ -13,7 +13,7 @@ import httpx
 
 def _limits():
     return httpx.Limits(
-        max_connections=16, max_keepalive_connections=8, keepalive_expiry=30
+        max_connections=16, max_keepalive_connections=16, keepalive_expiry=30
     )
 
 

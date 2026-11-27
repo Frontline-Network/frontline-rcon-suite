@@ -1,7 +1,9 @@
 """No external I/O: exercise the real HTTPX routing and ownership boundary."""
 
 from concurrent.futures import ThreadPoolExecutor
-from threading import Lock
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Event, Lock, Thread
+from time import monotonic, sleep
 
 import httpx
 import pytest
@@ -101,7 +103,7 @@ def test_app_reuses_one_bounded_pool_closes_all_leases_and_shutdown(wire, monkey
         assert not owner.cookies
         assert all("cookie" not in request.headers for _, request in requests)
         assert owner._transport._pool._max_connections == 16
-        assert owner._transport._pool._max_keepalive_connections == 8
+        assert owner._transport._pool._max_keepalive_connections == 16
     assert owner.is_closed
     assert closed == created
     assert app.state.discord_http_pool is None
@@ -239,3 +241,86 @@ def test_httpx_routing_compatibility_failure_closes_owner(wire, monkeypatch):
     with pytest.raises(RuntimeError, match="routing is unavailable"):
         transport.DiscordHTTPPool()
     assert wire[0] == wire[1]
+
+
+def test_busy_loopback_pool_reuses_connections_for_waiting_requests(monkeypatch):
+    """Real HTTP/1.1: eight queued requests reuse the first sixteen sockets."""
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"):
+        monkeypatch.delenv(name, raising=False)
+        monkeypatch.delenv(name.lower(), raising=False)
+    release = Event()
+    sixteen_active = Event()
+    lock = Lock()
+    accepted = 0
+    entered = 0
+
+    class Server(ThreadingHTTPServer):
+        # server_close joins request threads after pool.close releases their
+        # keepalive reads, including when an assertion fails midway through.
+        daemon_threads = False
+        block_on_close = True
+
+        def get_request(self):
+            nonlocal accepted
+            result = super().get_request()
+            with lock:
+                accepted += 1
+            return result
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_GET(self):
+            nonlocal entered
+            with lock:
+                entered += 1
+                if entered == 16:
+                    sixteen_active.set()
+            if not release.wait(10):
+                self.send_error(504)
+                return
+            self.send_response(200)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, *_args):
+            pass
+
+    server = Server(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    pool = transport.DiscordHTTPPool()
+    executor = ThreadPoolExecutor(max_workers=24)
+    url = f"http://127.0.0.1:{server.server_port}/probe"
+
+    def request():
+        with pool.client() as client:
+            response = client.get(url)
+            response.raise_for_status()
+            return response.text
+
+    try:
+        futures = [executor.submit(request) for _ in range(24)]
+        assert sixteen_active.wait(5), "16 requests never reached the local server"
+        core_pool = pool._owner._transport._pool
+        deadline = monotonic() + 5
+        queued = False
+        while monotonic() < deadline:
+            with core_pool._optional_thread_lock:
+                queued = len(core_pool._requests) == 24
+            if queued:
+                break
+            sleep(0.005)
+        assert queued, "eight requests never queued behind the busy pool"
+        release.set()
+        assert [future.result(timeout=10) for future in futures] == ["ok"] * 24
+        assert accepted <= 16, "idle sockets were retired instead of reused"
+    finally:
+        release.set()
+        executor.shutdown(wait=True, cancel_futures=True)
+        pool.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+        assert not thread.is_alive()
