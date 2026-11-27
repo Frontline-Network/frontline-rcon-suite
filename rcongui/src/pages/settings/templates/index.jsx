@@ -17,6 +17,11 @@ import PageHeader from "@/components/shared/PageHeader";
 
 const categories = [
   {
+    label: "playerLanguages.title",
+    href: "/settings/player-languages",
+    icon: <ChatIcon />,
+  },
+  {
     label: "settings.templates.message",
     href: "/settings/templates/message",
     icon: <ChatIcon />,

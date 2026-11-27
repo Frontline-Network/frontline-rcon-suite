@@ -1,4 +1,4 @@
-"""Separate language packets; server settings, never inferred player language."""
+"""Recipient language packets, with legacy server settings when routing is off."""
 
 from .feedback import send_private
 
@@ -139,6 +139,36 @@ def render(config, key, *, manual=False, **values):
 
 
 def send(rcon, player_id, config, key, **values):
+    from rcon.player_messages import routing_enabled, render as render_player, LocalizedText
+    if routing_enabled():
+        from rcon.player_message_catalog import autobalancer_definition
+        definition = autobalancer_definition(config,key)
+        manual = values.pop('manual',False)
+        locales={}
+        for locale in ('de','en','fr'):
+            data=dict(values)
+            if 'target_team' in data:
+                labels={'de':{'Allies':'Alliierte','Axis':'Achsenmächte'},
+                        'en':{'Alliierte':'Allies','Achsenmächte':'Axis'},
+                        'fr':{'Allies':'Alliés','Alliierte':'Alliés','Axis':'Axe','Achsenmächte':'Axe'}}[locale]
+                data['target_team']=labels.get(data['target_team'],data['target_team'])
+            locales[locale]=data
+        variants=dict(definition['defaults'])
+        for locale in variants:
+            variants[locale]=variants[locale].replace('!balance',config.volunteer_command)
+        packet=render_player(definition['key'],definition['source'],player_id=player_id,variables=values,
+                             defaults=variants,enabled=True,binding_hash=definition['source_hash'],locale_variables=locales)
+        if key=='volunteer_request':
+            packet=LocalizedText(str(packet).replace('!balance',config.volunteer_command),
+                                 original=getattr(packet,'original',packet).replace('!balance',config.volunteer_command),
+                                 key=definition['key'],language=getattr(packet,'language','legacy'))
+        if manual and config.mode=='manual':
+            note_definition=autobalancer_definition(config,'manual')
+            note=render_player('autobalancer.manual',SYSTEM['manual'][0],player_id=player_id,
+                               defaults=note_definition['defaults'],enabled=True,binding_hash=note_definition['source_hash'])
+            packet=LocalizedText(str(packet)+'\n'+str(note),original=getattr(packet,'original',packet)+'\n'+getattr(note,'original',note),
+                                 key=definition['key'],language=getattr(packet,'language','legacy'))
+        return send_private(rcon,player_id,packet)
     # Do not short-circuit: failure of one language must not suppress the other.
     results = [
         send_private(rcon, player_id, text) for text in render(config, key, **values)

@@ -2,7 +2,7 @@ import { Box, Button, Stack } from "@mui/material";
 import { useForm } from "react-hook-form";
 import { BadgeList } from "./BadgeList";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PlayerSearchField from "@/components/form/custom/PlayerSearchField";
 import { executeQueued } from "./executionQueue.mjs";
@@ -13,6 +13,7 @@ const ACTION_STATUS = {
   error: "error",
   success: "success",
 };
+const LanguagePreview = lazy(() => import("@/features/player-language/ActionPreview"));
 
 const initRecipients = (recipients) =>
   recipients.map((recipient) => {
@@ -195,6 +196,9 @@ export const ActionForm = ({
   };
 
   const ActionFields = action.component;
+  const draftReason = formProps.watch("reason");
+  const draftMessage = formProps.watch("message");
+  const singleRecipient = recipientStates.length === 1 ? recipientStates[0].recipient : null;
 
   return (
     <Stack spacing={1}>
@@ -218,6 +222,10 @@ export const ActionForm = ({
           sx={{ border: 0, m: 0, minWidth: 0, p: 0 }}
         >
           <ActionFields errors={errors} {...formProps} {...actionState} />
+          {singleRecipient && (draftReason || draftMessage) && <Suspense fallback={null}>
+            <LanguagePreview playerId={singleRecipient.player_id ?? singleRecipient.profile?.player_id}
+              text={draftReason || draftMessage} category={draftReason ? "REASON" : "MESSAGE"} />
+          </Suspense>}
         </Box>
         <Button
           ref={submitRef}

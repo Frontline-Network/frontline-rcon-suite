@@ -1,5 +1,6 @@
 import vipRewardDefaults from "./state/vip-rewards.json";
 import { createServer, Response } from "miragejs";
+import { registerPlayerLanguages } from "./routes/player-languages";
 // Snapshot of get_api_documentation from this source tree (2026-10-03).
 // Used only by the fake preview; production always requests its own backend.
 import apiDocumentation from "./data/api-documentation.json";
@@ -813,6 +814,7 @@ export function makeServer({ environment = "development" } = {}) {
           ?? []);
       });
       this.get("/get_ban", () => ok([]));
+      registerPlayerLanguages(this, ok);
       this.get("/get_message_templates", () => ok([
         {
           id: 1,

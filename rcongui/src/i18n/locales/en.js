@@ -1,8 +1,10 @@
 import { liveViewsEn } from "./live-views.js";
+import { playerLanguagesEn } from "./player-languages.js";
 import { sharedOperationsEn } from "./shared-operations.js";
 import { operatorMessagesEn } from "./operator-messages.js";
 
 const en = {
+  playerLanguages: playerLanguagesEn,
   themeLoading: {
     loading: "Loading appearance …",
     failed: "Appearance could not be loaded",

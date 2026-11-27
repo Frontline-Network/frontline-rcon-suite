@@ -62,6 +62,8 @@ def send_private(rcon, player_id: str | None, message: str) -> bool:
     if not player_id:
         return False
     try:
+        from rcon.player_messages import localize_automated
+        message = localize_automated(player_id, message, group='autobalancer')
         result = rcon.message_player(player_id, message=message)
         if result is False:
             logger.warning("Autobalancer private message was rejected")

@@ -973,17 +973,22 @@ class Rcon(ServerCtl):
         save_message: bool,
         player_name: str | None,
     ) -> bool:
+        from rcon.player_messages import localize_payload, render as render_player, dispatch
+        localized = localize_payload(player_id, message, ['MESSAGE','REASON'], player_name, by)
+        message = str(localized)
         config = RconServerSettingsUserConfig.load_from_db()
         if config.message_enhancements.enabled:
             message_header: str = config.message_enhancements.message_header
+            message_header = render_player('messages.message_header',message_header,player_id=player_id)
             if message_header:
                 message = f"{message_header}\n\n{message}"
             message_footer: str = config.message_enhancements.message_footer
+            message_footer = render_player('messages.message_footer',message_footer,player_id=player_id)
             # append to message if not empty. separate with blank line.
             if message_footer:
                 message = f"{message}\n\n{message_footer}"
 
-        res = super().message_player(player_id, message)
+        res = dispatch(player_id,'message',localized,message,lambda:super(Rcon,self).message_player(player_id,message))
         if save_message and res:
             safe_save_player_action(
                 player_id=player_id,
@@ -1322,7 +1327,9 @@ class Rcon(ServerCtl):
     ) -> bool:
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id, by)
-        res = super().punish(player_id, reason)
+        from rcon.player_messages import localize_payload, dispatch
+        reason = localize_payload(player_id,reason,['REASON'],player_name,by)
+        res = dispatch(player_id,'punish',reason,reason,lambda:super(Rcon,self).punish(player_id,reason))
         if res:
             safe_save_player_action(
                 player_id=player_id,
@@ -1386,8 +1393,10 @@ class Rcon(ServerCtl):
     def kick(self, player_id: str, reason, by, player_name: str | None = None) -> bool:
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id, by)
+        from rcon.player_messages import localize_payload, dispatch
+        reason = localize_payload(player_id,reason,['REASON'],player_name,by)
         with invalidates(Rcon.get_players):
-            res = super().kick(player_id, reason)
+            res = dispatch(player_id,'kick',reason,reason,lambda:super(Rcon,self).kick(player_id,reason))
 
         if res:
             safe_save_player_action(
@@ -1409,8 +1418,10 @@ class Rcon(ServerCtl):
     ) -> bool:
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id, by)
+        from rcon.player_messages import localize_payload, dispatch
+        reason = localize_payload(player_id,reason,['REASON'],player_name,by)
         with player_ban_lock(player_id), invalidates(Rcon.get_players, Rcon.get_temp_bans):
-            res = super().temp_ban(player_id, duration_hours, reason, admin_name=by)
+            res = dispatch(player_id,'temp_ban',reason,reason,lambda:super(Rcon,self).temp_ban(player_id,duration_hours,reason,admin_name=by))
 
         if res:
             safe_save_player_action(
@@ -1439,8 +1450,10 @@ class Rcon(ServerCtl):
     ) -> bool:
         from rcon.leadership_vote.storage import before_manual_action
         before_manual_action(player_id, by)
+        from rcon.player_messages import localize_payload, dispatch
+        reason = localize_payload(player_id,reason,['REASON'],player_name,by)
         with player_ban_lock(player_id), invalidates(Rcon.get_players, Rcon.get_perma_bans):
-            res = super().perma_ban(player_id, reason, admin_name=by)
+            res = dispatch(player_id,'perma_ban',reason,reason,lambda:super(Rcon,self).perma_ban(player_id,reason,admin_name=by))
 
         if res:
             safe_save_player_action(

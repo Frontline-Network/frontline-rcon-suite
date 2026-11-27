@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import {
   Tabs,
   Tab,
@@ -6,6 +6,7 @@ import {
   Divider,
   Typography,
   useMediaQuery,
+  Accordion, AccordionSummary, AccordionDetails,
 } from "@mui/material";
 import {
   useLoaderData,
@@ -28,6 +29,7 @@ import { useGlobalStore } from "@/stores/global-state";
 import ProfileActions from "@/components/player/profile/Actions";
 import { useTranslation } from "react-i18next";
 import LinkedAccounts from "@/components/player/profile/LinkedAccounts";
+const PlayerLanguageProfile = lazy(() => import("@/features/player-language/Profile"));
 
 const DETAIL_LINKS = [
   { path: "", label: "records.playerDetails.profile" },
@@ -42,6 +44,7 @@ const DETAIL_LINKS = [
 export default function PlayerProfilePage() {
   const { t } = useTranslation();
   const { profile } = useLoaderData();
+  const [languageOpen, setLanguageOpen] = useState(false);
   const submit = useSubmit();
   const location = useLocation();
   const navigate = useNavigate();
@@ -140,6 +143,10 @@ export default function PlayerProfilePage() {
               {t("records.playerDetails.caseSummary")}
             </Typography>
             <LinkedAccounts player={profile} />
+            <Accordion expanded={languageOpen} onChange={(_, value) => setLanguageOpen(value)} disableGutters>
+              <AccordionSummary>{t("playerLanguages.playerProfile")}</AccordionSummary>
+              <AccordionDetails>{languageOpen && <Suspense fallback={null}><PlayerLanguageProfile playerId={profile.player_id} /></Suspense>}</AccordionDetails>
+            </Accordion>
             <Divider />
             <PlayerProfileSummary
               player={profile}

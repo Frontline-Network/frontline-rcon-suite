@@ -166,11 +166,14 @@ def auto_ban_if_tks_right_after_connection(
                     logger.warning("Teamkill ban is held by the durable guard or cutover for %s", player_id)
                     return
                 try:
+                    from rcon.player_messages import localize_automated
+                    player_reason = (localize_automated(player_id,reason,prefix='automod.teamkill.')
+                                     if config.blacklist_id is None else reason)
                     result = blacklist_or_ban(
                         rcon=rcon,
                         blacklist_id=config.blacklist_id,
                         player_id=player_id,
-                        reason=reason,
+                        reason=player_reason,
                         admin_name=author,
                         expires_at=expires_at,
                     )

@@ -348,6 +348,7 @@ def expose_api_endpoint(
                 not command_name.startswith("get_")
                 and not command_name.startswith("validate_")
                 and not command_name.endswith("_config")
+                and command_name != "preview_player_message"
             ):
                 audit(command_name, request, safe_arguments)
 
@@ -772,6 +773,12 @@ ENDPOINT_PERMISSIONS: dict[Callable, list[str] | set[str] | str] = {
     rcon_api.get_seed_vip_config: "api.can_view_seed_vip_config",
     rcon_api.get_vip_rewards_config: "api.can_view_seed_vip_config",
     rcon_api.get_end_match_stats_config: "api.can_view_auto_broadcast_config",
+    rcon_api.get_player_message_catalog: "api.can_view_message_templates",
+    rcon_api.set_player_language_settings: "api.can_edit_message_templates",
+    rcon_api.set_player_message_translations: "api.can_edit_message_templates",
+    rcon_api.get_player_language: "api.can_view_player_profile",
+    rcon_api.set_player_language: "api.can_edit_player_account",
+    rcon_api.preview_player_message: "api.can_view_message_templates",
     rcon_api.set_end_match_stats_config: "api.can_change_auto_broadcast_config",
     rcon_api.validate_end_match_stats_config: "api.can_change_auto_broadcast_config",
     rcon_api.get_vip_rewards_weapons: "api.can_view_seed_vip_config",
@@ -915,6 +922,12 @@ RCON_ENDPOINT_HTTP_METHODS: dict[Callable, list[str]] = {
     rcon_api.get_seed_vip_config: ["GET"],
     rcon_api.get_vip_rewards_config: ["GET"],
     rcon_api.get_end_match_stats_config: ["GET"],
+    rcon_api.get_player_message_catalog: ["GET"],
+    rcon_api.set_player_language_settings: ["POST"],
+    rcon_api.set_player_message_translations: ["POST"],
+    rcon_api.get_player_language: ["GET"],
+    rcon_api.set_player_language: ["POST"],
+    rcon_api.preview_player_message: ["POST"],
     rcon_api.set_end_match_stats_config: ["POST"],
     rcon_api.validate_end_match_stats_config: ["POST"],
     rcon_api.get_vip_rewards_weapons: ["GET"],

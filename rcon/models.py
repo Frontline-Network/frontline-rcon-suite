@@ -13,6 +13,7 @@ from sqlalchemy import (
     JSON,
     TIMESTAMP,
     BigInteger,
+    Integer,
     CheckConstraint,
     Engine,
     Enum,
@@ -2349,6 +2350,30 @@ class LogLineWebHookField(pydantic.BaseModel):
                 raise ValueError(f"Invalid Discord role {role_or_user}")
 
         return values
+
+
+class PlayerMessageTranslation(Base):
+    __tablename__ = "player_message_translation"
+    key: Mapped[str] = mapped_column(String(160), primary_key=True)
+    source_hash: Mapped[str] = mapped_column(String(64), index=True)
+    source_content: Mapped[str] = mapped_column(Text)
+    translations: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_by: Mapped[str] = mapped_column(String(150))
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class PlayerMessageLocalizationAudit(Base):
+    __tablename__ = "player_message_localization_audit"
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, 'sqlite'), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc))
+    server_number: Mapped[int] = mapped_column()
+    player_id: Mapped[str] = mapped_column(String(100), index=True)
+    action: Mapped[str] = mapped_column(String(30))
+    template_key: Mapped[str] = mapped_column(String(160))
+    language: Mapped[str] = mapped_column(String(16))
+    original: Mapped[str] = mapped_column(Text)
+    delivered: Mapped[str] = mapped_column(Text)
+    outcome: Mapped[str] = mapped_column(String(16))
 
 
 class MessageTemplate(Base):
