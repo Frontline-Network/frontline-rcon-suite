@@ -61,6 +61,7 @@ test.describe("task-oriented navigation contract", () => {
         "/settings/maps/rotation",
         "/apps/discord-report-bot",
         "/settings/general",
+        "/settings/player-languages",
         "/records/audit-logs",
         "/settings/integrations",
         "/settings/services",
@@ -276,7 +277,7 @@ test.describe("task-oriented mobile navigation", () => {
     });
     await moderation.click();
     await expect(
-      navigation.getByRole("link", { name: "Spieler" })
+      navigation.getByRole("link", { name: "Spieler", exact: true })
     ).toBeVisible();
 
     await navigation

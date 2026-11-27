@@ -1,6 +1,24 @@
 import { test, expect } from "@playwright/test";
 import { openDemoPage, collectRuntimeErrors, expectNoHorizontalPageOverflow } from "./helpers.mjs";
 
+test("language management can be opened from the moderation navigation", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openDemoPage(page, "/");
+  await page.getByTestId("desktop-command-rail").getByRole("button", { name: "Moderation", exact: true }).click();
+  await page.getByTestId("desktop-navigation-panel").getByRole("link", { name: "Spielersprachen und Übersetzungen", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings\/player-languages$/);
+  await expect(page.getByRole("heading", { name: "Spielersprachen und Übersetzungen", exact: true })).toBeVisible();
+});
+
+test("a viewer sees the language-management destination as permission protected", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openDemoPage(page, "/", { query: { demo_role: "viewer" } });
+  await page.getByTestId("desktop-command-rail").getByRole("button", { name: "Moderation", exact: true }).click();
+  const panel=page.getByTestId("desktop-navigation-panel");
+  await expect(panel.getByRole("button", { name: "Spielersprachen und Übersetzungen", exact: true })).toHaveAttribute("aria-disabled","true");
+  await expect(panel.getByRole("link", { name: "Spielersprachen und Übersetzungen", exact: true })).toHaveCount(0);
+});
+
 for (const [language, heading, original] of [
   ["de", "Spielersprachen und Übersetzungen", "Originaltext"],
   ["en", "Player languages and translations", "Original text"],
