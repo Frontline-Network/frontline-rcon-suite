@@ -442,7 +442,7 @@ def test_real_chat_hook_uses_only_addressed_single_local_word(
     advance(60)
     service.tick(api, 1)
     v = snapshot(database, iid)["voice"]
-    assert v["reply_language"] == locale
+    assert v["reply_language"] == ("de+en" if locale == "en" else locale)
     assert not chat(positive, pid="v0")
     assert not chat(positive, age=1)
     assert not chat("!yes") and not chat("!no")
@@ -453,6 +453,26 @@ def test_real_chat_hook_uses_only_addressed_single_local_word(
     assert snapshot(database, iid)["voice"]["phase"] == (
         "resolved" if working else "kick_ready"
     )
+
+
+@pytest.mark.parametrize(("reply", "working"), [("Ja", True), ("Nein", False)])
+def test_english_default_question_accepts_advertised_german_reply_words(pilot, reply, working):
+    setup, advance = pilot
+    database, _, _ = setup
+    api = transport()
+    iid = report(setup, "!admin BattlefieldHero no VOIP", reporter_id="member")["id"]
+    service.tick(api, 1)
+    advance(60)
+    service.tick(api, 1)
+    question = api.message_player.call_args.args[1]
+    assert "Also accepted: Ja / Nein." in question
+    assert snapshot(database, iid)["voice"]["reply_language"] == "de+en"
+    assert voice_reports.handle_chat(api, {
+        "player_id_1": "member", "sub_content": reply,
+        "timestamp_ms": database.clock.now * 1000,
+    }, 1)
+    assert snapshot(database, iid)["voice"]["phase"] == ("resolved" if working else "kick_ready")
+    api.kick.assert_not_called()
 
 
 def test_delayed_old_log_never_answers_next_serialised_question(pilot):

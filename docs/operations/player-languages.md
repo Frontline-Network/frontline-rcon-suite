@@ -35,6 +35,9 @@ identity; game commands and ban lookups continue to use their existing IDs.
 No Steam request occurs during message rendering. A nickname, the reporter's
 language and an unverified Discord account are never attributed to a target.
 EOS spelling is canonicalized; old uppercase preferences/links remain readable.
+English PC voice questions advertise Yes/No and the Ja/Nein aliases. Only the
+addressed player's current question accepts these words; replying does not
+change the player's language preference.
 
 ## Templates and compatibility
 
