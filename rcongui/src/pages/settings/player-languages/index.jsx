@@ -166,26 +166,28 @@ export default function PlayerLanguages() {
         </Stack>
         {template.needs_review && <Alert severity="warning">{tr("review")}</Alert>}
         {!!missing.length && <Alert severity="info">{tr("missing", { languages: missing.map(code => languageNames[code]).join(", ") })}</Alert>}
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "minmax(0, 1fr) minmax(0, 1.25fr)" }, gap: 3 }}>
+        <Tabs value={locale} onChange={(_, value) => setLocale(value)} variant="scrollable" scrollButtons="auto" aria-label={tr("translations")}>
+          {languages.map(language => <Tab key={language} value={language} label={languageNames[language] || language} />)}
+        </Tabs>
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "repeat(2, minmax(0, 1fr))" }, gap: 3 }}>
           <Stack spacing={1.5} sx={{ minWidth: 0 }}>
-            <Typography component="h3" variant="subtitle2" sx={{ minHeight: 48, display: "flex", alignItems: "center" }}>{tr("original")}</Typography>
-            <TextField multiline minRows={7} maxRows={18} label={tr("original")} value={template.source} slotProps={{ input: { readOnly: true } }} fullWidth />
+            <Typography component="h3" variant="subtitle2">{tr("original")}</Typography>
+            <TextField multiline rows={6} label={tr("original")} value={template.source} slotProps={{ input: { readOnly: true } }} fullWidth />
             <Typography variant="caption" color="text.secondary">{tr("sourceHint")}</Typography>
-            {!!template.placeholders.length && <Box>
-              <Typography variant="caption" color="text.secondary">{tr("placeholders", { fields: "" })}</Typography>
-              <Stack direction="row" flexWrap="wrap" gap={0.75} sx={{ mt: 1 }}>
-                {template.placeholders.map(field => <Chip key={field} size="small" label={"{" + field + "}"} sx={{ fontFamily: "monospace" }} />)}
-              </Stack>
-            </Box>}
           </Stack>
           <Stack spacing={1.5} sx={{ minWidth: 0 }}>
-            <Tabs value={locale} onChange={(_, value) => setLocale(value)} variant="scrollable" scrollButtons="auto" aria-label={tr("translations")}>
-              {languages.map(language => <Tab key={language} value={language} label={languageNames[language] || language} />)}
-            </Tabs>
-            <TextField multiline minRows={7} maxRows={18} label={tr("translation") + " · " + locale} value={draft[locale] || ""} disabled={!canEdit || busy} onChange={e => {
+            <Typography component="h3" variant="subtitle2">{tr("translation")}</Typography>
+            <TextField multiline rows={6} label={tr("translation") + " · " + locale} value={draft[locale] || ""} disabled={!canEdit || busy} onChange={e => {
               setDraft(old => ({ ...old, [locale]: e.target.value })); setNotice(""); setPreview(null);
-            }} fullWidth helperText={tr("editHint")} />
-            {canEdit && <Accordion disableGutters elevation={0} sx={{ bgcolor: "transparent", "&:before": { display: "none" } }}>
+            }} fullWidth />
+            <Typography variant="caption" color="text.secondary">{tr("editHint")}</Typography>
+          </Stack>
+        </Box>
+        {!!template.placeholders.length && <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.75}>
+          <Typography variant="caption" color="text.secondary">{tr("placeholders", { fields: "" })}</Typography>
+          {template.placeholders.map(field => <Chip key={field} size="small" label={"{" + field + "}"} sx={{ fontFamily: "monospace" }} />)}
+        </Stack>}
+        {canEdit && <Accordion disableGutters elevation={0} sx={{ bgcolor: "transparent", alignSelf: "flex-start", width: "100%", maxWidth: 480, "&:before": { display: "none" } }}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>{tr("addLanguage")}</AccordionSummary>
               <AccordionDetails><Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                 <TextField size="small" label={tr("languageCode")} placeholder="pl" value={moreLocale} disabled={busy} onChange={e => setMoreLocale(e.target.value.trim().toLowerCase())} />
@@ -194,8 +196,6 @@ export default function PlayerLanguages() {
                 }}>{tr("add")}</Button>
               </Stack></AccordionDetails>
             </Accordion>}
-          </Stack>
-        </Box>
         <Divider />
         <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "center" }} spacing={1.5}>
           <Typography role="status" variant="body2" color={dirty ? "warning.main" : "text.secondary"}>{tr(dirty ? "dirtyState" : "savedState")}</Typography>
