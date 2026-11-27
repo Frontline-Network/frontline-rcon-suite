@@ -207,19 +207,62 @@ def _match(source, text):
 
 def _fragment(player_id, text, definitions, allow_split=True):
     # Nested rule explanations must use the same locale as their outer warning.
+    if allow_split and '\n' in text:
+        parts=[]
+        for line in text.splitlines(keepends=True):
+            body=line.rstrip('\r\n')
+            parts.extend((_fragment(player_id,body,definitions,False),line[len(body):]))
+        locales=set().union(*(p.variants for p in parts if isinstance(p,LocalizedText)))
+        variants={locale:''.join(p.variants.get(locale,p.original) if isinstance(p,LocalizedText) else p for p in parts)
+                  for locale in locales}
+        return LocalizedText(text,original=text,key='fragment',language='legacy',variants=variants)
+    if allow_split and ', ' in text:
+        parts=[_fragment(player_id,part,definitions,False) for part in text.split(', ')]
+        if all(isinstance(part,LocalizedText) for part in parts):
+            locales=set().union(*(part.variants for part in parts))
+            variants={locale:', '.join(part.variants.get(locale,part.original) for part in parts) for locale in locales}
+            return LocalizedText(text,original=text,key='fragment',language='legacy',variants=variants)
     candidates = [(d,_match(d['source'],text)) for d in definitions
                   if d['group']=='automod' and d['action'] in ('violation','min_level','max_level')]
     candidates = [(d,v) for d,v in candidates if v is not None]
-    if len(candidates)==1:
-        d,values = candidates[0]
-        return render(d['key'],d['source'],player_id=player_id,variables=values,
-                      defaults=d['defaults'],enabled=True)
+    if candidates:
+        rendered=[render(d['key'],d['source'],player_id=player_id,variables=values,
+                         defaults=d['defaults'],enabled=True) for d,values in candidates]
+        # Stock role/weapon fragments share wording. Use them only when every
+        # matching binding produces exactly the same language variants.
+        first=rendered[0]
+        if len(rendered)==1 or all(isinstance(value,LocalizedText) and isinstance(first,LocalizedText)
+                                  and value.variants==first.variants and str(value)==str(first) for value in rendered):
+            return first
     if allow_split and ', ' in text:
         parts = [_fragment(player_id, part, definitions, False) for part in text.split(', ')]
         variants={locale:', '.join(p.variants.get(locale,p.original) if isinstance(p,LocalizedText) else p for p in parts)
                   for locale in ('de','en','fr')}
         return LocalizedText(text,original=text,key='fragment',language='legacy',variants=variants)
     return text
+
+
+def _level_announcement_values(definition,text,definitions):
+    """Recover only independently identifiable rule lines in the adjacent block."""
+    block='{min_level_msg}{max_level_msg}{level_thresholds_msg}'
+    source=definition['source']
+    if definition['key']!='automod.level.announcement' or source.count(block)!=1:
+        return None
+    try:
+        prefix,suffix=(part.format() for part in source.split(block))
+    except (ValueError,KeyError,IndexError):
+        return None
+    if not text.startswith(prefix) or not text.endswith(suffix): return None
+    body=text[len(prefix):len(text)-len(suffix) if suffix else None]
+    values={'min_level_msg':'','max_level_msg':'','level_thresholds_msg':''}
+    for line in body.splitlines(keepends=True):
+        matches=[d for d in definitions if d['action'] in ('min_level','max_level','violation')
+                 and _match(d['source'],line.rstrip('\r\n')) is not None]
+        if len(matches)!=1: return None
+        name={'min_level':'min_level_msg','max_level':'max_level_msg','violation':'level_thresholds_msg'}[matches[0]['action']]
+        values[name]+=line
+    # Reject reordered/ambiguous custom blocks instead of guessing their meaning.
+    return values if _format(source,values)==text else None
 
 
 def localize_automated(player_id, text, *, group='automod', prefix=None):
@@ -229,13 +272,17 @@ def localize_automated(player_id, text, *, group='automod', prefix=None):
         if not routing_enabled(): return text
         from rcon.player_message_catalog import bindings
         definitions=[d for d in bindings() if d['group']==group and (prefix is None or d['key'].startswith(prefix))]
-        candidates=[(d,_match(d['source'],text)) for d in definitions
-                    if d['source'] and d['group'] in ('automod','autobalancer')]
+        candidates=[(d,_level_announcement_values(d,text,definitions) if d['key']=='automod.level.announcement' else _match(d['source'],text)) for d in definitions
+                    if d['source'] and d['group'] in ('automod','autobalancer')
+                    and d['action'] not in ('violation','min_level','max_level')]
         candidates=[(d,v) for d,v in candidates if v is not None]
         if len(candidates)!=1: return text
         d,values=candidates[0]
         if 'violation' in values:
             values['violation']=_fragment(player_id,values['violation'],definitions)
+        for name in ('min_level_msg','max_level_msg','level_thresholds_msg'):
+            if name in values:
+                values[name]=_fragment(player_id,values[name],definitions)
         return render(d['key'],d['source'],player_id=player_id,variables=values,defaults=d['defaults'],enabled=True,
                       binding_hash=d.get('source_hash'))
     except Exception:

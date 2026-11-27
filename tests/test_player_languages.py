@@ -227,3 +227,54 @@ def test_autobalancer_uses_the_passed_config_snapshot(database):
 
 def test_ambiguous_placeholders_cannot_cause_pattern_backtracking():
     assert messages._match('prefix {a}{b}{c} end','prefix '+'x'*4000+' missing') is None
+
+
+def test_level_announcement_localizes_adjacent_rule_blocks(database):
+    from rcon.user_config.auto_mod_level import AutoModLevelUserConfig
+    cfg=AutoModLevelUserConfig()
+    languages.set_language(EOS,'fr')
+    original=cfg.announcement_message.format(
+        min_level_msg=cfg.min_level_message.format(level=20)+'\n',
+        max_level_msg=cfg.max_level_message.format(level=200)+'\n',
+        level_thresholds_msg=cfg.violation_message.format(role='Officer',level=40)+'\n')
+    localized=messages.localize_payload(EOS,original,['MESSAGE'],by='AutoMod_LevelThresholds')
+    assert isinstance(localized,messages.LocalizedText)
+    assert localized.original==original and localized.language=='fr'
+    assert 'niveau 20' in localized and 'niveau 200' in localized and 'niveau 40' in localized
+    assert 'Access to' not in localized and 'not allowed' not in localized
+    # A changed/unknown rule line cannot be assigned to one of the three slots.
+    ambiguous=cfg.announcement_message.format(min_level_msg='Customer rule\n',max_level_msg='',level_thresholds_msg='')
+    assert messages.localize_payload(EOS,ambiguous,['MESSAGE'],by='AutoMod_LevelThresholds')==ambiguous
+
+
+def test_role_violation_is_only_a_fragment_not_a_competing_full_message(database):
+    from rcon.user_config.auto_mod_level import AutoModLevelUserConfig
+    cfg=AutoModLevelUserConfig()
+    languages.set_language(EOS,'fr')
+    original=cfg.force_kick_message.format(violation=cfg.violation_message.format(role='Officer',level=40))
+    localized=messages.localize_payload(EOS,original,['REASON'],by='AutoMod_LevelThresholds')
+    assert isinstance(localized,messages.LocalizedText) and localized.original==original
+    assert 'niveau 40' in localized and 'are not allowed' not in localized
+
+
+def test_multiple_seeding_reasons_all_use_the_recipient_language(database):
+    from rcon.user_config.auto_mod_seeding import AutoModSeedingUserConfig
+    cfg=AutoModSeedingUserConfig()
+    languages.set_language(EOS,'fr')
+    violation=', '.join(cfg.disallowed_roles.violation_message.format(role=role) for role in ('Officer','Tank'))
+    original=cfg.punish_message.format(violation=violation,received_punishes=1,max_punishes=3,next_check_seconds=60)
+    localized=messages.localize_payload(EOS,original,['REASON'],by='AutoMod_SeedingRules')
+    assert isinstance(localized,messages.LocalizedText) and localized.original==original
+    assert 'Officer' in localized and 'Tank' in localized and '1/3' in localized
+    assert 'not allowed' not in localized and localized.count('remplissage')>=3
+
+
+def test_ambiguous_custom_rule_translations_keep_the_original_fragment(database):
+    from rcon.user_config.auto_mod_seeding import AutoModSeedingUserConfig
+    cfg=AutoModSeedingUserConfig()
+    languages.set_language(EOS,'fr')
+    item=next(t for t in catalog.catalog() if t['key']=='automod.seeding.disallowed_roles.violation')
+    messages.save_translation(key=item['key'],source=item['source'],translations={'fr':'Le rôle {role} est interdit.'},expected_revision=item['revision'],by='test')
+    original=cfg.disallowed_roles.violation_message.format(role='Officer')
+    definitions=[d for d in catalog.bindings() if d['key'].startswith('automod.seeding.')]
+    assert messages._fragment(EOS,original,definitions)==original
