@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh Frontline RCON instance %i memory snapshot
+
+[Timer]
+OnBootSec=20s
+OnUnitActiveSec=15s
+AccuracySec=1s
+Unit=frontline-rcon-memory@%i.service
+
+[Install]
+WantedBy=timers.target

@@ -1,6 +1,10 @@
 from datetime import datetime, timedelta, timezone
+import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from rcon.system_usage import (
     SystemUsageSampler,
@@ -9,6 +13,7 @@ from rcon.system_usage import (
 )
 
 GIB = 1024**3
+NOW = datetime(2026, 11, 27, 12, tzinfo=timezone.utc)
 
 
 class FakePsutil:
@@ -224,3 +229,230 @@ def test_sampler_bounds_collection_rate_and_returns_history_and_data_age():
     assert second["range"]["seconds"] == 15.0
     assert second["range"]["max_samples"] == 3
     assert [item["cpu_percent"] for item in second["history"]] == [10.0, 20.0]
+
+
+def installation_snapshot():
+    return {
+        "schema_version": 1,
+        "sampled_at": NOW.isoformat(),
+        "server_number": 3,
+        "complete": True,
+        "dedicated_components": [
+            {"service": "backend_3", "used_bytes": GIB, "limit_bytes": 2 * GIB, "reclaimable_bytes": GIB // 4},
+            {"service": "supervisor_3", "used_bytes": 2 * GIB, "limit_bytes": None, "reclaimable_bytes": GIB // 4},
+        ],
+        "shared_components": [
+            {"service": "redis", "used_bytes": GIB, "limit_bytes": None, "reclaimable_bytes": 0},
+            {"service": "postgres", "used_bytes": 2 * GIB, "limit_bytes": None, "reclaimable_bytes": GIB // 2},
+        ],
+    }
+
+
+def snapshot_file(monkeypatch, tmp_path, document):
+    path = tmp_path / "installation-memory.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    monkeypatch.setenv("HLL_RESOURCE_USAGE_FILE", str(path))
+    monkeypatch.setenv("SERVER_NUMBER", "3")
+    return path
+
+
+def collect_snapshot(*, now=NOW):
+    return collect_system_usage(
+        sampled_at=now, monotonic_now=10,
+        psutil_module=FakePsutil(memory_used=4 * GIB, memory_total=32 * GIB),
+        read_text=reader({
+            "/sys/fs/cgroup/memory.current": str(GIB // 2),
+            "/sys/fs/cgroup/memory.max": str(GIB),
+        }),
+    )[0]
+
+
+def test_rcon_sum_is_absolute_and_includes_shared_services_exactly_once(monkeypatch, tmp_path):
+    snapshot_file(monkeypatch, tmp_path, installation_snapshot())
+    sample = collect_snapshot()
+    rcon = sample["rcon_ram_usage"]
+    assert rcon["available"] is True
+    assert rcon["source"] == "rcon_services"
+    assert rcon["accounting"] == "cgroup_memory_current"
+    assert rcon["used_bytes"] == 6 * GIB and rcon["used"] == 6.0
+    assert rcon["dedicated_used_bytes"] == rcon["shared_used_bytes"] == 3 * GIB
+    assert rcon["total_bytes"] is None and rcon["total"] is None and rcon["percent"] is None
+    assert rcon["reclaimable_bytes"] == GIB
+    assert rcon["working_set_bytes"] == 5 * GIB
+    assert [c["scope"] for c in rcon["components"]] == ["dedicated", "dedicated", "shared", "shared"]
+    assert rcon["sampled_at"] == NOW.isoformat() and rcon["data_age_seconds"] == 0
+    # The existing field remains backend/container memory, not the installation sum.
+    assert sample["ram_usage"]["source"] == "cgroup_v2"
+    assert sample["ram_usage"]["used_bytes"] == GIB // 2
+    assert sample["ram_usage"]["total_bytes"] == GIB
+    assert sample["ram_usage"]["percent"] == 50.0
+
+
+def test_missing_installation_source_never_inherits_backend_or_host_memory(monkeypatch):
+    monkeypatch.delenv("HLL_RESOURCE_USAGE_FILE", raising=False)
+    sample = collect_snapshot()
+    assert sample["ram_usage"]["available"] is True
+    assert sample["rcon_ram_usage"]["available"] is False
+    assert sample["rcon_ram_usage"]["reason"] == "not_configured"
+    assert sample["rcon_ram_usage"]["used_bytes"] is None
+    assert sample["rcon_ram_usage"]["components"] == []
+
+
+def test_installation_snapshot_is_independent_of_unavailable_local_metrics(monkeypatch, tmp_path):
+    snapshot_file(monkeypatch, tmp_path, installation_snapshot())
+    sample, _ = collect_system_usage(sampled_at=NOW, monotonic_now=10,
+        read_text=lambda path: None, psutil_module=UnavailablePsutil())
+    assert sample["ram_usage"]["available"] is False
+    assert sample["rcon_ram_usage"]["available"] is True
+    assert sample["rcon_ram_usage"]["used_bytes"] == 6 * GIB
+
+
+def test_known_stopped_components_are_valid_zero_not_unknown(monkeypatch, tmp_path):
+    document = installation_snapshot()
+    for item in document["dedicated_components"] + document["shared_components"]:
+        item.update(used_bytes=0, reclaimable_bytes=0, limit_bytes=None)
+    snapshot_file(monkeypatch, tmp_path, document)
+    result = collect_snapshot()["rcon_ram_usage"]
+    assert result["available"] is True and result["used_bytes"] == 0
+    assert result["used"] == 0.0 and result["percent"] is None
+
+
+@pytest.mark.parametrize("age,valid,reason", [
+    (60, True, None), (60.001, False, "stale"),
+    (-5, True, None), (-5.001, False, "future_timestamp"),
+])
+def test_installation_snapshot_enforces_age_bounds(monkeypatch, tmp_path, age, valid, reason):
+    document = installation_snapshot()
+    document["sampled_at"] = (NOW - timedelta(seconds=age)).isoformat()
+    snapshot_file(monkeypatch, tmp_path, document)
+    result = collect_snapshot()["rcon_ram_usage"]
+    assert result["available"] is valid
+    assert result["reason"] == reason
+
+
+@pytest.mark.parametrize("change,reason", [
+    (lambda d: d.update(schema_version=True), "invalid_schema"),
+    (lambda d: d.update(server_number=4), "wrong_server"),
+    (lambda d: d.update(server_number=True), "wrong_server"),
+    (lambda d: d.update(complete=False, dedicated_components=None), "incomplete"),
+    (lambda d: d.pop("complete"), "incomplete"),
+    (lambda d: d.update(dedicated_components=[]), "incomplete"),
+    (lambda d: d.pop("shared_components"), "incomplete"),
+    (lambda d: d.update(sampled_at="2026-11-27T12:00:00"), "invalid_timestamp"),
+    (lambda d: d.update(sampled_at="2026-11-27T13:00:00+01:00"), "invalid_timestamp"),
+    (lambda d: d["shared_components"].append(dict(d["dedicated_components"][0])), "duplicate_service"),
+    (lambda d: d["dedicated_components"][0].update(used_bytes=-1), "invalid_component"),
+    (lambda d: d["dedicated_components"][0].update(used_bytes=True), "invalid_component"),
+    (lambda d: d["dedicated_components"][0].update(used_bytes=1.0), "invalid_component"),
+    (lambda d: d["dedicated_components"][0].pop("limit_bytes"), "invalid_component"),
+    (lambda d: d["dedicated_components"][0].update(limit_bytes=False), "invalid_component"),
+    (lambda d: d["dedicated_components"][0].update(reclaimable_bytes=2 * GIB), "invalid_component"),
+])
+def test_invalid_or_partial_installation_data_is_explicitly_unavailable(monkeypatch, tmp_path, change, reason):
+    document = installation_snapshot()
+    change(document)
+    snapshot_file(monkeypatch, tmp_path, document)
+    sample = collect_snapshot()
+    assert sample["rcon_ram_usage"]["available"] is False
+    assert sample["rcon_ram_usage"]["reason"] == reason
+    assert sample["rcon_ram_usage"]["used_bytes"] is None
+    assert sample["ram_usage"]["used_bytes"] == GIB // 2
+
+
+def test_optional_reclaimable_breakdown_does_not_change_charged_sum(monkeypatch, tmp_path):
+    document = installation_snapshot()
+    document["shared_components"][0].pop("reclaimable_bytes")
+    snapshot_file(monkeypatch, tmp_path, document)
+    result = collect_snapshot()["rcon_ram_usage"]
+    assert result["available"] is True and result["used_bytes"] == 6 * GIB
+    assert result["reclaimable_bytes"] is None and result["working_set_bytes"] is None
+
+
+def test_component_count_and_file_size_are_bounded(monkeypatch, tmp_path):
+    document = installation_snapshot()
+    document["dedicated_components"] = [{"service": "backend_3", "used_bytes": 0, "limit_bytes": None}]
+    document["shared_components"] = [{"service": f"shared_{n}", "used_bytes": 1, "limit_bytes": None} for n in range(63)]
+    path = snapshot_file(monkeypatch, tmp_path, document)
+    assert collect_snapshot()["rcon_ram_usage"]["used_bytes"] == 63
+    document["shared_components"].append({"service": "overflow", "used_bytes": 1, "limit_bytes": None})
+    path.write_text(json.dumps(document))
+    assert collect_snapshot()["rcon_ram_usage"]["reason"] == "too_many_components"
+    raw = json.dumps(installation_snapshot()).encode()
+    path.write_bytes(raw + b" " * (32768 - len(raw)))
+    assert collect_snapshot()["rcon_ram_usage"]["available"] is True
+    with path.open("ab") as stream:
+        stream.write(b" ")
+    assert collect_snapshot()["rcon_ram_usage"]["reason"] == "too_large"
+
+
+def test_unreadable_and_malformed_files_are_not_zero_usage(monkeypatch, tmp_path):
+    path = snapshot_file(monkeypatch, tmp_path, installation_snapshot())
+    path.write_bytes(b"not-json")
+    assert collect_snapshot()["rcon_ram_usage"]["reason"] == "invalid_json"
+    path.unlink()
+    assert collect_snapshot()["rcon_ram_usage"]["reason"] == "unreadable"
+    monkeypatch.setenv("HLL_RESOURCE_USAGE_FILE", str(tmp_path))
+    assert collect_snapshot()["rcon_ram_usage"]["available"] is False
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="POSIX named pipe")
+def test_a_configured_fifo_is_rejected_without_waiting_for_a_writer(monkeypatch, tmp_path):
+    path = tmp_path / "snapshot.fifo"
+    os.mkfifo(path)
+    monkeypatch.setenv("HLL_RESOURCE_USAGE_FILE", str(path))
+    assert collect_snapshot()["rcon_ram_usage"]["reason"] == "not_regular_file"
+
+
+def test_snapshot_server_defaults_to_one(monkeypatch, tmp_path):
+    document = installation_snapshot()
+    document["server_number"] = 1
+    snapshot_file(monkeypatch, tmp_path, document)
+    monkeypatch.delenv("SERVER_NUMBER")
+    assert collect_snapshot()["rcon_ram_usage"]["available"] is True
+
+
+def test_cached_response_expires_installation_data_without_extra_collection(monkeypatch, tmp_path):
+    document = installation_snapshot()
+    document["sampled_at"] = (NOW - timedelta(seconds=59)).isoformat()
+    snapshot_file(monkeypatch, tmp_path, document)
+    monotonic_values = iter([0, 1, 2])
+    now_values = iter([NOW, NOW + timedelta(seconds=1), NOW + timedelta(seconds=2)])
+    calls = []
+
+    def collector(previous, *, sampled_at, monotonic_now):
+        calls.append(1)
+        return collect_snapshot(now=sampled_at), {}
+
+    sampler = SystemUsageSampler(collector=collector, monotonic=lambda: next(monotonic_values), now=lambda: next(now_values))
+    first = sampler.get_snapshot()
+    first["rcon_ram_usage"]["components"][0]["used_bytes"] = -1
+    first["history"][0]["rcon_ram_used_bytes"] = -1
+    second = sampler.get_snapshot()
+    assert second["rcon_ram_usage"]["available"] is True
+    assert second["rcon_ram_usage"]["components"][0]["used_bytes"] == GIB
+    assert second["history"][0]["rcon_ram_used_bytes"] == 6 * GIB
+    third = sampler.get_snapshot()
+    assert third["cache_hit"] is True and len(calls) == 1
+    assert third["rcon_ram_usage"]["available"] is False
+    assert third["rcon_ram_usage"]["reason"] == "stale"
+    assert third["ram_usage"]["used_bytes"] == GIB // 2
+
+
+def test_installation_history_remains_bounded_and_records_missing_samples(monkeypatch, tmp_path):
+    path = snapshot_file(monkeypatch, tmp_path, installation_snapshot())
+    monotonic_values = iter([0, 15, 30])
+    now_values = iter([NOW, NOW + timedelta(seconds=15), NOW + timedelta(seconds=30)])
+
+    def collector(previous, *, sampled_at, monotonic_now):
+        return collect_snapshot(now=sampled_at), {}
+
+    sampler = SystemUsageSampler(max_history_samples=2, collector=collector,
+        monotonic=lambda: next(monotonic_values), now=lambda: next(now_values))
+    sampler.get_snapshot()
+    path.unlink()
+    missing = sampler.get_snapshot()
+    assert [h["rcon_ram_used_bytes"] for h in missing["history"]] == [6 * GIB, None]
+    snapshot_file(monkeypatch, tmp_path, installation_snapshot())
+    last = sampler.get_snapshot()
+    assert len(last["history"]) == 2
+    assert [h["rcon_ram_used_bytes"] for h in last["history"]] == [None, 6 * GIB]

@@ -857,6 +857,7 @@ const demoSystemUsageHistory = Array.from({ length: 12 }, (_, index) => ({
   sampled_at: new Date(now - (11 - index) * 15_000).toISOString(),
   cpu_percent: [11, 15, 17, 14, 19, 23, 21, 18, 16, 20, 17, 18][index],
   ram_percent: [42, 42, 43, 43, 44, 44, 45, 45, 45, 46, 46, 46][index],
+  rcon_ram_used_bytes: [1420, 1430, 1450, 1460, 1480, 1490, 1500, 1505, 1510, 1520, 1530, 1536][index] * 1024 ** 2,
   disk_percent: 62,
   status: "ok",
 }));
@@ -881,12 +882,38 @@ export const demoSystemUsage = {
   },
   ram_usage: {
     available: true,
-    percent: 46,
-    used: 3.68,
-    total: 8,
+    percent: 25,
+    used: 0.25,
+    total: 1,
+    used_bytes: 256 * 1024 ** 2,
+    total_bytes: 1024 ** 3,
     unit: "GiB",
     source: "cgroup_v2",
     severity: "ok",
+  },
+  rcon_ram_usage: {
+    available: true,
+    source: "rcon_services",
+    used_bytes: 1536 * 1024 ** 2,
+    used: 1.5,
+    unit: "GiB",
+    total: null,
+    percent: null,
+    dedicated_used_bytes: 640 * 1024 ** 2,
+    shared_used_bytes: 896 * 1024 ** 2,
+    reclaimable_bytes: 512 * 1024 ** 2,
+    working_set_bytes: 1024 ** 3,
+    sampled_at: new Date(now).toISOString(),
+    data_age_seconds: 0,
+    components: [
+      { service: "backend", scope: "dedicated", used_bytes: 256 * 1024 ** 2, limit_bytes: 1024 ** 3 },
+      { service: "supervisor", scope: "dedicated", used_bytes: 380 * 1024 ** 2, limit_bytes: 2 * 1024 ** 3 },
+      { service: "frontend", scope: "dedicated", used_bytes: 4 * 1024 ** 2, limit_bytes: 128 * 1024 ** 2 },
+      { service: "redis", scope: "shared", used_bytes: 160 * 1024 ** 2, limit_bytes: null },
+      { service: "postgres", scope: "shared", used_bytes: 600 * 1024 ** 2, limit_bytes: null },
+      { service: "webhook", scope: "shared", used_bytes: 72 * 1024 ** 2, limit_bytes: 512 * 1024 ** 2 },
+      { service: "background_worker", scope: "shared", used_bytes: 64 * 1024 ** 2, limit_bytes: 512 * 1024 ** 2 },
+    ],
   },
   disk_usage: {
     available: true,
@@ -914,7 +941,14 @@ export const getDemoSystemUsage = () => {
   if (mode === "warning") {
     result.status = "warning";
     result.ram_usage.percent = 86;
-    result.ram_usage.used = 6.88;
+    result.ram_usage.used = 0.86;
+    const delta = Math.round(0.86 * 1024 ** 3) - result.ram_usage.used_bytes;
+    result.ram_usage.used_bytes += delta;
+    result.rcon_ram_usage.used_bytes += delta;
+    result.rcon_ram_usage.used = result.rcon_ram_usage.used_bytes / 1024 ** 3;
+    result.rcon_ram_usage.dedicated_used_bytes += delta;
+    result.rcon_ram_usage.working_set_bytes += delta;
+    result.rcon_ram_usage.components.find((item) => item.service === "backend").used_bytes += delta;
     result.ram_usage.severity = "warning";
     result.warnings = [
       {
@@ -958,6 +992,7 @@ export const getDemoSystemUsage = () => {
     result.status = "unavailable";
     result.warnings = [];
     result.history = [];
+    result.rcon_ram_usage = { available: false, source: "rcon_services", used_bytes: null, reason: "collector_unavailable" };
     for (const key of ["cpu_usage", "ram_usage", "disk_usage"]) {
       result[key] = {
         available: false,
@@ -976,6 +1011,23 @@ export const getDemoSystemUsage = () => {
     result.sampled_at = sampledAt;
     result.data_age_seconds = 300;
     result.range.to = sampledAt;
+    result.rcon_ram_usage = { available: false, source: "rcon_services", used_bytes: null, reason: "stale", sampled_at: sampledAt, data_age_seconds: 300 };
+  }
+
+  if (mode === "rcon_unavailable" || mode === "host_fallback") {
+    result.rcon_ram_usage = { available: false, source: "rcon_services", used_bytes: null, reason: "collector_unavailable" };
+    if (mode === "host_fallback") {
+      result.ram_usage = { available: true, source: "host", unit: "GiB", percent: 50, used: 32, total: 64 };
+    }
+  }
+
+  if (mode === "rcon_missing") delete result.rcon_ram_usage;
+
+  if (mode === "local_unavailable") {
+    result.status = "unavailable";
+    for (const key of ["cpu_usage", "ram_usage", "disk_usage"]) {
+      result[key] = { available: false, source: "unavailable", percent: null };
+    }
   }
 
   return result;

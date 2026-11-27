@@ -1,0 +1,24 @@
+[Unit]
+Description=Collect container memory for Frontline RCON instance %i
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0022
+ExecStart=/usr/bin/python3 /usr/local/lib/frontline-rcon/collect_rcon_memory.py --config /etc/frontline-rcon/memory-%i.json --output /var/lib/frontline-rcon/memory/%i/usage.json
+TimeoutStartSec=12
+MemoryMax=128M
+CPUQuota=25%
+TasksMax=64
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/var/lib/frontline-rcon/memory/%i
+RestrictAddressFamilies=AF_UNIX

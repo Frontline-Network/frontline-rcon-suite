@@ -3614,8 +3614,8 @@
       "GET"
     ],
     "description_translations": {
-      "de": "Liest aufgezeichnete Systemauslastung des CRCON-Hosts für das ausgewählte Zeitfenster von 5, 15 oder 60 Minuten.",
-      "en": "Reads recorded CRCON host resource usage for the selected 5, 15 or 60 minute window."
+      "de": "Liest Backend-Ressourcen und die konfigurierte RAM-Summe der eigenen und gemeinsam genutzten RCON-Dienste mit einem Verlauf von 5, 15 oder 60 Minuten.",
+      "en": "Reads backend resources and the configured memory sum of dedicated and shared RCON services with a 5, 15 or 60 minute history."
     }
   },
   {
