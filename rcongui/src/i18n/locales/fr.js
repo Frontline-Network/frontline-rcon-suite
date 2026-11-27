@@ -1,5 +1,6 @@
 // French catalog with reviewed overrides; production rollout requires full validation.
 import draft from "./fr-draft.json";
+import { playerLanguagesFr } from "./player-languages.js";
 import { actionsFr } from "./fr-actions.js";
 import { autobalancerFr } from "./fr-autobalancer.js";
 import { frenchCore } from "./fr-core.js";
@@ -14,6 +15,7 @@ import { otherSettingsFr } from "./fr-settings-others.js";
 import { discordReportsFr } from "./fr-discord-reports.js";
 
 const fr = {
+  playerLanguages: playerLanguagesFr,
   ...draft,
   ...frenchCore,
   ...accountInterfaceFr,

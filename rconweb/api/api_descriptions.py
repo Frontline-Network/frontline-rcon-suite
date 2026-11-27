@@ -49,6 +49,12 @@ CONFIG_SUBJECTS = {
 }
 
 DESCRIPTIONS = {
+    "get_player_message_catalog": ("Liest Sprachvarianten und aktuelle Originalvorlagen für Moderation, Automods und Autobalancer.", "Reads language variants and current source templates for moderation, automods and autobalancing."),
+    "set_player_language_settings": ("Aktiviert oder deaktiviert den Versand nach Empfängersprache; bestehende Modultexte bleiben erhalten.", "Enables or disables recipient-language delivery while preserving existing module texts."),
+    "set_player_message_translations": ("Speichert geprüfte Sprachvarianten mit Platzhalter- und Revisionsprüfung.", "Saves language variants with placeholder and revision validation."),
+    "get_player_language": ("Liest die Sprachpräferenz eines Spielers und bis zu zehn protokollierte Übersetzungszustellungen.", "Reads a player's language preference and up to ten localized delivery audit records."),
+    "set_player_language": ("Setzt die ausdrückliche Sprachpräferenz eines Spielkontos. Benötigt die Berechtigung zur Kontobearbeitung.", "Sets a game account's explicit language preference. Requires account-edit permission."),
+    "preview_player_message": ("Zeigt den Empfängertext für eine Vorlage oder Moderationsnachricht. Sendet keine Nachricht und führt keine Maßnahme aus.", "Previews recipient text for a template or moderation message without sending it or executing a moderation action."),
     "get_status": (
         "Liefert eine kompakte Serverübersicht mit Name, aktueller Karte, Spielerzahl, Kapazität und Serverkennung. Geeignet für Statusanzeigen und Serverlisten.",
         "Returns a compact server summary with name, current map, player count, capacity and server identity. Suitable for status displays and server lists."),

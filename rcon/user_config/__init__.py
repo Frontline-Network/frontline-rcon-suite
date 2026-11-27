@@ -34,6 +34,7 @@ if not any(
         report_admin,
         name_kicks,
         population_history,
+        player_language,
         rcon_connection_settings,
         rcon_server_settings,
         real_vip,

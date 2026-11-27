@@ -2346,6 +2346,63 @@ class RconAPI(Rcon):
 
         return result
 
+    def get_player_message_catalog(self):
+        from rcon.player_message_catalog import catalog
+        from rcon.user_config.player_language import PlayerLanguageUserConfig
+        return {"enabled":PlayerLanguageUserConfig.load_from_db().enabled,"templates":catalog()}
+
+    def set_player_language_settings(self, enabled: bool, by: str):
+        if type(enabled) is not bool:
+            raise ValueError('Expected a boolean')
+        from rcon.user_config.player_language import PlayerLanguageUserConfig
+        old = PlayerLanguageUserConfig.load_from_db()
+        PlayerLanguageUserConfig.save_to_db({"enabled":enabled})
+        audit_user_config_differences(old_model=old,new_model={"enabled":enabled},
+                                     command_name="set_player_language_settings",author=by)
+        return True
+
+    def set_player_message_translations(self, key: str, source: str, translations: dict,
+                                        expected_revision: str, by: str):
+        from rcon.player_messages import save_translation
+        return save_translation(key=key,source=source,translations=translations,
+                                expected_revision=expected_revision,by=by)
+
+    def get_player_language(self, player_id: str):
+        from rcon.player_language import get_profile, game_identity
+        from rcon.models import PlayerMessageLocalizationAudit
+        from sqlalchemy import select
+        result=get_profile(player_id)
+        with enter_session() as sess:
+            rows=sess.scalars(select(PlayerMessageLocalizationAudit).where(
+                PlayerMessageLocalizationAudit.player_id==game_identity(player_id)
+            ).order_by(PlayerMessageLocalizationAudit.id.desc()).limit(10))
+            result['recent_messages']=[{k:getattr(r,k) for k in
+                ('created_at','server_number','action','language','original','delivered','outcome')} for r in rows]
+        return result
+
+    def set_player_language(self, player_id: str, language: str, by: str):
+        from rcon.player_language import set_language
+        return set_language(player_id,language)
+
+    def preview_player_message(self, player_id: str, text: str, category: str='REASON', key: str | None=None,
+                               translations: dict | None=None):
+        from rcon.player_messages import localize_payload, render
+        from rcon.player_language import get_profile
+        from rcon.player_message_catalog import catalog
+        if not isinstance(text,str) or len(text)>4000 or category not in ('MESSAGE','REASON'):
+            raise ValueError('Invalid preview text/category')
+        if key:
+            definition=next((d for d in catalog() if d['key']==key),None)
+            if definition is None: raise ValueError('Unknown template')
+            # Keep placeholders visible in a template preview; actual actions
+            # supply their own current values at the existing dispatch point.
+            value=render(key,definition['source'],player_id=player_id,defaults=definition['defaults'],
+                         enabled=True,binding_hash=definition.get('source_hash'),draft=translations)
+        else:
+            value=localize_payload(player_id,text,[category])
+        return {**get_profile(player_id),'text':str(value),'original':getattr(value,'original',text),
+                'delivered_language':getattr(value,'language','legacy'),'template_key':getattr(value,'template_key',None)}
+
     def get_message_templates(
         self, category: MessageTemplateCategory
     ) -> list[MessageTemplateType]:

@@ -5,7 +5,7 @@ import time
 import unicodedata
 from functools import lru_cache
 
-from sqlalchemy import Boolean, Float, JSON, String, select
+from sqlalchemy import Boolean, Float, JSON, String, select, Index, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Mapped, mapped_column
@@ -44,6 +44,10 @@ class VoiceVerifiedIdentity(Base):
     game_id: Mapped[str] = mapped_column(String(100), unique=True)
 
 
+Index('ix_voice_language_preference_identity_lower',func.lower(VoiceLanguagePreference.identity))
+Index('ix_voice_verified_identity_game_lower',func.lower(VoiceVerifiedIdentity.game_id))
+
+
 class VoiceTranslationCache(Base):
     __tablename__ = "voice_translation_cache"
     language: Mapped[str] = mapped_column(String(16), primary_key=True)
@@ -80,26 +84,39 @@ def _insert(sess, model):
 
 
 def linked_game_id(sess, discord_id):
-    return sess.scalar(
+    value = sess.scalar(
         select(VoiceVerifiedIdentity.game_id).where(
             VoiceVerifiedIdentity.discord_id == str(discord_id)
         )
     )
+    from rcon.player_language import game_identity
+    return game_identity(value) if value else None
 
 
 def linked_discord_id(sess, game_id):
-    return sess.scalar(
+    from rcon.player_language import game_identity
+    game_id = game_identity(game_id)
+    from sqlalchemy import func
+    condition = func.lower(VoiceVerifiedIdentity.game_id)==game_id.lower() if re.fullmatch(r'[0-9a-fA-F]{32}',game_id) else VoiceVerifiedIdentity.game_id==game_id
+    matches = list(sess.scalars(
         select(VoiceVerifiedIdentity.discord_id).where(
-            VoiceVerifiedIdentity.game_id == str(game_id)
-        )
-    )
+            condition
+        ).limit(2)
+    ))
+    if len(matches)>1:
+        raise ValueError('Ambiguous verified game identity')
+    return matches[0] if matches else None
 
 
 def link_verified(sess, *, game_id, discord_id):
     """Caller has already consumed a challenge for BOTH identities in this transaction."""
-    game, discord = str(game_id or "").strip(), str(discord_id or "").strip()
+    from rcon.player_language import game_identity
+    game, discord = game_identity(game_id), str(discord_id or "").strip()
     if not (0 < len(game) <= 100 and re.fullmatch(r"[0-9]{1,32}", discord)):
         raise ValueError("Invalid voice account identity")
+    existing_discord = linked_discord_id(sess,game)
+    if existing_discord and existing_discord != discord:
+        raise ValueError('Voice account already linked to a different identity')
     statement = _insert(sess, VoiceVerifiedIdentity).values(
         discord_id=discord, game_id=game
     )
@@ -129,18 +146,8 @@ def _identities(sess, game_id, discord_id):
 
 
 def preferred_language(sess, *, game_id=None, discord_id=None):
-    ids = _identities(sess, game_id, discord_id)
-    row = sess.scalar(
-        select(VoiceLanguagePreference.language)
-        .where(VoiceLanguagePreference.identity.in_(ids))
-        .order_by(
-            VoiceLanguagePreference.explicit.desc(),
-            VoiceLanguagePreference.updated.desc(),
-            VoiceLanguagePreference.identity,
-        )
-        .limit(1)
-    )
-    return row or DEFAULT
+    from rcon.player_language import profile_in_session
+    return profile_in_session(sess,player_id=game_id,discord_id=discord_id)['language']
 
 
 def _warm(sess, locale):
@@ -154,6 +161,8 @@ def _warm(sess, locale):
 def _remember(sess, locale, game_id, discord_id, *, explicit):
     # Record each observation on its actual identity. A verified link resolves both
     # preferences on read (explicit wins, then most recent), without copying history.
+    from rcon.player_language import game_identity
+    game_id = game_identity(game_id)
     _identities(sess, game_id, discord_id)
     identity = (
         f"discord:{discord_id}"

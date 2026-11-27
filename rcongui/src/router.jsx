@@ -539,6 +539,11 @@ const router = createBrowserRouter([
         errorElement: <RouteError />,
       },
       {
+        path: "/settings/player-languages",
+        lazy: lazyPage(() => import("./pages/settings/player-languages")),
+        errorElement: <RouteError />,
+      },
+      {
         path: "/settings/:category/:type",
         lazy: lazyPage(() => import("./pages/settings/[configs]/detail")),
         errorElement: <RouteError />,

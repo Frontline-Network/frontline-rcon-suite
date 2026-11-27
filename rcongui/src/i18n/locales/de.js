@@ -1,8 +1,10 @@
 import { liveViewsDe } from "./live-views.js";
+import { playerLanguagesDe } from "./player-languages.js";
 import { sharedOperationsDe } from "./shared-operations.js";
 import { operatorMessagesDe } from "./operator-messages.js";
 
 const de = {
+  playerLanguages: playerLanguagesDe,
   themeLoading: {
     loading: "Darstellung wird geladen …",
     failed: "Darstellung konnte nicht geladen werden",

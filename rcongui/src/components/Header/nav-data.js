@@ -332,6 +332,11 @@ const rawNavMenus = [
         icon: <MilitaryTechIcon />,
       },
       {
+        name: "Player languages and translations",
+        to: "/settings/player-languages",
+        icon: <MenuBookOutlinedIcon />,
+      },
+      {
         name: "RCON Game Server Connection",
         to: "/settings/others/game-server",
         icon: <CableIcon />,
@@ -451,6 +456,7 @@ const linkTranslationKeys = {
   "/settings/others/seed-vip": "navigation.links.seedVip",
   "/settings/others/vip-rewards": "navigation.links.vipRewards",
   "/settings/others/end-match-stats": "navigation.links.endMatchStats",
+  "/settings/player-languages": "playerLanguages.title",
   "/settings/others/game-server": "navigation.links.gameServer",
   "/settings/others/crcon": "navigation.links.crcon",
   "/settings/others/chat-commands": "navigation.links.chatCommands",

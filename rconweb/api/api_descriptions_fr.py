@@ -39,6 +39,12 @@ CONFIG_SUBJECTS_FR = {
 }
 
 DESCRIPTIONS_FR = {
+    "get_player_message_catalog": "Lit les versions linguistiques et les modèles sources actuels pour la modération, les règles automatiques et l’équilibrage.",
+    "set_player_language_settings": "Active ou désactive l’envoi selon la langue du destinataire en conservant les textes existants des modules.",
+    "set_player_message_translations": "Enregistre les versions linguistiques après vérification des variables et de la révision.",
+    "get_player_language": "Lit la préférence linguistique d’un joueur et jusqu’à dix enregistrements d’envois traduits.",
+    "set_player_language": "Définit la langue explicitement choisie pour un compte de jeu. Nécessite le droit de modification du compte.",
+    "preview_player_message": "Affiche le texte destiné au joueur sans envoyer de message ni exécuter de sanction.",
     "get_logs": "Lit les journaux textuels bruts du serveur de jeu pour les since_min_ago dernières minutes. Utilisez get_structured_logs ou get_recent_logs pour filtrer les événements.",
     "get_structured_logs": "Lit les journaux actuels du serveur et les analyse en événements. Filtrage facultatif par type et joueur ; since_min_ago fixe la période en minutes.",
     "get_recent_logs": "Renvoie les événements récents enregistrés par CRCON pour la vue en direct, notamment les messages, éliminations et tirs alliés. Les filtres et start/end limitent la sélection. GET et POST ne font ici que lire les données.",

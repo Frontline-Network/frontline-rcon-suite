@@ -115,6 +115,9 @@ def frontline_vip_verification(rcon: Rcon, struct_log: StructuredLogLineWithMeta
 
 @on_chat
 def chat_commands(rcon: Rcon, struct_log: StructuredLogLineWithMetaData):
+    from rcon.player_language import handle_chat_language
+    if handle_chat_language(rcon, struct_log):
+        return
     chat_config = ChatCommandsUserConfig.load_from_db()
     rcon_config = RConChatCommandsUserConfig.load_from_db()
 
@@ -862,25 +865,27 @@ def windows_store_player_check(rcon: Rcon, _, name: str, player_id: str):
         action_value,
     )
 
+    from rcon.player_messages import localize_automated
+    player_message = localize_automated(player_id,config.player_message,prefix='automod.windows_store.')
     try:
         if action == WindowsStoreIdActionType.kick:
             accepted = rcon.kick(
                 player_id=player_id,
                 player_name=name,
-                reason=config.player_message,
+                reason=player_message,
                 by=config.audit_message_author,
             )
         elif action == WindowsStoreIdActionType.temp_ban:
             accepted = rcon.temp_ban(
                 player_id=player_id,
                 duration_hours=config.temp_ban_length_hours,
-                reason=config.player_message,
+                reason=player_message,
                 by=config.audit_message_author,
             )
         elif action == WindowsStoreIdActionType.perma_ban:
             accepted = rcon.perma_ban(
                 player_id=player_id,
-                reason=config.player_message,
+                reason=player_message,
                 by=config.audit_message_author,
             )
     except Exception as e:
