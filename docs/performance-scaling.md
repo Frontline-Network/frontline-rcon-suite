@@ -874,3 +874,28 @@ downgrade refuses to drop retained payloads or unacknowledged legacy imports.
 Test an upgrade and its recovery using real isolated PostgreSQL and Redis,
 including a stopped consumer, more than 150 messages, Redis restart, claim
 expiry, uncertain HTTP results, concurrent consumers, and legacy import failure.
+
+## Complete RCON memory accounting
+
+The sidebar can consume an opt-in, host-generated snapshot of the configured
+RCON service containers. Dedicated services and shared dependencies are summed
+once, with shared dependencies explicitly charged in full rather than allocated
+by an invented per-instance fraction. The backend receives only a read-only JSON
+directory, without a Docker socket or access to host processes. Collection is
+bounded and independent of browser polling. Installation and recovery are
+documented in [RCON memory telemetry](operations/rcon-memory-telemetry.md).
+
+Container memory charges include file cache. The display separates inactive file
+cache and the remaining working set so a database backup warming the filesystem
+cache is not mistaken for an application memory leak. A total assembled from
+multiple container limits has no useful percentage, so the combined RCON value
+uses absolute MiB/GiB and an absolute history. The existing backend limit remains
+a separately labelled detail. Unknown or stale service samples are never replaced
+by the backend value under a total-RCON label.
+
+After the bounded profile/cache refresh work, Supervisor cleanup, Redis list
+compression, and durable webhook reconnection, use this component view to choose
+the next memory target. Compare anonymous/working-set growth separately from
+reclaimable file cache over the same round sequence and load. Do not drop the
+host page cache, restart healthy services, shorten log history, or enable global
+Redis eviction merely to make a memory graph fall.

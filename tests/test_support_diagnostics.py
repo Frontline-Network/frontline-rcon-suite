@@ -16,6 +16,14 @@ def test_support_diagnostics_allowlists_aggregate_fields_and_omits_sensitive_dat
             "warnings": [{"metric": "ram", "severity": "warning", "code": "ram_warning", "threshold_percent": 80, "text": "secret"}],
             "cpu_usage": {"percent": 12, "source": "host", "process_count": 9000},
             "ram_usage": {"percent": 81, "source": "host", "path": "/private"},
+            "rcon_ram_usage": {
+                "available": True, "used_bytes": 1234,
+                "dedicated_used_bytes": 1000, "shared_used_bytes": 234,
+                "reclaimable_bytes": 100, "working_set_bytes": 1134,
+                "source": "rcon_services", "percent": None,
+                "components": [{"service": "private-hostname", "token": "private-token"}],
+                "path": "/private-resource-metrics",
+            },
             "disk_usage": {"percent": 32, "source": "filesystem"},
             "history": [{"sampled_at": "x", "cpu_percent": 1, "player_name": "Alice"}],
         },
@@ -35,6 +43,13 @@ def test_support_diagnostics_allowlists_aggregate_fields_and_omits_sensitive_dat
     assert "unknown_secret" not in rendered
     assert "process_count" not in rendered
     assert "path" not in rendered
+    assert "private-hostname" not in rendered
+    assert "private-token" not in rendered
+    metric = package["system_usage"]["metrics"]["rcon_ram"]
+    assert metric["used_bytes"] == 1234
+    assert metric["shared_used_bytes"] == 234
+    assert metric["reclaimable_bytes"] == 100
+    assert metric["percent"] is None
 
 
 def test_support_diagnostics_preview_matches_exact_export_scope():

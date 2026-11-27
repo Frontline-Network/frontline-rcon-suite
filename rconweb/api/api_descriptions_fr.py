@@ -117,7 +117,7 @@ DESCRIPTIONS_FR.update({
     "get_services": "Liste les services en arrière-plan gérés par CRCON et leur état actuel.",
     "do_service": "Démarre ou arrête le service CRCON indiqué avec START ou STOP, ce qui affecte l'automatisation associée.",
     "get_operational_health": "Renvoie l'état opérationnel et les indicateurs de diagnostic pour la période choisie de 5, 15 ou 60 minutes.",
-    "get_system_usage": "Lit l'utilisation des ressources enregistrée pour l'hôte CRCON sur la période choisie de 5, 15 ou 60 minutes.",
+    "get_system_usage": "Lit les ressources du backend et la mémoire totale configurée des services RCON dédiés et partagés avec un historique de 5, 15 ou 60 minutes.",
     "get_support_diagnostics_preview": "Construit un aperçu du paquet de diagnostic avec les valeurs sensibles masquées. Rien n'est envoyé à un service d'assistance.",
     "download_support_diagnostics": "Télécharge le paquet de diagnostic en fichier JSON. Les valeurs sensibles sont masquées ; la réponse est un fichier plutôt que l'enveloppe habituelle des résultats API.",
     "reconnect_gameserver": "Redémarre les processus web Gunicorn pour rétablir leurs connexions RCON. Ne redémarre pas le serveur de jeu ; les requêtes web actives peuvent être interrompues.",
