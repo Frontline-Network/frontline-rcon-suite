@@ -348,6 +348,7 @@ def expose_api_endpoint(
                 not command_name.startswith("get_")
                 and not command_name.startswith("validate_")
                 and not command_name.endswith("_config")
+                and command_name != "preview_player_message"
             ):
                 audit(command_name, request, safe_arguments)
 
