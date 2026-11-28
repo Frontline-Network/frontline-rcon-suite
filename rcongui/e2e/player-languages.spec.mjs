@@ -99,9 +99,17 @@ test('template search uses readable names and preserves the original binding whe
   await expect(page.getByRole('heading', { name: 'Squad ohne Führung · Warnung', exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Originaltext', exact: true })).toHaveValue('Warning {player_name}: no squad leader.');
   await page.getByLabel('Übersetzung · de', { exact: true }).fill('Bitte stelle einen Squadleader, {player_name}.');
-  const requestPromise = page.waitForRequest(request => request.url().includes('/set_player_message_translations') && request.method() === 'POST');
   await page.getByRole('button', { name: 'Übersetzungen speichern', exact: true }).click();
-  expect((await requestPromise).postDataJSON().key).toBe('automod.no_leader.warning');
+  // Mirage handles the fake API inside the page, so no browser-network POST
+  // is emitted. Verify persistence on the selected binding and isolation from
+  // the original moderation template instead of waiting for a network event.
+  await expect(page.getByText('Gespeichert', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Neu laden', exact: true }).click();
+  await expect(page.getByLabel('Übersetzung · de', { exact: true })).toHaveValue('Bitte stelle einen Squadleader, {player_name}.');
+  await expect(page.getByRole('textbox', { name: 'Originaltext', exact: true })).toHaveValue('Warning {player_name}: no squad leader.');
+  await picker.fill('Serverregeln');
+  await page.getByRole('option', { name: /^Serverregeln/ }).click();
+  await expect(page.getByLabel('Übersetzung · de', { exact: true })).toHaveValue('Bitte beachte die Serverregeln.');
 });
 
 test('filtering to an empty translation status protects unsaved edits', async ({ page }) => {
