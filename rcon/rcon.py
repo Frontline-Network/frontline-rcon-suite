@@ -1198,16 +1198,20 @@ class Rcon(ServerCtl):
             logger.exception("Unable to format message")
             formatted = message
 
-        prev: bytes | None = None
+        return self._send_rendered_broadcast(formatted, cached_text=message)
+
+    def _send_rendered_broadcast(self, formatted: str, *, cached_text: str) -> str:
+        # ServerCtl.exchange raises unless the game server acknowledges this
+        # request with status 200. Cache only the successfully set message.
+        super().set_broadcast(formatted)
+        prev: str | bytes | None = None
         try:
             red = get_redis_client()
-            prev = red.set("BROADCAST_MESSAGE", message, get=True)  # type: ignore
-            red.expire("BROADCAST_MESSAGE", 60 * 30)
+            prev = red.set("BROADCAST_MESSAGE", cached_text, ex=60 * 30, get=True)  # type: ignore
         except Exception:
-            logger.exception("Can't save message in redis: %s", message)
+            logger.exception("Cannot cache acknowledged broadcast")
 
-        super().set_broadcast(formatted)
-        return prev.decode() if isinstance(prev, bytes) else (prev or "")
+        return prev.decode(errors="replace") if isinstance(prev, bytes) else (prev or "")
 
     @ttl_cache(ttl=5)
     def get_slots(self) -> SlotsType:

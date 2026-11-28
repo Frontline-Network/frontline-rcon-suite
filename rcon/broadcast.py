@@ -4,9 +4,9 @@ import re
 import threading
 import time
 
-from rcon.broadcast_activity import update_state, record_attempt
+from rcon.broadcast_activity import load_rotation, record_attempt, save_rotation, update_state
 
-from rcon.commands import HLLCommandFailedError
+from rcon.connection import HLLCommandError
 from rcon.message_variables import format_message_string, populate_message_variables
 from rcon.types import MessageVariable
 from rcon.user_config.auto_broadcast import (
@@ -119,20 +119,39 @@ def manual_broadcast_is_active(ctl, campaigns: list[AutoBroadcastMessage]) -> bo
     return current not in managed_messages
 
 
-def wait_for_campaign(stop_event, config, seconds):
-    """Recheck saved settings every 20 seconds, including during long intervals."""
-    deadline = time.time() + seconds
+def broadcast_slots(config):
+    # Older records can lack IDs. A private message inserted before an old
+    # slot must not change its identity within the broadcast rotation.
+    broadcasts = (msg for msg in config.messages if msg.delivery_mode == "broadcast")
+    return {
+        (f"id:{msg.id}" if msg.id else f"legacy:{index}"): msg
+        for index, msg in enumerate(broadcasts)
+    }
+
+
+def wait_for_campaign(stop_event, slot_key, campaign):
+    """Keep this slot's dwell time when unrelated settings change."""
+    started = time.monotonic()
+    current = campaign
     while not stop_event.is_set():
-        remaining = deadline - time.time()
+        remaining = started + current.time_sec - time.monotonic()
         if remaining <= 0:
-            return False
-        update_state("waiting", deadline)
+            return
+        update_state("waiting", time.time() + remaining)
         if stop_event.wait(min(CHECK_INTERVAL, remaining)):
-            return True
-        if AutoBroadcastUserConfig.load_from_db() != config:
-            update_state("settings_changed")
-            return True
-    return True
+            return
+        try:
+            config = AutoBroadcastUserConfig.load_from_db()
+        except Exception:
+            logger.exception("Cannot refresh broadcast settings during a slot")
+            continue
+        current = broadcast_slots(config).get(slot_key)
+        if (not config.enabled or current is None or not current.enabled
+                or current.message != campaign.message
+                or current.min_players != campaign.min_players
+                or current.max_players != campaign.max_players
+                or current.pause_during_seeding != campaign.pause_during_seeding):
+            return
 
 
 def run(stop_event: threading.Event | None = None):
@@ -143,76 +162,68 @@ def run(stop_event: threading.Event | None = None):
     if stop_event.is_set():
         return
     ctl = get_rcon()
-
+    remaining = load_rotation()
     while not stop_event.is_set():
-        config = AutoBroadcastUserConfig.load_from_db()
-        if not config.enabled or not config.messages:
-            logger.debug(
-                "Auto broadcasts are disabled. Sleeping %s seconds", CHECK_INTERVAL
-            )
-            update_state("paused")
-            stop_event.wait(CHECK_INTERVAL)
-            continue
-
-        campaigns = [
-            campaign
-            for campaign in config.messages
-            if campaign.delivery_mode == "broadcast"
-        ]
-        if not campaigns:
-            update_state("no_broadcasts")
-            stop_event.wait(CHECK_INTERVAL)
-            continue
-        if config.randomize:
-            logger.debug("Auto broadcasts. Radomizing")
-            random.shuffle(campaigns)
-
-        sent_campaign = False
-        needs_seeding_state = any(msg.pause_during_seeding for msg in campaigns)
-        seeding_config = (
-            AutoModSeedingUserConfig.load_from_db() if needs_seeding_state else None
-        )
-
         try:
-            player_count = int(ctl.get_slots()["current_players"])
-        except (HLLCommandFailedError, KeyError, TypeError, ValueError):
-            logger.exception("Unable to determine player count for campaigns")
-            update_state("player_count_unavailable")
-            stop_event.wait(CHECK_INTERVAL)
-            continue
-
-        for msg in campaigns:
-            if not config.enabled:
-                break
-
-            if not campaign_is_eligible(msg, player_count, seeding_config):
-                logger.debug(
-                    "Skipping campaign %s for %s players",
-                    msg.title or msg.id or "legacy broadcast",
-                    player_count,
-                )
+            config = AutoBroadcastUserConfig.load_from_db()
+            slots = broadcast_slots(config)
+            if not config.enabled or not slots:
+                update_state("paused" if not config.enabled else "no_broadcasts")
+                stop_event.wait(CHECK_INTERVAL)
                 continue
 
-            formatted = format_message(ctl, msg.message)
-            logger.debug(
-                "Broadcasting campaign %s for %s seconds: %s",
-                msg.title or msg.id or "legacy broadcast",
-                msg.time_sec,
-                formatted,
-            )
             try:
-                update_state("sending")
-                ctl.set_broadcast(formatted)
-                sent_campaign = True
-                record_attempt(msg, formatted, True)
-            except Exception as exc:
-                record_attempt(msg, formatted, False, type(exc).__name__)
-                logger.exception("Unable to broadcast campaign %s", msg.id)
-            if wait_for_campaign(stop_event, config, int(msg.time_sec)):
-                break
+                player_count = int(ctl.get_slots()["current_players"])
+            except Exception:
+                logger.exception("Unable to determine player count for campaigns")
+                update_state("player_count_unavailable")
+                stop_event.wait(CHECK_INTERVAL)
+                continue
 
-        if not sent_campaign:
-            update_state("no_eligible_campaigns")
+            seeding = (
+                AutoModSeedingUserConfig.load_from_db()
+                if any(msg.enabled and msg.pause_during_seeding for msg in slots.values())
+                else None
+            )
+            eligible = {
+                key for key, msg in slots.items()
+                if campaign_is_eligible(msg, player_count, seeding)
+            }
+            if not eligible:
+                update_state("no_eligible_campaigns")
+                stop_event.wait(CHECK_INTERVAL)
+                continue
+
+            remaining = [key for key in remaining if key in eligible]
+            if not remaining:
+                remaining = [key for key in slots if key in eligible]
+                if config.randomize:
+                    random.shuffle(remaining)
+
+            key = remaining.pop(0)
+            campaign = slots[key]
+            formatted = campaign.message
+            try:
+                formatted = format_message(ctl, campaign.message)
+                update_state("sending")
+                # The same text is sent, cached and audited. Never interpret
+                # braces in a substituted map, server or player name twice.
+                ctl._send_rendered_broadcast(formatted, cached_text=formatted)
+            except Exception as exc:
+                logger.exception("Unable to broadcast campaign %s", campaign.id)
+                error = f"RCON {exc.status_code}" if isinstance(exc, HLLCommandError) else type(exc).__name__
+                record_attempt(campaign, formatted, False, error)
+                save_rotation(remaining)
+                update_state("waiting", time.time() + CHECK_INTERVAL)
+                stop_event.wait(CHECK_INTERVAL)
+                continue
+
+            record_attempt(campaign, formatted, True)
+            save_rotation(remaining)
+            wait_for_campaign(stop_event, key, campaign)
+        except Exception:
+            logger.exception("Broadcast scheduler temporarily unavailable")
+            update_state("waiting", time.time() + CHECK_INTERVAL)
             stop_event.wait(CHECK_INTERVAL)
 
 
