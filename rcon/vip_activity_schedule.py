@@ -42,8 +42,11 @@ def contacts_by_player(sess, player_ids, config):
                       delivery.last_attempt_at, delivery.created_at).filter(
         delivery.player_id_id.in_(player_ids), delivery.server_family == config.server_family,
         delivery.status != "test")
-    if not config.test_mode:
-        rows = rows.filter(delivery.test_mode.is_(False))
+    measured = delivery.test_mode.is_(False)
+    if config.test_mode:
+        # Old simulations used a different eligibility model and were never seen.
+        measured = or_(measured, delivery.status_fingerprint.startswith("a1:sim:"))
+    rows = rows.filter(measured)
     for pid, key, session, rule, fingerprint, sent, attempted, created in rows:
         grouped[pid].append(Contact(key, session, rule, fingerprint, utc(sent or attempted or created)))
     return grouped
@@ -124,12 +127,67 @@ def budget_available(contacts, session_id, now):
     )
 
 
+def separate_visit(sess, row):
+    """Require a 30-minute break across servers since the preceding contact.
+
+    A long stay on a different server can bridge two quick reconnects. Physical
+    session IDs or the elapsed time since the message alone cannot prove a gap.
+    """
+    if not row["contacts"]:
+        return True
+    previous = max(row["contacts"], key=lambda c: (c.at, c.id))
+    start = utc(row["start"])
+    gap = timedelta(minutes=30)
+    if start < previous.at + gap:
+        return False
+    original = sess.get(PlayerSession, previous.session_id) if previous.session_id else None
+    lower = int(previous.at.timestamp() * 1_000_000)
+    upper = int(start.timestamp() * 1_000_000)
+    seen = sess.query(PlayerSession).filter(
+        PlayerSession.player_id_id == row["player_db_id"],
+        PlayerSession.id != row["session_id"],
+        or_(PlayerSession.start_event_us.between(lower, upper),
+            and_(PlayerSession.start_event_us.is_(None),
+                 PlayerSession.created.between(previous.at.replace(tzinfo=None), start.replace(tzinfo=None)))),
+    ).all()
+
+    def beginning(session):
+        if session.start_event_us is not None:
+            return datetime.fromtimestamp(session.start_event_us / 1_000_000, timezone.utc)
+        return utc(session.created)
+
+    def ending(session):
+        if session.end_event_us is not None:
+            return datetime.fromtimestamp(session.end_event_us / 1_000_000, timezone.utc)
+        if session.start and session.end and session.end >= session.start:
+            return beginning(session) + (session.end - session.start)
+        return None
+
+    intervals = []
+    if original is not None:
+        intervals.append((previous.at, ending(original), original.server_number))
+    for visit in seen:
+        if visit.id != previous.session_id:
+            intervals.append((beginning(visit), ending(visit), visit.server_number))
+    open_servers = set()
+    last_end = None
+    for began, end, server in sorted(intervals, key=lambda item: item[0]) + [(start, None, row["server_number"])]:
+        if not open_servers and last_end is not None and began >= last_end + gap:
+            return True
+        open_servers.discard(server)
+        if end is None or end < began:
+            open_servers.add(server)
+        else:
+            last_end = max(last_end or end, end)
+    return False
+
+
 def expiry_already_attempted(contacts, fingerprint):
     for contact in contacts:
         if contact.rule not in {"trial_expiring", "trial_expired"}:
             continue
         parts = contact.fingerprint.split(":", 2)
-        if len(parts) != 3 or parts[0] != "v2":
+        if len(parts) != 3 or parts[0] not in {"v2", "a1"}:
             return True
         if fingerprint == "single" or parts[2] in {fingerprint, "single"}:
             return True

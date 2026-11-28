@@ -483,8 +483,8 @@ def _can_contact(sess, *, row, player_id, server_number, config, decision, statu
         if (decision.rule != RULE_TRIAL_EXPIRING or trial_end is None
                 or stored is None or _as_utc(stored) > trial_end):
             return False
-    return activity_message_allowed(sess, player_db_id=pid, player_id=player_id,
-                                   server_number=server_number, now=now)
+    return activity.separate_visit(sess, row) and activity_message_allowed(
+        sess, player_db_id=pid, player_id=player_id, server_number=server_number, now=now)
 
 
 def _activity_message(decision, campaign, status, player_id):
@@ -643,6 +643,11 @@ def _prepare_delivery(
     rendered_message: str | None = None,
 ) -> int | None:
     with enter_session() as sess:
+        if config.activity_model and sess.get_bind().dialect.name == "postgresql":
+            from rcon.campaign_delivery import CLAIM_LOCK_NAMESPACE
+
+            if not sess.query(func.pg_try_advisory_xact_lock(CLAIM_LOCK_NAMESPACE + server_number)).scalar():
+                return None
         # Serialize claims across servers and the two expiry notice rules.
         sess.query(PlayerID.id).filter(PlayerID.id == player_db_id).with_for_update().one()
         if config.activity_model:
@@ -716,7 +721,8 @@ def _prepare_delivery(
             player_id_id=player_db_id,
             player_session_id=player_session_id,
             player_name=player_name,
-            status_fingerprint=_delivery_key(decision, config.test_mode),
+            status_fingerprint=(f"a1:sim:{decision.status_fingerprint}" if config.activity_model and config.test_mode
+                                else _delivery_key(decision, config.test_mode)),
             message=rendered_message or campaign.message.strip(),
             status="sending",
             attempt_count=1,

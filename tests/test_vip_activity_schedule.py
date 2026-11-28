@@ -84,6 +84,11 @@ class Pilot:
         monkeypatch.setattr(vip, "utc_now", lambda: self.now)
 
     def visit(self, when, minutes, *, server=3, game=2, exact=True, closed=False):
+        if when > self.now:
+            with self.session() as sess:
+                for old in sess.query(PlayerSession).filter(PlayerSession.end.is_(None)):
+                    old.end = self.now.replace(tzinfo=None)
+                    old.end_event_us = int(self.now.timestamp() * 1_000_000)
         self.server = server
         self.now = when + timedelta(minutes=minutes)
         with self.session() as sess:
@@ -204,3 +209,34 @@ def test_parallel_claim_on_separate_servers(pilot):
     with ThreadPoolExecutor(2) as executor:
         claimed = list(executor.map(claim, sessions))
     assert sum(key is not None for key in claimed) == 1
+
+
+def test_quick_switches_do_not_reset_same_visit_across_rule_changes(pilot):
+    p = pilot
+    p.visit(BASE, 45)
+    assert p.tick()["sent"] == 1
+    p.state.update(verified=True, grant_source="trial", vip_active=True, trial_id="grant",
+                   expires_at=(p.now+timedelta(days=1)).isoformat())
+    p.visit(p.now + timedelta(minutes=1), 180, server=4)
+    assert not p.preview()["eligible"]
+    p.visit(p.now + timedelta(minutes=1), 60)
+    assert p.tick()["sent"] == 0
+    p.visit(p.now + timedelta(minutes=30), 15)
+    assert p.tick()["sent"] == 1
+
+
+def test_old_simulation_is_not_an_invitation_in_the_activity_pilot(pilot):
+    p = pilot
+    prior = p.visit(BASE, 15, closed=True)
+    with p.session() as sess:
+        sess.add(VipLifecycleDelivery(server_number=3, server_family="hll_vietnam", rule="unverified",
+            player_id_id=p.dbid, player_session_id=prior, player_name="Test",
+            status_fingerprint="v2:test:invitation", message="old test", status="simulated",
+            test_mode=True, status_checked_at=p.now, created_at=p.now, updated_at=p.now))
+    p.config.test_mode = True
+    p.visit(BASE+timedelta(days=1), 15)
+    assert p.preview()["eligible"]
+    assert p.tick()["simulated"] == 1
+    assert not p.preview()["eligible"]
+    p.config.test_mode = False
+    assert p.preview()["eligible"]
