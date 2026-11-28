@@ -623,9 +623,13 @@ def advance(api, server, event_id, context):
             )
             if sending == "question_sending":
                 hint = render(sess, "pc_reply", locale, case=str(event.id))
+                if locale == "en":
+                    # Keep the English prompt concise while retaining the reply
+                    # words used before English became the unknown-player default.
+                    hint += " Also accepted: Ja / Nein."
                 body += "\n" + hint
                 reply_language = (
-                    locale
+                    ("de+en" if locale == "en" else locale)
                     if locale in _REPLIES
                     else (
                         "de+en"

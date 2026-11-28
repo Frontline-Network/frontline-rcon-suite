@@ -39,7 +39,7 @@ def profile_in_session(sess, *, player_id=None, discord_id=None):
             hint = country_hint(sess, game_id)
             if hint:
                 return hint
-    return {"language": row.language if row else storage.DEFAULT,
+    return {"language": row.language if row else storage.FALLBACK_LANGUAGE,
             "explicit": bool(row.explicit) if row else False,
             "source": ("selected" if row.explicit else "detected") if row else "fallback",
             "updated": row.updated if row else None}
@@ -56,8 +56,8 @@ def preferred_language(player_id):
     try:
         return get_profile(player_id)["language"]
     except Exception:
-        logger.warning("Player language unavailable; using bilingual fallback")
-        return storage.DEFAULT
+        logger.warning("Player language unavailable; using English fallback")
+        return storage.FALLBACK_LANGUAGE
 
 
 def set_language(player_id, language):

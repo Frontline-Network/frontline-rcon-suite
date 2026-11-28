@@ -60,7 +60,7 @@ def test_pick_online_identity_with_duplicate_names_and_revalidate_departure(pane
         assert not s.get(AdminIncident, stale["incident_id"])
 
 
-def test_console_report_polish_receipt_and_german_english_target(panel):
+def test_console_report_polish_receipt_and_english_default_target(panel):
     setup, advance, game = panel
     database, players, ctx = setup
     name = players[0]["name"]
@@ -72,14 +72,15 @@ def test_console_report_polish_receipt_and_german_english_target(panel):
     assert api._handle(1, "1234", "321", "report", submission)["incident_id"] == iid
     with database() as s:
         assert s.get(AdminIncident, iid).reporter_id is None
-        assert lang.preferred_language(s, game_id=players[0]["player_id"]) == "de+en"
+        assert lang.preferred_language(s, game_id=players[0]["player_id"]) == "en"
         assert api._list(s, 1, "9876", "en")["content"] == "No reports yet."
     complete(setup, iid, decision(target=name, excerpt=text))
     service.tick(game, 1)
     service.tick(game, 1)
     assert snapshot(database, iid)["voice"]["phase"] == "notice_sent"
     sent = game.message_player.call_args_list[0].args
-    assert sent[0] == players[0]["player_id"] and " / " in sent[1]
+    assert sent[0] == players[0]["player_id"]
+    assert sent[1] == "Your squad is trying to reach you. Please respond in squad voice."
     with database() as s:
         delivery = s.scalar(
             select(VoicePlayerDelivery).where(VoicePlayerDelivery.incident_id == iid)

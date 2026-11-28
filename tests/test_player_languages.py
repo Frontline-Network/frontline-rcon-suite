@@ -60,7 +60,7 @@ def test_chat_and_verified_discord_share_preference_without_attributing_reporter
     assert 'saved' in api.message_player.call_args.kwargs['message']
     with database() as s:
         assert voice.preferred_language(s,discord_id='123')=='en'
-        assert voice.preferred_language(s,game_id='unlinked-target')=='de+en'
+        assert voice.preferred_language(s,game_id='unlinked-target')=='en'
         voice.report_language(s,'Unser Squadleader antwortet seit mehreren Minuten nicht im Sprachkanal.',game_id=EOS)
     assert languages.get_profile(EOS)['language']=='en'
 
@@ -77,7 +77,7 @@ def test_unverified_discord_cannot_set_target_preference(database):
         voice.set_language(s,'de',discord_id='123')
         with pytest.raises(ValueError,match='Unverified'):
             voice.preferred_language(s,game_id=EOS,discord_id='123')
-    assert languages.get_profile(EOS)['language']=='de+en'
+    assert languages.get_profile(EOS)['language']=='en'
 
 
 def test_catalog_variants_preserve_every_placeholder(database):
@@ -117,7 +117,7 @@ def test_autobalancer_single_packet_for_known_and_unknown_language(database):
     api=Mock(); api.message_player.return_value=True
     send(api,EOS,cfg,'disabled')
     api.message_player.assert_called_once()
-    assert 'ausgeschaltet' in api.message_player.call_args.kwargs['message']
+    assert 'ausgeschaltet' not in api.message_player.call_args.kwargs['message']
     assert 'disabled' in api.message_player.call_args.kwargs['message']
     api.reset_mock()
     languages.set_language(EOS,'en')
@@ -125,6 +125,27 @@ def test_autobalancer_single_packet_for_known_and_unknown_language(database):
     api.message_player.assert_called_once()
     assert 'disabled' in api.message_player.call_args.kwargs['message']
     assert 'ausgeschaltet' not in api.message_player.call_args.kwargs['message']
+
+
+def test_english_default_is_not_persisted_and_explicit_bilingual_is_preserved(database):
+    assert languages.get_profile(EOS)['language']=='en'
+    assert languages.get_profile(EOS)['source']=='fallback'
+    with database() as s:
+        assert s.query(voice.VoiceLanguagePreference).count()==0
+    defaults={'de':'Deutsch','en':'English','fr':'Français'}
+    assert messages.render('test.reason','Original',player_id=EOS,defaults=defaults)=='English'
+    languages.set_language(EOS,'de+en')
+    result=messages.render('test.reason','Original',player_id=EOS,defaults=defaults)
+    assert result=='Deutsch / English' and result.language=='de+en'
+
+
+def test_missing_variant_uses_english_then_preserves_original(database):
+    languages.set_language(EOS,'pl')
+    result=messages.render('test.reason','Original',player_id=EOS,defaults={'de':'Deutsch','en':'English'})
+    assert result=='English' and result.language=='en'
+    assert languages.get_profile(EOS)['language']=='pl'
+    result=messages.render('test.reason','Original',player_id=EOS,defaults={'de':'Deutsch'})
+    assert result=='Original' and result.language=='legacy'
 
 
 def test_automod_nested_reason_localizes_and_free_text_stays_untouched(database):

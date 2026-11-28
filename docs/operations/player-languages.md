@@ -4,6 +4,14 @@ The first phase routes moderation messages/reasons, Automods and Autobalancer
 feedback by recipient. It adds no machine-translation request to an RCON action.
 The interface is at `/settings/player-languages`, also linked from Templates.
 
+The translation workspace shows localized rule and message names instead of
+internal binding keys. Search matches the displayed name and original text;
+area and translation-status filters narrow the list. Original and translation
+are displayed together on desktop and stacked on smaller screens. Empty source
+texts are marked unused. Player language profiles have their own tab, and new
+moderation templates open in a separate dialog. Changing a template or filter
+still protects unsaved translations; previews never send game commands.
+
 ## Preferences and identity
 
 PC players use `!lang`, `!lang de`, `!lang en` or `!lang fr` (alias `!language`).
@@ -20,12 +28,16 @@ Explicit choices beat report-language observations. If both are absent and
 recipient routing is enabled, a cached public Steam country can supply a
 provisional language default. The profile labels this source separately; it
 does not create an explicit preference. Multilingual countries such as CH, BE
-and CA retain the bilingual fallback. Missing translations still use DE/EN.
+and CA use the English fallback. An unknown player defaults to English without
+writing a preference row. Explicit bilingual choices remain readable and usable.
 Vietnam profile refreshes query the stored Steam ID and validate the response
 identity; game commands and ban lookups continue to use their existing IDs.
 No Steam request occurs during message rendering. A nickname, the reporter's
 language and an unverified Discord account are never attributed to a target.
 EOS spelling is canonicalized; old uppercase preferences/links remain readable.
+English PC voice questions advertise Yes/No and the Ja/Nein aliases. Only the
+addressed player's current question accepts these words; replying does not
+change the player's language preference.
 
 ## Templates and compatibility
 
@@ -45,8 +57,9 @@ editor saves. Arbitrary free text is not silently machine-translated.
 
 Enable recipient routing explicitly after reviewing templates. The default is
 off for upgrades, retaining existing module behavior. With routing enabled, a
-known preference selects one variant. Unknown/unavailable variants use one
-combined DE/EN packet where available, otherwise preserved original content.
+known preference selects one variant. Unknown players and missing variants use
+English where available, otherwise preserved original content. An explicitly
+selected DE/EN preference still uses one combined bilingual packet.
 Autobalancer sends one packet; disabled routing retains its legacy configured
 pack behavior. A translation does not change an action, duration, eligibility,
 round/session check, warning counter, or existing delivery reservation.

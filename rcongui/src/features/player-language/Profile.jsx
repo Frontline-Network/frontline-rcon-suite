@@ -10,7 +10,7 @@ export default function PlayerLanguageProfile({ playerId }) {
   const { permissions } = useAuth();
   const canEdit = allowed(permissions, "can_edit_player_account");
   const [profile, setProfile] = useState(null);
-  const [language, setLanguage] = useState("de+en");
+  const [language, setLanguage] = useState("en");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -39,7 +39,7 @@ export default function PlayerLanguageProfile({ playerId }) {
       <TextField select label={tr("language")} value={language} disabled={!canEdit || busy} onChange={e => { setLanguage(e.target.value); setSaved(false); }}>
         {[...new Set(["de+en", "de", "en", "fr", profile.language])].map(code => <MenuItem key={code} value={code}>{({ "de+en": tr("bilingual"), de: "Deutsch", en: "English", fr: "Français" })[code] || code}</MenuItem>)}
       </TextField>
-      {canEdit && <Button variant="outlined" onClick={save} disabled={busy || language === profile.language}>{tr("choose")}</Button>}
+      {canEdit && <Button variant="outlined" onClick={save} disabled={busy || (language === profile.language && profile.explicit)}>{tr("choose")}</Button>}
       {!!profile.recent_messages?.length && <Accordion disableGutters>
         <AccordionSummary>{tr("audit")}</AccordionSummary>
         <AccordionDetails><Stack spacing={2}>{profile.recent_messages.map((message, index) => <Stack key={index} spacing={0.5}>

@@ -35,7 +35,7 @@ def test_polish_report_unknown_target_then_explicit_french(db):
     locale = lang.report_language(db, message, discord_id="101", handles=["Alex"])
     assert locale == "pl"
     assert lang.preferred_language(db, discord_id="101") == "pl"
-    assert lang.preferred_language(db, game_id="target-eos") == "de+en"
+    assert lang.preferred_language(db, game_id="target-eos") == "en"
     assert lang.render(db, "notice_squad", "de+en").count(" / ") == 1
     assert lang.render(db, "notice_sent", locale, target="Alex").startswith(
         "Wysłaliśmy"
@@ -65,6 +65,11 @@ def test_explicit_preference_and_different_language_for_one_report(db):
     assert lang.preferred_language(db, game_id="target") == "nl"
 
 
+@pytest.mark.parametrize('locale',[None,'','not-a-language'])
+def test_missing_or_invalid_voice_language_renders_english(db,locale):
+    assert lang.render(db,'notice_squad',locale)==lang.render(db,'notice_squad','en')
+
+
 def test_conflicting_links_never_move_preference(db):
     lang.link_verified(db, game_id="one", discord_id="1")
     lang.link_verified(db, game_id="one", discord_id="1")
@@ -88,7 +93,7 @@ def test_short_handle_or_mixed_text_does_not_change_preference(db, text):
         lang.report_language(
             db, text, discord_id="1", handles=["Our squad has no microphone"]
         )
-        == "de+en"
+        == "en"
     )
     assert db.query(lang.VoiceLanguagePreference).count() == 0
 
