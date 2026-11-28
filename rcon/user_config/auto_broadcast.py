@@ -25,6 +25,7 @@ class VipLifecycleMessagesType(TypedDict, total=False):
 class VipLifecycleCampaignType(TypedDict, total=False):
     enabled: bool
     message: str
+    translations: dict[str, str]
     min_session_minutes: int
     min_players: int
     max_players: int
@@ -40,6 +41,7 @@ class VipLifecycleCampaignsType(TypedDict, total=False):
 
 class VipLifecycleConfigType(TypedDict, total=False):
     enabled: bool
+    activity_model: bool
     server_family: Literal["hll", "hll_vietnam"]
     expiry_window_hours: int
     # Accepted for backwards compatibility with v0.6.0. New configurations
@@ -88,6 +90,7 @@ class VipLifecycleCampaign(BaseModel):
 
     enabled: bool = Field(default=True, strict=True)
     message: str
+    translations: dict[str, str] = Field(default_factory=dict)
     min_session_minutes: int = Field(default=5, ge=1, le=1440)
     min_players: int = Field(default=0, ge=0, le=100)
     max_players: int = Field(default=100, ge=0, le=100)
@@ -97,6 +100,12 @@ class VipLifecycleCampaign(BaseModel):
     def validate_player_range(self):
         if self.max_players < self.min_players:
             raise ValueError("max_players must be greater than or equal to min_players")
+        if self.translations:
+            from rcon.player_messages import validate_translations
+
+            self.translations = validate_translations(
+                self.message, {key: value for key, value in self.translations.items() if value.strip()}
+            )
         return self
 
 
@@ -139,6 +148,7 @@ class VipLifecycleConfig(BaseModel):
     """
 
     enabled: bool = Field(default=False, strict=True)
+    activity_model: bool = Field(default=False, strict=True)
     server_family: Literal["hll", "hll_vietnam"] = "hll_vietnam"
     expiry_window_hours: int = Field(default=48, ge=1, le=168)
     status_cache_seconds: int = Field(default=60, ge=30, le=900)

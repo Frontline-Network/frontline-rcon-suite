@@ -6557,6 +6557,12 @@ Object.assign(de.dashboard, {
 });
 
 de.settings.campaigns.vipLifecycle = {
+  simulationHelp: "Im Testmodus werden fällige Hinweise für die gespeicherten Einstellungen protokolliert. Spieler erhalten keine Nachrichten.",
+  activityModel: "Aktivitätsabhängige VIP-Hinweise",
+  activityHelp: "Erste Einladung nach 45 Minuten oder an einem späteren Spieltag nach 15 Minuten. Eine Erinnerung ist nach 14 Tagen und zwei weiteren Spieltagen möglich. Nach zwei Angeboten folgen mindestens 60 Tage Pause.",
+  activityFrequency: "Höchstens zwei Angebote in 28 Tagen",
+  translations: "Sprachvarianten bearbeiten",
+  activeTrialPaused: "Während der aktiven Probe pausiert",
   title: "VIP-Lebenszyklus",
   subtitle:
     "Der zweite Besuch beginnt nach mindestens 30 Minuten Abwesenheit. Die Zustellung gilt für die gesamte Serverfamilie.",
