@@ -755,6 +755,10 @@ class Rcon(ServerCtl):
         """Read game membership directly, without cache or database expirations."""
         return any(vip[PLAYER_ID] == player_id for vip in super().get_vip_ids())
 
+    def _native_vip_member_ids(self) -> set[str]:
+        """One current roster read without loading all local VIP profile records."""
+        return {vip[PLAYER_ID] for vip in super().get_vip_ids()}
+
     def get_live_vip_ids(self) -> list[VipIdType]:
         """Read current game-server VIPs with per-server database expirations."""
         res: list[VipId] = super().get_vip_ids()

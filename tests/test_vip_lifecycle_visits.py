@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
 from rcon import vip_lifecycle as vip
-from rcon.models import CampaignDelivery, LogLine, PlayerID, PlayerSession, VipLifecycleDelivery
+from rcon.models import CampaignDelivery, LogLine, PlayerID, PlayerOptins, PlayerSession, VipLifecycleDelivery
 from rcon.user_config.auto_broadcast import VipLifecycleConfig
 
 
@@ -32,7 +32,7 @@ def campaign_db(monkeypatch):
         with Session(db) as sess, sess.begin():
             yield sess
     try:
-        for model in (PlayerID, PlayerSession, LogLine, CampaignDelivery, VipLifecycleDelivery):
+        for model in (PlayerID, PlayerOptins, PlayerSession, LogLine, CampaignDelivery, VipLifecycleDelivery):
             model.__table__.create(db)
         monkeypatch.setattr(vip, "enter_session", session)
         yield session
