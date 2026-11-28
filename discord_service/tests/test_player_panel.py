@@ -364,6 +364,20 @@ def test_publishing_reuses_post_and_validates_channel(database):
         publish(database, "mine", 3, "6", "2", client)
 
 
+def test_vip_optout_button_roundtrips_through_private_panel(database, monkeypatch):
+    edited, post = Mock(), Mock()
+    monkeypatch.setattr(ui, "private_reply", edited)
+    post.return_value.json.return_value = {"result": {
+        "content": "No reports yet.", "actions": [{"operation":"vip_off","label":"Turn off VIP offers"}]}}
+    ui.finish_interaction(PANEL, "123", "401", "private", "en", "list", {}, post)
+    control = edited.call_args.args[1]["components"][0]["components"][0]
+    assert control["custom_id"] == f"vp:{PANEL}:vip_off"
+    event = interaction("vip_off")
+    tasks = BackgroundTasks()
+    assert ui.handle_interaction(database, event, tasks, post) == {"type":5,"data":{"flags":64}}
+    assert tasks.tasks[0].args[-3:-1] == ("vip_consent", {"enabled":False})
+
+
 def test_prefs_apply_latest_consent_and_list_controls(database, monkeypatch):
     edited, post = Mock(), Mock()
     monkeypatch.setattr(ui, "private_reply", edited)

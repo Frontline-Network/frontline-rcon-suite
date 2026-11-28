@@ -21,6 +21,8 @@ from api.discord_integration import _authorized_integration
 from api.mobile import _error, _json_body
 from api.multi_servers import forward_mobile_request_to_server
 from rcon import voice_language as language
+from rcon import vip_activity_messages as vip_offers
+from rcon.vip_lifecycle import feature_enabled as vip_offers_available
 from rcon.admin_incidents import _is_commander, create_incident
 from rcon.api_commands import get_rcon_api
 from rcon.leadership_vote.service import read_context
@@ -426,6 +428,12 @@ def _list(sess, server, actor, locale):
             ("language", "lang_button"),
         )
     }
+    if vip_offers_available():
+        opted_out = bool(pid and vip_offers.opted_out_player_ids(sess, {pid}))
+        actions.append({
+            "operation": "vip_on" if opted_out else "vip_off",
+            "label": vip_offers.preference_copy(locale)[0 if opted_out else 1],
+        })
     return {
         "content": (
             "\n".join(lines)[:1900]
@@ -462,6 +470,25 @@ def _handle(server, actor, interaction, op, args):
             return _content(
                 sess, "updated", language.preferred_language(sess, discord_id=actor)
             )
+        if op == "vip_consent" and vip_offers_available() and type(args.get("enabled")) is bool:
+            pid = language.linked_game_id(sess, actor)
+            labels = vip_offers.preference_copy(locale)
+            if not pid:
+                return {"content": labels[4], "actions": [
+                    {"operation": "link", "label": language.render(sess, "link", locale)}
+                ]}
+            # Use the authenticated Discord snowflake's creation time so a late
+            # callback cannot reverse a newer preference set in Discord or chat.
+            snowflake = int(interaction)
+            if not 0 < snowflake < 2**64:
+                raise ValueError("Invalid Discord interaction")
+            chosen_at = datetime.fromtimestamp(
+                (1420070400000 + (snowflake >> 22)) / 1000, timezone.utc)
+            enabled = vip_offers.set_activity_consent(sess, pid, args["enabled"], chosen_at=chosen_at)
+            return {"content": labels[2 if enabled else 3], "actions": [{
+                "operation": "vip_off" if enabled else "vip_on",
+                "label": labels[1 if enabled else 0],
+            }]}
         if op == "dm" and type(args.get("enabled")) is bool:
             # The Discord service owns the DM preference and commits it after this reply.
             return _content(sess, "updated", locale)
