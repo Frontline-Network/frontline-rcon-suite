@@ -755,6 +755,10 @@ class Rcon(ServerCtl):
         """Read game membership directly, without cache or database expirations."""
         return any(vip[PLAYER_ID] == player_id for vip in super().get_vip_ids())
 
+    def _native_vip_member_ids(self) -> set[str]:
+        """One current roster read without loading all local VIP profile records."""
+        return {vip[PLAYER_ID] for vip in super().get_vip_ids()}
+
     def get_live_vip_ids(self) -> list[VipIdType]:
         """Read current game-server VIPs with per-server database expirations."""
         res: list[VipId] = super().get_vip_ids()
@@ -1198,16 +1202,20 @@ class Rcon(ServerCtl):
             logger.exception("Unable to format message")
             formatted = message
 
-        prev: bytes | None = None
+        return self._send_rendered_broadcast(formatted, cached_text=message)
+
+    def _send_rendered_broadcast(self, formatted: str, *, cached_text: str) -> str:
+        # ServerCtl.exchange raises unless the game server acknowledges this
+        # request with status 200. Cache only the successfully set message.
+        super().set_broadcast(formatted)
+        prev: str | bytes | None = None
         try:
             red = get_redis_client()
-            prev = red.set("BROADCAST_MESSAGE", message, get=True)  # type: ignore
-            red.expire("BROADCAST_MESSAGE", 60 * 30)
+            prev = red.set("BROADCAST_MESSAGE", cached_text, ex=60 * 30, get=True)  # type: ignore
         except Exception:
-            logger.exception("Can't save message in redis: %s", message)
+            logger.exception("Cannot cache acknowledged broadcast")
 
-        super().set_broadcast(formatted)
-        return prev.decode() if isinstance(prev, bytes) else (prev or "")
+        return prev.decode(errors="replace") if isinstance(prev, bytes) else (prev or "")
 
     @ttl_cache(ttl=5)
     def get_slots(self) -> SlotsType:

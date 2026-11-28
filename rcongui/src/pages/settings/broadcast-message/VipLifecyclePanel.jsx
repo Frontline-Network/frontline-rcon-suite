@@ -192,11 +192,18 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
               {t("settings.campaigns.vipLifecycle.title")}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {t("settings.campaigns.vipLifecycle.subtitle")}
+              {t(value.activity_model
+                ? "settings.campaigns.vipLifecycle.activityHelp"
+                : "settings.campaigns.vipLifecycle.subtitle")}
             </Typography>
           </Box>
         </Stack>
         <Stack direction="row" gap={2} alignItems="center" flexWrap="wrap">
+          <FormControlLabel
+            control={<Switch checked={Boolean(value.activity_model)}
+              onChange={(event) => update("activity_model", event.target.checked)} />}
+            label={t("settings.campaigns.vipLifecycle.activityModel")}
+          />
           <FormControlLabel
             control={
               <Switch
@@ -222,7 +229,7 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
       <Stack spacing={2.5} sx={{ p: { xs: 2, md: 2.5 } }}>
         {value.test_mode && (
           <Alert severity="info">
-            {t("settings.campaigns.vipLifecycle.testModeHelp")}
+            {t(value.activity_model ? "settings.campaigns.vipLifecycle.simulationHelp" : "settings.campaigns.vipLifecycle.testModeHelp")}
           </Alert>
         )}
         {feedback && (
@@ -280,6 +287,14 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
         >
           {RULES.map((rule) => {
             const campaign = value.campaigns[rule];
+            if (value.activity_model && rule === "trial_active") {
+              return (
+                <Paper key={rule} variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="subtitle2">{t("settings.campaigns.vipLifecycle.rules.trial_active.title")}</Typography>
+                  <Typography variant="body2" color="text.secondary">{t("settings.campaigns.vipLifecycle.activeTrialPaused")}</Typography>
+                </Paper>
+              );
+            }
             return (
               <Paper
                 key={rule}
@@ -327,9 +342,11 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
                     size="small"
                     variant="outlined"
                     label={t(
-                        rule === "unverified"
-                          ? "settings.campaigns.vipLifecycle.onceReturning"
-                          : "settings.campaigns.vipLifecycle.oncePerTrial"
+                      rule === "unverified" && value.activity_model
+                        ? "settings.campaigns.vipLifecycle.activityFrequency"
+                        : rule === "unverified"
+                        ? "settings.campaigns.vipLifecycle.onceReturning"
+                        : "settings.campaigns.vipLifecycle.oncePerTrial"
                     )}
                     sx={{ alignSelf: "flex-start" }}
                   />
@@ -344,6 +361,24 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
                     disabled={!campaign.enabled}
                     fullWidth
                   />
+                  {value.activity_model && (
+                    <details>
+                      <summary>{t("settings.campaigns.vipLifecycle.translations")}</summary>
+                      <Stack spacing={1.5} sx={{ mt: 1.5 }}>
+                        {[...new Set(["de", "en", "fr", ...Object.keys(campaign.translations ?? {})])].map((language) => (
+                          <TextField
+                            key={language}
+                            label={{ de: "Deutsch", en: "English", fr: "Français" }[language] ?? language}
+                            value={campaign.translations?.[language] ?? ""}
+                            onChange={(event) => updateCampaign(rule, "translations", {
+                              ...campaign.translations, [language]: event.target.value,
+                            })}
+                            multiline minRows={2} disabled={!campaign.enabled}
+                          />
+                        ))}
+                      </Stack>
+                    </details>
+                  )}
                   <Box
                     sx={{
                       display: "grid",
@@ -494,7 +529,7 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
           </Stack>
         </Paper>
 
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        {!value.activity_model && <Paper variant="outlined" sx={{ p: 2 }}>
           <Stack spacing={1.5}>
             <Box>
               <Typography variant="subtitle1">
@@ -549,7 +584,7 @@ const VipLifecyclePanel = ({ value, onChange, initialStatus }) => {
               </Button>
             </Stack>
           </Stack>
-        </Paper>
+        </Paper>}
 
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Stack spacing={1.5}>

@@ -1,4 +1,4 @@
-"""Bounded, server-local diagnostics; never control delivery from this cache."""
+"""Server-local rotation checkpoint and independent bounded diagnostics."""
 import json
 import logging
 import time
@@ -8,6 +8,25 @@ from rcon.cache_utils import get_redis_client
 logger = logging.getLogger(__name__)
 STATE = "campaign:broadcast:state"
 HISTORY = "campaign:broadcast:history"
+ROTATION = "campaign:broadcast:remaining"
+
+
+def load_rotation() -> list[str]:
+    """Resume unattempted slots after a supervisor restart, if available."""
+    try:
+        keys = json.loads(get_redis_client().get(ROTATION) or "[]")
+        if isinstance(keys, list) and all(isinstance(key, str) for key in keys):
+            return keys
+    except Exception:
+        logger.exception("Cannot restore broadcast rotation")
+    return []
+
+
+def save_rotation(keys: list[str]) -> None:
+    try:
+        get_redis_client().set(ROTATION, json.dumps(keys), ex=86400)
+    except Exception:
+        logger.exception("Cannot checkpoint broadcast rotation; continuing in memory")
 
 def iso(timestamp):
     return datetime.fromtimestamp(timestamp, timezone.utc).isoformat()

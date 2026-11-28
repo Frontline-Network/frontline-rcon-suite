@@ -233,6 +233,8 @@ jobs:
           export POPULATION_TEST_DB_URL="$HLL_DB_URL"
           export VIP_REWARDS_TEST_DB_URL="$HLL_DB_URL"
           PYTHONPATH=. pytest tests/
+          RCON_SEARCH_TEST_DATABASE="$HLL_DB_URL" PYTHONPATH=. \
+            pytest tests/test_vip_lifecycle_visits.py tests/test_vip_activity_schedule.py
           TEST_POSTGRES_DSN="$HLL_DB_URL" TEST_REDIS_URL="$HLL_REDIS_URL" PYTHONPATH=. \
             pytest tests/test_barricade_auto_activation_postgres.py tests/test_barricade_full_pipeline_postgres.py \
               tests/test_blacklist_sync_journal_postgres.py tests/test_blacklist_list_reconciliation_postgres.py \

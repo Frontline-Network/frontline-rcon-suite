@@ -16,6 +16,7 @@ from rcon import voice_language as lang
 from rcon.models import AdminIncident
 from rcon.user_config.report_admin import ReportAdminUserConfig as Config
 from rcon.voice_player_store import VoiceDraft, VoiceLinkChallenge, VoicePlayerDelivery
+from rcon.models import PlayerOptins
 
 
 @pytest.fixture
@@ -31,6 +32,25 @@ def panel(pilot, monkeypatch):
             t.__table__.create(s.bind)
     service.configure(1, Config(enabled=True, mode="dry_run", reason_mode="ai"))
     return setup, advance, game
+
+
+def test_vip_marketing_button_changes_only_verified_account_and_keeps_newest_choice(panel, monkeypatch):
+    (database, players, _), _, _ = panel
+    monkeypatch.setattr(api, "vip_offers_available", lambda: True)
+    pid, other = [p["player_id"] for p in players[:2]]
+    with database() as sess:
+        PlayerOptins.__table__.create(sess.bind)
+        lang.link_verified(sess, game_id=pid, discord_id="100")
+        assert {a["operation"] for a in api._list(sess, 1, "100", "en")["actions"]} >= {"vip_off"}
+    unlinked = api._handle(1, "999", "100", "vip_consent", {"enabled":False,"player_id":other})
+    assert unlinked["actions"][0]["operation"] == "link"
+    fresh = str(123456789 << 22)
+    older = str(123456788 << 22)
+    assert api._handle(1, "100", fresh, "vip_consent", {"enabled":False,"player_id":other})["actions"][0]["operation"] == "vip_on"
+    assert api._handle(1, "100", older, "vip_consent", {"enabled":True})["actions"][0]["operation"] == "vip_on"
+    with database() as sess:
+        assert api.vip_offers.opted_out_player_ids(sess, {pid,other}) == {pid}
+        assert {a["operation"] for a in api._list(sess, 1, "100", "en")["actions"]} >= {"vip_on"}
 
 
 def test_pick_online_identity_with_duplicate_names_and_revalidate_departure(panel):

@@ -6511,6 +6511,12 @@ Object.assign(en.dashboard, {
 });
 
 en.settings.campaigns.vipLifecycle = {
+  simulationHelp: "Test mode records eligible messages using the saved settings. Players receive no messages.",
+  activityModel: "Activity-based VIP messages",
+  activityHelp: "Invite after 45 minutes or after 15 minutes on a later play day. A reminder is eligible after 14 days and two further play days. After two offers, wait at least 60 days.",
+  activityFrequency: "Up to two offers in 28 days",
+  translations: "Edit language variants",
+  activeTrialPaused: "Paused during the active trial",
   title: "VIP lifecycle",
   subtitle:
     "A second visit starts after at least 30 minutes away. Delivery history is shared across the server family.",

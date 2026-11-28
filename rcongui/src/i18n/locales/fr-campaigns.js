@@ -60,6 +60,12 @@ export const campaignsFr = {
   deleteDescription: "« {{name}} » sera supprimée de la configuration. La modification prend effet uniquement après enregistrement.",
   priorityNote: "Les diffusions conservent la protection des messages des administrateurs et de la modération automatique. Les campagnes directes sont envoyées une fois par session et échelonnées via message_player.",
   vipLifecycle: {
+    simulationHelp: "Le mode test journalise les messages prévus selon les réglages enregistrés. Les joueurs ne reçoivent aucun message.",
+    activityModel: "Messages VIP selon l’activité",
+    activityHelp: "Première invitation après 45 minutes, ou après 15 minutes un autre jour de jeu. Un rappel est possible après 14 jours et deux autres jours de jeu. Après deux offres, attendre au moins 60 jours.",
+    activityFrequency: "Deux offres au maximum en 28 jours",
+    translations: "Modifier les traductions",
+    activeTrialPaused: "En pause pendant l’essai actif",
     title: "Cycle de vie VIP", subtitle: "Une nouvelle visite commence après au moins 30 minutes d’absence. L’historique des envois est partagé entre les serveurs de la même famille.", testMode: "Mode test",
     testModeHelp: "Le mode test enregistre les destinataires et les journaux d'envoi sans envoyer automatiquement de messages aux joueurs. Un test déclenché manuellement est toutefois envoyé au joueur sélectionné.",
     serverFamily: "Famille de serveurs cible", expiryWindow: "Délai d'avertissement avant expiration (heures)", cacheSeconds: "Cache de statut (secondes)",

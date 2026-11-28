@@ -81,6 +81,7 @@ const createVipLifecycleCampaign = (message) => ({
 
 const createVipLifecycleConfig = () => ({
   enabled: false,
+  activity_model: false,
   server_family: "hll_vietnam",
   expiry_window_hours: 48,
   status_cache_seconds: 60,

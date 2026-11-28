@@ -17,6 +17,8 @@ import requests
 from sqlalchemy import String, cast, func, or_
 
 from rcon.broadcast import campaign_is_eligible, format_message
+from rcon import vip_activity_schedule as activity
+from rcon.vip_rewards.locking import eos_vip_key
 from rcon.models import (
     Blacklist,
     BlacklistRecord,
@@ -24,6 +26,7 @@ from rcon.models import (
     LogLine,
     PlayerID,
     PlayerSession,
+    PlayerVIP,
     VipLifecycleDelivery,
     enter_session,
 )
@@ -338,6 +341,8 @@ def _blocked_player_ids(player_ids: set[str], server_number: int) -> set[str]:
     if not player_ids:
         return set()
     now = utc_now()
+    from rcon.vip_activity_messages import opted_out_player_ids
+
     with enter_session() as sess:
         rows = (
             sess.query(PlayerID.player_id, Blacklist)
@@ -352,7 +357,7 @@ def _blocked_player_ids(player_ids: set[str], server_number: int) -> set[str]:
             )
             .all()
         )
-        return {
+        return opted_out_player_ids(sess, player_ids) | {
             player_id
             for player_id, blacklist in rows
             if blacklist.servers is None
@@ -374,35 +379,40 @@ def _active_sessions(
     if not player_ids:
         return {}
     with enter_session() as sess:
-        rows = latest_open_sessions(sess, player_ids, server_number)
-        result: dict[str, dict[str, Any]] = {}
-        for player, player_session in sorted(
-            rows, key=lambda row: PlayerID._session_order_key(row[1]), reverse=True
-        ):
-            result.setdefault(
-                player.player_id,
-                {
-                    "player_db_id": player.id,
-                    "session_id": player_session.id,
-                    "start_us": player_session.start_event_us,
-                    "server_number": server_number,
-                    "start": (
-                        datetime.fromtimestamp(
-                            player_session.start_event_us / 1_000_000, timezone.utc
-                        )
-                        if player_session.start_event_us is not None
-                        # Legacy start is local wall time without a timezone;
-                        # UTC creation is the conservative known boundary.
-                        else player_session.created
-                    ),
-                },
-            )
-        return result
+        return _session_rows(sess, player_ids, server_number)
 
 
-def _audience_sessions(statuses, server_number, config):
+def _session_rows(sess, player_ids, server_number):
+    rows = latest_open_sessions(sess, player_ids, server_number)
+    result: dict[str, dict[str, Any]] = {}
+    for player, player_session in sorted(
+        rows, key=lambda row: PlayerID._session_order_key(row[1]), reverse=True
+    ):
+        result.setdefault(
+            player.player_id,
+            {
+                "player_db_id": player.id,
+                "session_id": player_session.id,
+                "start_us": player_session.start_event_us,
+                "server_number": server_number,
+                "start": (
+                    datetime.fromtimestamp(player_session.start_event_us / 1_000_000, timezone.utc)
+                    if player_session.start_event_us is not None
+                    # Legacy start is local wall time without a timezone;
+                    # UTC creation is the conservative known boundary.
+                    else player_session.created
+                ),
+            },
+        )
+    return result
+
+
+def _audience_sessions(statuses, server_number, config, now=None):
     result = _active_sessions(set(statuses), server_number)
     with enter_session() as sess:
+        if config.activity_model:
+            _attach_activity(sess, result, config, now or utc_now())
+            return result
         ids = [row["player_db_id"] for row in result.values()]
         attempts = _family_attempts(sess, ids, config)
         invitation = LifecycleDecision(RULE_UNVERIFIED, "invitation")
@@ -414,6 +424,78 @@ def _audience_sessions(statuses, server_number, config):
             row["returning"] = row["player_db_id"] in returning
             row["attempts"] = attempts
         return result
+
+
+def _attach_activity(sess, rows, config, now):
+    contacts = activity.contacts_by_player(sess, [row["player_db_id"] for row in rows.values()], config)
+    prior_day = activity.prior_playday_players(sess, rows, contacts, config.server_family, now)
+    for row in rows.values():
+        player = row["player_db_id"]
+        row["contacts"] = contacts[player]
+        row["prior_day"] = player in prior_day
+
+
+def _scheduled_decision(status_decision, row, config, now):
+    if status_decision is None or row is None:
+        return None
+    if not config.activity_model:
+        return status_decision if _eligible_this_visit(row, status_decision, config) else None
+    if row["start"] is None or not activity.budget_available(row["contacts"], row["session_id"], now):
+        return None
+    if status_decision.rule == RULE_UNVERIFIED:
+        key = activity.invitation_key(row["contacts"], row["prior_day"], _as_utc(row["start"]), now)
+        return LifecycleDecision(RULE_UNVERIFIED, key) if key else None
+    if status_decision.rule in (RULE_TRIAL_EXPIRING, RULE_TRIAL_EXPIRED):
+        if not activity.expiry_already_attempted(row["contacts"], status_decision.status_fingerprint):
+            return status_decision
+    return None
+
+
+def _native_vip_members(ctl, family):
+    try:
+        ids = ctl._native_vip_member_ids()
+        return {(eos_vip_key(pid) or pid) if family == "hll_vietnam" else pid for pid in ids}
+    except Exception:
+        logger.exception("Unable to verify live VIP entitlements; skipping VIP offers")
+        return None
+
+
+def _can_contact(sess, *, row, player_id, server_number, config, decision, status, native, now):
+    from rcon.vip_activity_messages import activity_message_allowed
+
+    if native is None:
+        return False
+    pid = row["player_db_id"]
+    key = eos_vip_key(player_id) if config.server_family == "hll_vietnam" else None
+    if key:
+        # Ambiguous historical aliases must not receive independent contact budgets.
+        alias = sess.query(PlayerID.id).filter(func.lower(PlayerID.player_id) == key,
+                                                PlayerID.id != pid).first()
+        if alias:
+            return False
+    stored = sess.query(PlayerVIP.expiration).filter(
+        PlayerVIP.player_id_id == pid, PlayerVIP.server_number == server_number,
+        PlayerVIP.expiration > now).scalar()
+    # A server-listed VIP may be a trial. A longer or indefinite grant (including
+    # manual/reward/seed VIP) precludes even the trial purchase reminder.
+    if (key or player_id) in native or stored is not None:
+        trial_end = parse_utc_timestamp(status.get("expires_at"))
+        if (decision.rule != RULE_TRIAL_EXPIRING or trial_end is None
+                or stored is None or _as_utc(stored) > trial_end):
+            return False
+    return activity.separate_visit(sess, row) and activity_message_allowed(
+        sess, player_db_id=pid, player_id=player_id, server_number=server_number, now=now)
+
+
+def _activity_message(decision, campaign, status, player_id):
+    from rcon.vip_activity_messages import render_activity_message
+
+    return render_activity_message(
+        rule=decision.rule, player_id=player_id, source=campaign.message,
+        translations=campaign.translations,
+        reminder=decision.rule == RULE_UNVERIFIED and decision.status_fingerprint != "invitation",
+        expires_at=status.get("expires_at"),
+    )
 
 
 def _session_is_eligible(
@@ -529,6 +611,20 @@ def _delivery_key(decision, test_mode):
     return f"v2:{'test' if test_mode else 'live'}:{decision.status_fingerprint}"
 
 
+def _server_interval_due(sess, server_number, config, seconds, now):
+    direct = sess.query(func.max(CampaignDelivery.last_attempt_at)).filter(
+        CampaignDelivery.server_number == server_number).scalar()
+    delivery = VipLifecycleDelivery
+    observed = sess.query(func.max(delivery.last_attempt_at)).filter(
+        delivery.server_number == server_number, delivery.test_mode.is_(False)).scalar()
+    simulated = None
+    if config.activity_model and config.test_mode:
+        simulated = sess.query(func.max(delivery.created_at)).filter(
+            delivery.server_number == server_number, delivery.test_mode.is_(True),
+            delivery.status != "test").scalar()
+    return _interval_is_due(_latest_timestamp(direct, observed, simulated), seconds, now)
+
+
 def _prepare_delivery(
     *,
     player_db_id: int,
@@ -541,12 +637,40 @@ def _prepare_delivery(
     player_message_interval_sec: int,
     player_message_gap_sec: int,
     now: datetime,
+    player_id: str | None = None,
+    status: dict | None = None,
+    native: set[str] | None = None,
+    rendered_message: str | None = None,
 ) -> int | None:
     with enter_session() as sess:
+        if config.activity_model and sess.get_bind().dialect.name == "postgresql":
+            from rcon.campaign_delivery import CLAIM_LOCK_NAMESPACE
+
+            if not sess.query(func.pg_try_advisory_xact_lock(CLAIM_LOCK_NAMESPACE + server_number)).scalar():
+                return None
         # Serialize claims across servers and the two expiry notice rules.
         sess.query(PlayerID.id).filter(PlayerID.id == player_db_id).with_for_update().one()
-        if _already_attempted(_family_attempts(sess, [player_db_id], config), player_db_id, decision, config.test_mode):
+        if config.activity_model:
+            if not player_id or not status or not rendered_message:
+                return None
+            rows = _session_rows(sess, {player_id}, server_number)
+            current = rows.get(player_id)
+            if not current or current["session_id"] != player_session_id:
+                return None
+            _attach_activity(sess, rows, config, now)
+            current_status = classify_status(status, now=now, expiry_window_hours=config.expiry_window_hours)
+            if _scheduled_decision(current_status, current, config, now) != decision:
+                return None
+            if not _can_contact(sess, row=current, player_id=player_id, server_number=server_number,
+                                config=config, decision=decision, status=status, native=native, now=now):
+                return None
+        elif _already_attempted(_family_attempts(sess, [player_db_id], config), player_db_id, decision, config.test_mode):
             return None
+        elif player_id:
+            from rcon.vip_activity_messages import activity_opted_out
+
+            if activity_opted_out(sess, player_db_id=player_db_id, player_id=player_id):
+                return None
         existing = (
             sess.query(VipLifecycleDelivery)
             .filter(
@@ -561,25 +685,8 @@ def _prepare_delivery(
             # Keep compatibility with the historical unique session constraint.
             return None
 
-        if not config.test_mode:
-            latest_direct_attempt = (
-                sess.query(func.max(CampaignDelivery.last_attempt_at))
-                .filter(CampaignDelivery.server_number == server_number)
-                .scalar()
-            )
-            latest_lifecycle_attempt = (
-                sess.query(func.max(VipLifecycleDelivery.last_attempt_at))
-                .filter(
-                    VipLifecycleDelivery.server_number == server_number,
-                    VipLifecycleDelivery.test_mode.is_(False),
-                )
-                .scalar()
-            )
-            if not _interval_is_due(
-                _latest_timestamp(latest_direct_attempt, latest_lifecycle_attempt),
-                player_message_interval_sec,
-                now,
-            ):
+        if not config.test_mode or config.activity_model:
+            if not _server_interval_due(sess, server_number, config, player_message_interval_sec, now):
                 return None
 
             latest_direct_send = (
@@ -614,8 +721,9 @@ def _prepare_delivery(
             player_id_id=player_db_id,
             player_session_id=player_session_id,
             player_name=player_name,
-            status_fingerprint=_delivery_key(decision, config.test_mode),
-            message=campaign.message.strip(),
+            status_fingerprint=(f"a1:sim:{decision.status_fingerprint}" if config.activity_model and config.test_mode
+                                else _delivery_key(decision, config.test_mode)),
+            message=rendered_message or campaign.message.strip(),
             status="sending",
             attempt_count=1,
             test_mode=config.test_mode,
@@ -672,6 +780,15 @@ def process_once(
 
     now = _as_utc(now or utc_now())
     server_number = int(get_server_number())
+    tick_started = time.monotonic()
+    if config.activity_model:
+        from rcon.vip_activity_messages import activity_window_open
+
+        with enter_session() as sess:
+            if not activity_window_open(sess, server_number=server_number, now=now):
+                return counters
+            if not _server_interval_due(sess, server_number, config, player_message_interval_sec, now):
+                return counters
     players = _online_players(ctl)
     counters["online"] = len(players)
     blocked = _blocked_player_ids(set(players), server_number)
@@ -681,7 +798,7 @@ def process_once(
         server_family=config.server_family,
         cache_seconds=config.status_cache_seconds,
     )
-    active_sessions = _audience_sessions(statuses, server_number, config)
+    active_sessions = _audience_sessions(statuses, server_number, config, now)
     seeding_config = (
         AutoModSeedingUserConfig.load_from_db()
         if any(
@@ -691,18 +808,21 @@ def process_once(
         else None
     )
     player_count = len(players)
+    native = None
+    fresh_statuses = None
 
     for player_id in sorted(candidate_ids):
         status = statuses.get(player_id)
         player_session = active_sessions.get(player_id)
         if status is None or player_session is None:
             continue
-        decision = classify_status(
+        status_decision = classify_status(
             status,
             now=now,
             expiry_window_hours=config.expiry_window_hours,
         )
-        if decision is None or not _eligible_this_visit(player_session, decision, config):
+        decision = _scheduled_decision(status_decision, player_session, config, now)
+        if decision is None:
             continue
         campaign = _campaign_for_rule(config, decision.rule)
         if not campaign.message.strip():
@@ -711,7 +831,34 @@ def process_once(
             continue
         if not _session_is_eligible(campaign, player_session["start"], now):
             continue
+        rendered = None
+        if config.activity_model:
+            if native is None:
+                native = _native_vip_members(ctl, config.server_family)
+                if native is None:
+                    return counters
+            with enter_session() as sess:
+                if not _can_contact(sess, row=player_session, player_id=player_id, server_number=server_number,
+                                    config=config, decision=decision, status=status, native=native, now=now):
+                    continue
+            # An activation, purchase or change to the expiry while the status
+            # cache was warm must invalidate the decision before its claim.
+            if fresh_statuses is None:
+                fresh_statuses = fetch_statuses(candidate_ids, server_family=config.server_family,
+                                                cache_seconds=config.status_cache_seconds, force=True)
+            fresh = fresh_statuses.get(player_id)
+            if not fresh or classify_status(fresh, now=now, expiry_window_hours=config.expiry_window_hours) != status_decision:
+                continue
+            status = fresh
+            source = _activity_message(decision, campaign, status, player_id)
+            if not source:
+                continue
+            rendered = format_message(ctl, source, player_id=player_id,
+                                      context={"player_id": player_id, "player_name": players[player_id]})
+            if not rendered.strip():
+                continue
         counters["eligible"] += 1
+        claim_time = now + timedelta(seconds=time.monotonic() - tick_started) if config.activity_model else now
         delivery_id = _prepare_delivery(
             player_db_id=player_session["player_db_id"],
             player_session_id=player_session["session_id"],
@@ -722,7 +869,11 @@ def process_once(
             server_number=server_number,
             player_message_interval_sec=player_message_interval_sec,
             player_message_gap_sec=player_message_gap_sec,
-            now=now,
+            now=claim_time,
+            player_id=player_id,
+            status=status,
+            native=native,
+            rendered_message=rendered,
         )
         if delivery_id is None:
             continue
@@ -731,7 +882,7 @@ def process_once(
             counters["simulated"] += 1
             return counters
         try:
-            formatted = format_message(
+            formatted = rendered or format_message(
                 ctl,
                 campaign.message.strip(),
                 player_id=player_id,
@@ -743,7 +894,7 @@ def process_once(
                 by=f"VIP lifecycle: {decision.rule}",
                 player_name=players[player_id],
             )
-            if not accepted:
+            if accepted is not True:
                 raise RuntimeError("RCON rejected the player message")
         except Exception as exc:
             logger.exception("VIP lifecycle message failed for %s", player_id)
@@ -780,7 +931,7 @@ def preview(ctl, config: VipLifecycleConfig) -> dict[str, Any]:
         force=True,
     )
     now = utc_now()
-    active_sessions = _audience_sessions(statuses, server_number, config)
+    active_sessions = _audience_sessions(statuses, server_number, config, now)
     seeding_config = (
         AutoModSeedingUserConfig.load_from_db()
         if any(
@@ -790,6 +941,7 @@ def preview(ctl, config: VipLifecycleConfig) -> dict[str, Any]:
         else None
     )
     rows = []
+    native = _native_vip_members(ctl, config.server_family) if config.activity_model and statuses else None
     for player_id, player_name in players.items():
         status = statuses.get(player_id)
         decision = (
@@ -805,15 +957,21 @@ def preview(ctl, config: VipLifecycleConfig) -> dict[str, Any]:
         campaign = (
             _campaign_for_rule(config, decision.rule) if decision else None
         )
+        scheduled = _scheduled_decision(decision, player_session, config, now)
         eligible = bool(
-            decision
+            scheduled
             and campaign
             and player_session
-            and _eligible_this_visit(player_session, decision, config)
             and campaign.message.strip()
             and campaign_is_eligible(campaign, len(players), seeding_config)
             and _session_is_eligible(campaign, player_session["start"], now)
         )
+        if eligible and config.activity_model:
+            with enter_session() as sess:
+                eligible = _can_contact(sess, row=player_session, player_id=player_id, server_number=server_number,
+                                        config=config, decision=scheduled, status=status, native=native, now=now)
+            if eligible:
+                eligible = bool(_activity_message(scheduled, campaign, status, player_id))
         rows.append(
             {
                 "player_id": player_id,
@@ -894,6 +1052,8 @@ def send_test_message(
     rule: str,
 ) -> str:
     require_feature_enabled()
+    if config.activity_model:
+        raise ValueError("Use the activity model preview or simulation for VIP offers")
     if rule not in RULES:
         raise ValueError("Unknown VIP lifecycle rule")
     players = _online_players(ctl)

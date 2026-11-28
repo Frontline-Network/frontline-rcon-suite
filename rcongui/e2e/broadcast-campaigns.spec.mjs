@@ -8,6 +8,22 @@ import {
 
 const path = "/settings/broadcast-message";
 
+test("activity-based VIP settings expose translations and suppress one-off trial prompts", async ({ page }) => {
+  const main = await openDemoPage(page, path);
+  const shell = main.getByTestId("campaign-workbench");
+  await shell.getByRole("navigation", { name: "Kampagnenbereiche" })
+    .getByRole("button", { name: /^VIP-Lebenszyklus/ }).click();
+  await shell.getByLabel("Aktivitätsabhängige VIP-Hinweise").check();
+  await expect(shell.getByText("Während der aktiven Probe pausiert")).toBeVisible();
+  await expect(shell.getByText("Höchstens zwei Angebote in 28 Tagen")).toBeVisible();
+  await shell.getByText("Sprachvarianten bearbeiten").first().click();
+  const translation = shell.getByLabel("English", { exact: true }).first();
+  await translation.fill("Free VIP trial on your phone");
+  await expect(translation).toHaveValue("Free VIP trial on your phone");
+  await expect(shell.getByTestId("config-dirty-indicator")).toBeVisible();
+  await expectNoHorizontalPageOverflow(page);
+});
+
 for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
   test(`campaign workbench stays usable on ${viewportName}`, async ({
     page,

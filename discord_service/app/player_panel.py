@@ -144,6 +144,8 @@ ACTIONS = {
     "home",
     "dm_on",
     "dm_off",
+    "vip_on",
+    "vip_off",
     "resolved",
     "persisting",
     "squad",
@@ -291,6 +293,8 @@ def operation_args(payload, op, case_id):
         args, op = {"answer": op}, "answer"
     elif op in {"dm_on", "dm_off"}:
         args, op = {"enabled": op == "dm_on"}, "dm"
+    elif op in {"vip_on", "vip_off"}:
+        args, op = {"enabled": op == "vip_on"}, "vip_consent"
     else:
         args = {}
     if case_id:
